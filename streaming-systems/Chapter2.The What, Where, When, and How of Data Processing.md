@@ -1,3 +1,10 @@
+# Chapter2.The What, Where, When, and How of Data Processing
+
+摘录来自
+Streaming Systems
+Tyler Akidau
+https://itunes.apple.com/WebObjects/MZStore.woa/wa/viewBook?id=0
+此材料可能受版权保护。
 As discussed in Chapter 1, windowing is the process of slicing up a data source along temporal boundaries. Common windowing strategies include fixed windows, sliding windows, and sessions windows, as demonstrated in Figure 2-4.
 
 ![image-20220410233440292](/Users/Laobe/Documents/images/image-20220410233440292.png)
