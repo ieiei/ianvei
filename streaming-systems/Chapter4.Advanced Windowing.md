@@ -1,4 +1,4 @@
-## Chapter 4. Advanced Windowing
+# Chapter4.Advanced Windowing
 
 Hello again! I hope you enjoyed Chapter 3 as much as I did. Watermarks are a fascinating topic, and Slava knows them better than anyone on the planet. Now that we have a deeper understanding of watermarks under our belts, I’d like to dive into some more advanced topics related to the what, where, when, and how questions. 
 

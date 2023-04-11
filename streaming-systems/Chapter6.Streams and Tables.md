@@ -1,4 +1,4 @@
-# Chapter 6. Streams and Tables
+# Chapter6.Streams and Tables
 
 You have reached the part of the book where we talk about streams and tables. If you recall, back in [Chapter 1](ch01.html#streaming_one_oh_one), we briefly discussed two important but orthogonal dimensions of data: *cardinality* and *constitution*. Until now, we’ve focused strictly on the cardinality aspects (bounded versus unbounded) and otherwise ignored the constitution aspects (stream versus table). This has allowed us to learn about the challenges brought to the table by the introduction of unbounded datasets, without worrying too much about the lower-level details that really drive the way things work. We’re now going to expand our horizons and see what the added dimension of constitution brings to the mix.
 

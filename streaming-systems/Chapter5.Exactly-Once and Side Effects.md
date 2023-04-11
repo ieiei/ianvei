@@ -1,4 +1,4 @@
-# Chapter 5. Exactly-Once and Side Effects
+# Chapter5.Exactly-Once and Side Effects
 
 We now shift from discussing programming models and APIs to the systems that implement them. A model and API allows users to describe what they want to compute. Actually running the computation accurately at scale requires a system—usually a distributed system.
 

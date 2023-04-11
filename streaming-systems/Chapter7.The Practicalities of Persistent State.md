@@ -1,4 +1,4 @@
-# Chapter 7. The Practicalities of Persistent State
+# Chapter7.The Practicalities of Persistent State
 
 Why do people write books? When you factor out the joy of creativity, a certain fondness for grammar and punctuation, and perhaps the occasional touch of narcissism, you’re basically left with the desire to capture an otherwise ephemeral idea so that it can be revisited in the future. At a very high level, I’ve just motivated and explained persistent state in data processing pipelines.
 

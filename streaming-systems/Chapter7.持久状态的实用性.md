@@ -1,4 +1,4 @@
-# 第 7 章持久状态的实用性
+# Chapter7.持久状态的实用性
 
 人们为什么要写书？当你考虑到创造力的乐趣、对语法和标点符号的某种喜爱，以及偶尔的自恋感时，你基本上就会渴望捕捉一个原本短暂的想法，以便将来重新审视它。在非常高的层次上，我刚刚激发并解释了数据处理管道中的持久状态。
 
@@ -101,9 +101,9 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
-![](/Users/Laobe/Documents/Streaming-Systems/images/stsy_0701.mp4)
+![](./media/stsy_0701.mp4)
 
-<center><i>图 7-1。 通过具有窗口和早期/准时/延迟触发的原始输入分组求和。 原始输入通过 GroupByKey 转换组合在一起并存储在表中。 触发后，MapElements lambda 将单个窗格中的原始输入汇总在一起，以得出每个团队的分数。
+<center><i>图 7-1。 通过具有窗口和早期/准时/延迟触发的原始输入分组求和。 原始输入通过 GroupByKey 转换组合在一起并存储在表中。 触发后，MapElements lambda 将单个窗格中的原始输入汇总在一起，以得出每个团队的分数。</i></center>
 
 将其与 [图 6-10](ch06.html#streams_and_tables_view_of_windowed_summation) （使用增量合并，稍后讨论）进行比较，很明显这要糟糕得多。首先，我们要存储更多数据：我们现在存储该窗口的所有输入，而不是每个窗口一个整数。其次，如果我们有多个触发器触发，我们通过重新汇总我们已经为之前的触发器触发添加在一起的输入来重复工作。最后，如果分组操作是我们将状态检查点到持久存储的点，那么在机器故障时，我们必须再次重新计算表的任何重新触发的总和。这是很多重复的数据和计算。更好的是增量计算和检查实际总和，这是*增量组合*的一个示例。
 
@@ -181,9 +181,9 @@ PCollection<KV<Team, Integer>> totals = input
 
 执行后，我们得到了我们所看到的 [图 6-10](ch06.html#streams_and_tables_view_of_windowed_summation)（此处显示在 [图 7-2](#grouping_and_summation_via_incremental_combination)）。与 [图 7-1](#summation_via_raw_grouping_of_input_with_windowing) 相比，这显然是一个很大的改进，在存储的数据量和执行的计算量方面效率更高。
 
-![](/Users/Laobe/Documents/Streaming-Systems/images/stsy_0702.mp4)
+![](./media/stsy_0702.mp4)
 
-<center><i>图 7-2。通过增量组合进行分组和求和。在这个版本中，增量总和被计算并存储在表中，而不是输入列表中，这些输入列表以后必须独立地加在一起。
+<center><i>图 7-2。通过增量组合进行分组和求和。在这个版本中，增量总和被计算并存储在表中，而不是输入列表中，这些输入列表以后必须独立地加在一起。</i></center>
 
 
 通过为分组操作提供更紧凑的中间表示，并通过放宽对排序的要求（在元素和子组级别），Beam 的“CombineFn”以一定数量的实现复杂性换取效率的提高。在这样做的过程中，它为热键问题提供了一个干净的解决方案，并且与合并窗口的概念很好地结合在一起。
@@ -224,9 +224,9 @@ PCollection<KV<Team, Integer>> totals = input
 
 [图 7-3](#example_conversion_attribution_in_this_diagram_a_users_traversal) 显示了一组网站访问、目标和广告展示的示例，其中一个归因转化以红色突出显示。在无限制、无序的数据流上建立转化归因需要跟踪迄今为止看到的印象、访问和目标。这就是持久状态的用武之地。
 
-![](/Users/Laobe/Documents/Streaming-Systems/images/stsy_0703.png)
+![](./media/stsy_0703.png)
 
-<center><i>图 7-3。 转化归因示例
+<center><i>图 7-3。 转化归因示例</i></center>
 
 在此图中，用户对网站上各个页面的遍历以图表的形式表示。印象是向用户显示并点击的广告，导致用户访问网站上的页面。访问代表在网站上查看的单个页面。目标是已被确定为用户期望目的地的特定访问页面（例如，完成购买或注册邮件列表）。转化归因的目标是识别导致用户在网站上实现某些目标的广告印象。在此图中，有一个以红色突出显示的此类转换。请注意，事件可能会无序到达，因此图中的事件时间轴和水印参考点指示输入被认为正确的时间。
 

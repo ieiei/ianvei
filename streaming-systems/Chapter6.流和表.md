@@ -1,4 +1,4 @@
-# Chapter6. 流和表
+# Chapter6.流和表
 
 您已经到达了本书中我们讨论流和表的部分。如果您还记得，在 [第 1 章](ch01.html#streaming_one_oh_one) 中，我们简要讨论了两个重要但正交的数据维度：*基数*和*构成*。到目前为止，我们一直严格关注基数方面（有界与无界），而忽略了构成方面（流与表）。这使我们能够了解无界数据集的引入带来的挑战，而不必过多担心真正推动事物运作方式的低级细节。我们现在将扩大我们的视野，看看宪法的附加维度带来了什么。
 
@@ -112,9 +112,9 @@ Map阶段完成后，我们进入MapWrite阶段。正如我之前提到的，Map
 
 我们已经在三个操作中从表转到流并再次返回。 MapRead 将表格转换为流，然后通过 Map（通过用户的代码）将其转换为新的流，然后通过 MapWrite 将其转换回表格。我们会发现 MapReduce 中接下来的三个操作看起来非常相似，所以我会更快地介绍它们，但我仍然想指出一个重要的细节。
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0601.png)
+![](./media/stsy_0601.png)
 
-<center><i>图 6-1。 MapReduce 中的映射阶段。表中的数据被转换为流并再次转换回来。
+<center><i>图 6-1。 MapReduce 中的映射阶段。表中的数据被转换为流并再次转换回来。</center></i>
 
 
 
@@ -130,9 +130,9 @@ ReduceWrite 是一个有点值得注意的。我们已经知道这个阶段必�
 
 看一下[图6-2](#map_and_reduce_phases_in_a_mapreduce)，它从流/表的角度展示了整个管道。你可以看到它是一个 TABLE → STREAM → STREAM → TABLE → STREAM → STREAM → TABLE 的序列。即使我们正在处理有界数据，即使我们正在做我们传统上认为的批处理，它实际上只是隐藏在流和表之下。
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0602.png)
+![](./media/stsy_0602.png)
 
-<center><i>图 6-2。从流和表的角度来看，MapReduce 中的 Map 和 Reduce 阶段
+<center><i>图 6-2。从流和表的角度来看，MapReduce 中的 Map 和 Reduce 阶段</i></center>
 
 
 
@@ -198,14 +198,15 @@ PCollection<KV<Team, Integer>> 总计 =
 
 该管道只是读取输入数据，解析单个团队成员的分数，然后将每个团队的分数相加。它的事件时间/处理时间可视化看起来像 [图 6-3]（#event_time_processing_time_view_of_classic_batch_processing）中呈现的图表。
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0603.png)
+![](./media/stsy_0603.png)
 
-<center><i></i>图 6-3。经典批处理的事件时间/处理时间视图
+<center><i>图 6-3。经典批处理的事件时间/处理时间视图</i></center>
+
 [图 6-4](#stream_and_tables_view_of_classic_batch_processing) 描绘了该管道随时间推移的更多拓扑视图，从流和表的角度呈现。
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0604.png)
+![](./media/stsy_0604.png)
 
-<center><i>图 6-4。经典批处理的流和表视图
+<center><i>图 6-4。经典批处理的流和表视图</i></center>
 
 
 在此可视化的流和表格版本中，时间的流逝表现为随着时间的推移在处理时间维度（y 轴）中向下滚动图形区域。以这种方式渲染的好处是它非常清楚地指出了非分组操作和分组操作之间的区别。与我们之前的图表不同，其中我省略了管道中除“Sum.integersByKey”之外的所有初始转换，我在这里也包含了初始解析操作，因为解析操作的非分组方面提供了一个很好的对比总和的分组方面。从这个角度来看，很容易看出两者之间的区别。非分组操作不会阻止流中元素的运动，因此会在另一侧产生另一个流。相反，分组操作使流中的所有元素都处于静止状态，因为它将它们一起添加到最终总和中。由于此示例在有界数据的批处理引擎上运行，因此仅在达到输入结束后才会发出最终结果。正如我们在 [Chapter 2](ch02.html#the_what_where_when_and_how) 中所指出的，这个示例对于有界数据来说已经足够了，但是在无界数据的上下文中过于局限，因为理论上输入永远不会结束。但真的不够吗？
@@ -248,16 +249,16 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 
 原始的可视化看起来像 [图 6-5](#event_time_process_time_view_of_windowed_summation_on_a_batch_engine) 中所示。
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0605.png)
+![](./media/stsy_0605.png)
 
-<center><i>图 6-5。批处理引擎上窗口求和的事件时间/处理时间视图
+<center><i>图 6-5。批处理引擎上窗口求和的事件时间/处理时间视图</i></center>
 
 
 现在，[图 6-6](#streams_and_tables_view_of_windowed_summation_on_a_batch_engine) 显示了流和表的版本。
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0606.png)
+![](./media/stsy_0606.png)
 
-<center><i>图 6-6。批处理引擎上窗口求和的流和表视图
+<center><i>图 6-6。批处理引擎上窗口求和的流和表视图</i></center>
 
 
 如您所料，这看起来与 [图 6-4](#stream_and_tables_view_of_classic_batch_processing) 非常相似，但表中有四个分组（对应于数据占用的四个窗口），而不仅仅是一个。但是和以前一样，我们必须等到有界输入的末尾才发出结果。我们将在下一节中讨论如何解决无界数据的问题，但首先让我们简要介绍一下合并窗口。
@@ -297,16 +298,16 @@ PCollection<KV<Team, Integer>> totals = input
   .apply(Sum.integersPerKey());
 ```
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0607.png)
+![](./media/stsy_0607.png)
 
-<center><i> 图 6-7。批处理引擎上窗口求和的流和表视图
+<center><i> 图 6-7。批处理引擎上窗口求和的流和表视图</i></center>
 
 
 和以前一样，每次遇到新记录时都会产生新的结果。以流和表类型的视图呈现，此图看起来像 [图 6-8](#streams_and_tables_view_of_windowed_summation_with_per_record_triggering_on_a_streaming_engine)。
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0608.png)
+![](./media/stsy_0608.png)
 
-<center><i>图 6-8。在流引擎上按记录触发的窗口求和的流和表视图
+<center><i>图 6-8。在流引擎上按记录触发的窗口求和的流和表视图</i></center>
 
 
 使用每记录触发器的一个有趣的副作用是它如何在一定程度上掩盖了数据被静止的影响，因为它们随后会立即被触发器再次恢复运动。即便如此，来自分组的聚合工件仍然在表中保持静止，因为未分组的值流从它流出。
@@ -328,18 +329,19 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0609.png)
+![](./media/stsy_0609.png)
 
-<center><i>图 6-9。流引擎上带有启发式水印的窗口求和的事件时间/处理时间视图
+<center><i>图 6-9。流引擎上带有启发式水印的窗口求和的事件时间/处理时间视图</i></center>
 
 
 多亏了 [Example 6-4](#watermark_completeness_trigger_chap_six) 中指定的触发器，它声明当水印通过窗口时应该物化窗口，系统能够以渐进的方式发出结果，因为管道的其他无界输入变为越来越完整。查看 [图 6-10](#streams_and_tables_view_of_windowed_summation) 中的流和表版本，它看起来与您预期的一样。
 
 
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0610.png)
+![](./media/stsy_0610.png)
 
-<center><i>图 6-10。流式引擎上带有启发式水印的窗口求和的流和表视图
+<center><i>图 6-10。流式引擎上带有启发式水印的窗口求和的流和表视图</i></center>
+
 在这个版本中，您可以非常清楚地看到取消分组触发器对状态表的影响。 当水印通过每个窗口的末尾时，它将该窗口的结果从表中拉出并将其设置在下游，与表中的所有其他值分开。 当然，我们仍然有之前的延迟数据问题，我们可以使用[示例 6-5]（#early_on_time_and_late_firings_via_the_early_on_time_late_api_chap_six）中显示的更全面的触发器再次解决。
 
 *示例 6-5。 通过 early/on-time/late API 提前、准时和延迟触发*
@@ -360,16 +362,16 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0611.png)
+![](./media/stsy_0611.png)
 
-<center><i> 图 6-11。具有早/准/晚触发的流引擎上的窗口求和的事件时间/处理时间视图
+<center><i> 图 6-11。具有早/准/晚触发的流引擎上的窗口求和的事件时间/处理时间视图</i></center>
 
 
 而流和表版本看起来像 [图 6-12](#streams_and_tables_view_of_windowed_summation_on_a_streaming) 中所示。
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0612.png)
+![](./media/stsy_0612.png)
 
-<center><i> 图 6-12。具有早/准/晚触发的流引擎上的窗口求和的流和表视图
+<center><i> 图 6-12。具有早/准/晚触发的流引擎上的窗口求和的流和表视图</i></center>
 
 
 此版本更清楚地说明了触发器的取消分组效果，将表的各个独立部分的演变视图呈现为流，如 [示例 6-6](#our_full_score_parsing_pipeline) 中指定的触发器所指示的那样。
@@ -438,16 +440,16 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0613.png)
+![](./media/stsy_0613.png)
 
-<center><i> 图 6-13。团队得分求和管道的逻辑阶段，具有中间 PCollection 类型
+<center><i> 图 6-13。团队得分求和管道的逻辑阶段，具有中间 PCollection 类型</i></center>
 
 
 当你实际运行这个管道时，它首先经过一个优化器，它的工作是把这个逻辑执行计划转换成一个优化的物理执行计划。每个执行引擎都是不同的，因此实际的物理执行计划会因运行者而异。但是一个可信的稻草人计划可能看起来像 [图 6-14](#theoretical_physical_phases_of_a_team_score_summation_pipeline_with_intermediate_pcollection_types)。
 
-![](/Users/Laobe/Documents/images/Streaming-Systems/images/stsy_0614.png)
+![](./media/stsy_0614.png)
 
-<center><i>图 6-14。团队得分总和管道的理论物理阶段，具有中间 PCollection 类型
+<center><i>图 6-14。团队得分总和管道的理论物理阶段，具有中间 PCollection 类型</i></center>
 
 
 这里发生了很多事情，所以让我们来看看所有这些。我们将讨论的图 [6-13](#logical_phases_of_a_team_score_summation_pipeline_with_intermediate) 和 [6-14](#theoretical_physical_phases_of_a_team_score_summation_pipeline_with_intermediate_pcollection_types) 之间存在三个主要区别：
@@ -510,25 +512,25 @@ PCollection<KV<Team, Integer>> totals = input
 
 - *操作*作用于流或表并产生新的流或表。它们分类如下：
 
-  - 流 → 流：非分组（逐元素）操作
+- 流 → 流：非分组（逐元素）操作
 
     对流应用 *nongrouping* 操作会改变流中的数据，同时让它们处于运动状态，从而产生一个可能具有不同基数的新流。
 
-  - 流→表：分组操作
+- 流→表：分组操作
 
     *分组*流中的数据使这些数据静止，产生一个随时间演变的*表*。
 
-    - *Windowing* 将事件时间维度合并到此类分组中。
-    - *合并窗口*随着时间的推移动态组合，允许它们根据观察到的数据重塑自己，并规定该键仍然是原子性/并行化的单元，窗口是该键中分组的子组件。
+- *Windowing* 将事件时间维度合并到此类分组中。
+- *合并窗口*随着时间的推移动态组合，允许它们根据观察到的数据重塑自己，并规定该键仍然是原子性/并行化的单元，窗口是该键中分组的子组件。
 
-  - 表→流：取消分组（触发）操作
+- 表→流：取消分组（触发）操作
 
     *触发*表中的数据将它们分解为运动，产生一个*流*，捕获表随时间演变的视图。
 
-    - *Watermarks* 提供了相对于事件时间的输入完整性概念，这是触发事件时间戳数据时的有用参考点，特别是从无界流中分组到事件时间窗口的数据。
-    -触发器的*累积模式*确定流的性质，指示它是否包含增量或值，以及是否提供先前增量/值的撤回。
+- *Watermarks* 提供了相对于事件时间的输入完整性概念，这是触发事件时间戳数据时的有用参考点，特别是从无界流中分组到事件时间窗口的数据。
+- 触发器的*累积模式*确定流的性质，指示它是否包含增量或值，以及是否提供先前增量/值的撤回。
 
-  - 表→表：（无）
+- 表→表：（无）
 
     没有使用表并产生表的操作，因为数据不可能在没有运动的情况下从静止状态返回静止状态。因此，对表的所有修改都是通过转换为流并再次返回。
 

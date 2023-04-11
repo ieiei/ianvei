@@ -1,4 +1,4 @@
-# Chapter 10. The Evolution of Large-Scale Data Processing
+# Chapter10.The Evolution of Large-Scale Data Processing
 
 You have now arrived at the final chapter in the book, you stoic literate, you. Your journey will soon be complete!
 
@@ -10,9 +10,9 @@ Also note that I’m covering a disproportionate amount of Google technologies h
 
 To ground our travels in concrete chronology, we’ll be following the timeline in [Figure 10-1](#approximate_timeline_of_systems_discussed_in_this_chapter), which shows rough dates of existence for the various systems I discuss.
 
-![img](assets/stsy_1001.png)
+![img](./media/stsy_1001.png)
 
-<center><i>Figure 10-1. Approximate timeline of systems discussed in this chapter
+<center><i>Figure 10-1. Approximate timeline of systems discussed in this chapter</center></i>
 
 At each stop, I give a brief history of the system as best I understand it and frame its contributions from the perspective of shaping streaming systems as we know them today. At the end, we recap all of the contributions to see how they’ve summed up to create the modern stream processing ecosystem of today.
 
@@ -20,9 +20,9 @@ At each stop, I give a brief history of the system as best I understand it and f
 
 We begin the journey with MapReduce ([Figure 10-2](#timeline_map_reduce)).
 
-![img](assets/stsy_1002.png)
+![img](./media/stsy_1002.png)
 
-<center><i>Figure 10-2. Timeline: MapReduce
+<center><i>Figure 10-2. Timeline: MapReduce</i></center>
 
 I think it’s safe to say that large-scale data processing as we all know it today got its start with MapReduce way back in 2003.[2](ch10.html#idm139957173422208) At the time, engineers within Google were building all sorts of bespoke systems to tackle data processing challenges at the scale of the World Wide Web.[3](ch10.html#idm139957173420864) As they did so, they noticed three things:
 

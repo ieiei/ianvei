@@ -1,4 +1,4 @@
-# 第 8 章流式 SQL
+# Chapter8.流 SQL
 
 让我们谈谈SQL。在本章中，我们将从中间的某个地方开始讲妙语，稍微回到过去以建立额外的背景，最后跳回到未来以一个漂亮的鞠躬结束一切。想象一下，昆汀·塔伦蒂诺 (Quentin Tarantino) 拥有计算机科学学位，并且非常乐意向全世界介绍流式 SQL 的优点，因此他主动提出与我代写这一章；有点像那样。减去暴力。
 
@@ -364,7 +364,7 @@
 
 如果您回想一下图 [6-11](ch06.html#even_time_processing_time_view_of_windowed_summation) 和 [6-12](ch06.html#streams_and_tables_view_of_windowed_summation_on_a_streaming)，它们显示了我们用作相同分数求和管道的两个不同视图 本书中的一个示例：在[图 6-11](ch06.html#even_time_processing_time_view_of_windowed_summation) 中是一个逻辑的 Beam-Model 视图，在 [图 6-12](ch06.html#streams_and_tables_view_of_windowed_summation_on_a_streaming) 中是一个物理的流和表—— 导向的观点。 比较两者有助于突出 Beam 模型与流和表的关系。 但是通过将一个叠加在另一个之上，正如我在 [图 8-1](#stream_bias_in_the_beam_model_approach) 中所做的那样，我们可以看到这种关系的另一个有趣的方面：Beam 模型的固有流偏差。
 
-![img](assets/stsy_0801.png)
+![img](./media/stsy_0801.png)
 
 ###### Figure 8-1. Stream bias in the Beam Model approach
 
@@ -425,7 +425,7 @@ UserScores (user, team, score, timestamp)
 
 `SCAN` 操作获取输入表并将其触发到一个有界流中，该流包含查询执行时该表内容的快照。 该流由`SELECT`操作使用，它将四列输入行向下投影到两列输出行。 作为非分组操作，它会产生另一个流。 最后，团队和用户分数的两列流进入“GROUP BY”并按团队分组到一个表中，同一个团队的分数“SUM”在一起，产生我们的团队及其对应团队的输出表 总分。
 
-![img](assets/stsy_0802.png)
+![img](./media/stsy_0802.png)
 
 <center><i>Figure 8-2. Table bias in a simple SQL query</center></i>
 
@@ -444,7 +444,7 @@ UserScores (user, team, score, timestamp)
 
 在这些查询中，我们首先将 UserScores 表向下投影到我们关心的两列，将结果存储在临时的 TeamAndScore 表中。 然后我们按团队对该表进行分组，同时汇总分数。 将事情分解为两个查询的管道后，我们的图表看起来像 [图 8-3](#breaking_the_query_into_two_to_surface_more_evidence_of_table_bias) 中所示。
 
-![img](assets/stsy_0803.png)
+![img](./media/stsy_0803.png)
 
 <center><i>Figure 8-3. Breaking the query into two to reveal more evidence of table bias</center></i>
 
@@ -454,7 +454,7 @@ UserScores (user, team, score, timestamp)
 
 也就是说，SQL 中的表并不*总是*明确的； 隐式表也可以存在。 例如，如果我们使用“GROUP BY”语句在查询末尾添加一个`HAVING`子句，以过滤掉得分低于特定阈值的团队，则该图将变为类似于 [图 8] -4]（#table_bias_with_a_final_having_clause）。
 
-![img](assets/stsy_0804.png)
+![img](./media/stsy_0804.png)
 
 <center><i>Figure 8-4. Table bias with a final HAVING clause</center></i>
 
@@ -498,7 +498,7 @@ UserScores (user, team, score, timestamp)
 
 这样做时，我们将它们转换为连续的、常设的查询，以流式方式连续处理对 `UserScores` 表的更新。 即便如此，视图的最终物理执行图*看起来几乎与一次性查询完全相同*； 为了支持这种流式实体化视图的想法，没有任何地方将流变成显式的一流对象。 物理执行计划中*唯一*值得注意的变化是替换了不同的触发器：`SCAN-AND-STREAM` 而不是 `SCAN`，如 [图 8-5](#table_bias_in_materialized_views) 所示。
 
-![img](assets/stsy_0805.png)
+![img](./media/stsy_0805.png)
 
 <center><i>Figure 8-5. Table bias in materialized views</center></i>
 
@@ -563,7 +563,7 @@ UserScores (user, team, score, timestamp)
 
 在我们继续之前，让我们看一个例子。 为了帮助将所有这些 SQL 内容与我们之前在本书中探索过的概念联系起来，我们恢复了运行示例，即对团队不同成员的九个分数求和以获得该团队的总分。 如果您还记得的话，当绘制在 X = 事件时间/Y = 处理时间轴上时，这些分数看起来像 [图 8-6](#data_points_in_our_running_example)。
 
-![img](assets/stsy_0806.png)
+![img](./media/stsy_0806.png)
 
 <center><i>Figure 8-6. Data points in our running example</center></i>
 
@@ -712,7 +712,7 @@ PCollection<KV<Team, Integer>> totals =
 
 
 
-
+![img](./media/stsy_0807.mp4)
 <center><i>Figure 8-7. Streams and tables view of classic batch processing</center></i>
 
 鉴于我们已经将数据放入适当的模式中，我们将不会在 SQL 中进行任何解析； 相反，我们专注于解析转换后管道中的所有内容。 因为我们使用的是经典的批处理模型，即仅在所有输入数据都已处理后才检索单个答案，求和关系的“TABLE”和“STREAM”视图看起来基本相同（回想一下我们 为这些初始的批处理式示例处理我们数据集的有界版本；因此，这个“STREAM”查询实际上以一行破折号和一个“END-OF-STREAM”标记结束：
@@ -758,7 +758,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
-
+![img](./media/stsy_0808.mp4)
 
 <center><i>Figure 8-8. Streams and tables view of windowed summation on a batch engine</center></i>
 
@@ -854,6 +854,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
+![img](./media/stsy_0809.mp4)
 
 <center><i>Figure 8-9. Streams and tables view of windowed summation on a streaming engine with per-record triggering</center></i>
 
@@ -902,6 +903,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
+![img](./media/stsy_0810.mp4)
 
 <center><i>Figure 8-10. Windowed summation with watermark triggering</center></i>
 
@@ -943,6 +945,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
+![img](./media/stsy_0811.mp4)
 
 <center><i>Figure 8-11. Windowed summation with on-time/late triggering</center></i>
 
@@ -995,6 +998,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
+![img](./media/stsy_0812.mp4)
 
 <center><i>Figure 8-12. Windowed summation with repeated one-minute-delay triggering</center></i>
 
@@ -1084,6 +1088,7 @@ PCollection<KV<Team, Integer>> totals = input
 ```
 
 
+![img](./media/stsy_0813.mp4)
 
 <center><i>Figure 8-13. Session window summation with accumulation but no retractions</center></i>
 
@@ -1127,6 +1132,7 @@ PCollection<KV<Team, Integer>> totals = input
 ```
 
 
+![img](./media/stsy_0814.mp4)
 
 <center><i>Figure 8-14. Session window summation with accumulation and retractions</center></i>
 
