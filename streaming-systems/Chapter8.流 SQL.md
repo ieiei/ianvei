@@ -695,7 +695,7 @@ SQL 的有趣之处在于它以不同的方式查看数据是多么容易。 例
 ........ [12:00, 12:10] ........
 ```
 
-但这只是查看原始输入记录，没有进行任何类型的转换。 更有趣的是当我们开始改变关系时。 当我们过去探索这个例子时，我们总是从经典的批处理开始，对整个数据集的分数求和，所以让我们在这里做同样的事情。 第一个示例管道（以前作为 [Example 6-1](ch06.html#summation_pipeline_key_value_data_are_read) 提供）看起来像 Beam 中的 [Example 8-1](#summation_pipeline_chap_eight)。
+但这只是查看原始输入记录，没有进行任何类型的转换。 更有趣的是当我们开始改变关系时。 当我们过去探索这个例子时，我们总是从经典的批处理开始，对整个数据集的分数求和，所以让我们在这里做同样的事情。 第一个示例管道（以前作为 [Example 6-1](Chapter6.流和表.md#summation_pipeline_key_value_data_are_read) 提供）看起来像 Beam 中的 [Example 8-1](#summation_pipeline_chap_eight)。
 
 *Example 8-1. Summation pipeline*
 

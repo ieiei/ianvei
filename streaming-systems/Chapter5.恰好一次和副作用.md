@@ -55,16 +55,16 @@ Beam 和 Dataflow 的一个特点是用户注入自定义代码，这些代码�
 *示例 5-1。一个简单的流管道*
 
 ```java
-管道 p = Pipeline.create(options);
-// 计算每个用户的 1 分钟事件计数。
-PCollection<..> perUserCounts =
+Pipeline p = Pipeline.create(options);
+// Calculate 1-minute counts of events per user.
+PCollection<..> perUserCounts = 
       p.apply(ReadFromUnboundedSource.read())
-       .apply(新的 KeyByUser())
+       .apply(new KeyByUser())
        .Window.<..>into(FixedWindows.of(Duration.standardMinutes(1)))
        .apply(Count.perKey());
-// 处理这些每用户计数，并将输出写入某处。
+// Process these per-user counts, and write the output somewhere.
 perUserCounts.apply(new ProcessPerUserCountsAndWriteToSink());
-// 将所有这些每用户计数相加以获得所有事件的 1 分钟计数。
+// Add up all these per-user counts to get 1-minute counts of all events.
 perUserCounts.apply(Values.<..>create())
              .apply(Count.globally())
              .apply(new ProcessGlobalCountAndWriteToSink());
@@ -201,8 +201,8 @@ Beam 提供了一个源 API，用于将数据读入 Dataflow 管道。如果处�
 ```java
 c.apply(Window.<..>into(FixedWindows.of(Duration.standardMinutes(1))))
  .apply(GroupByKey.<..>.create())
- .apply(新的 PrepareOutputData())
- .apply(重新洗牌。<..>of())
+ .apply(new PrepareOutputData())
+ .apply(Reshuffle.<..>of())
  .apply(WriteToSideEffect());
 ```
 

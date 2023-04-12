@@ -185,7 +185,7 @@ ReduceWrite 是一个有点值得注意的。我们已经知道这个阶段必�
 
    这些操作（如我们在 MapWrite 和 ReduceWrite 中看到的）接受记录流并以某种方式将它们组合在一起，从而将流转换为表。分组转换的示例是连接、聚合、列表/集合累积、更改日志应用程序、直方图创建、机器学习模型训练等。
 
-为了更好地了解所有这些是如何联系在一起的，让我们看一下 [图 2-2](ch02.html#types_of_transformations) 的更新版本，我们首先开始研究转换。为了避免您跳回那里查看我们正在讨论的内容，[示例 6-1](#summation_pipeline_key_value_data_are_read) 包含我们正在使用的代码片段。
+为了更好地了解所有这些是如何联系在一起的，让我们看一下 [图 2-2](ch02.html#types_of_transformations) 的更新版本，我们首先开始研究转换。为了避免您跳回那里查看我们正在讨论的内容，<a name="summation_pipeline_key_value_data_are_read">[示例 6-1]</a> 包含我们正在使用的代码片段。
 
 *示例 6-1。求和管道*
 

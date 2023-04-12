@@ -18,11 +18,11 @@
 
 触发器
 
- 忽略事件时间（即，使用跨越所有事件时间的全局窗口）并使用触发器在处理时间轴上提供该窗口的快照。
+  忽略事件时间（即，使用跨越所有事件时间的全局窗口）并使用触发器在处理时间轴上提供该窗口的快照。
 
 进入时间
 
- 将入口时间分配为数据到达时的事件时间，并从那里开始使用正常的事件时间窗口。这基本上就是 Spark Streaming 1.x 所做的事情。
+  将入口时间分配为数据到达时的事件时间，并从那里开始使用正常的事件时间窗口。这基本上就是 Spark Streaming 1.x 所做的事情。
 
 请注意，这两种方法或多或少是等效的，尽管它们在多级管道的情况下略有不同：在触发器版本中，多级管道将在每个阶段独立地分割处理时间“窗口”，例如，数据在一个阶段的窗口 N 中，可能会在下一阶段的窗口 N-1 或 N+1 中结束；在 ingress-time 版本中，在将数据合并到窗口 N 后，由于阶段之间通过水印（在 Cloud Dataflow 案例中）、微批处理边界（在Spark Streaming 案例），或引擎级别涉及的任何其他协调因素。
 
@@ -48,25 +48,26 @@
 
 - 开窗
 
-  我们使用全局事件时间窗口，因为我们本质上是在使用事件时间窗格来模拟处理时间窗口。
+    我们使用全局事件时间窗口，因为我们本质上是在使用事件时间窗格来模拟处理时间窗口。
 
 - 触发
 
-  我们根据所需的处理时间窗口大小在处理时间域中定期触发。
+    我们根据所需的处理时间窗口大小在处理时间域中定期触发。
 
 - 积累
 
-  我们使用丢弃模式来保持窗格彼此独立，从而让它们中的每一个都像一个独立的处理时间“窗口”。
+    我们使用丢弃模式来保持窗格彼此独立，从而让它们中的每一个都像一个独立的处理时间“窗口”。
 
 相应的代码类似于示例 4-1；请注意，全局窗口是 Beam 中的默认设置，因此没有特定的窗口策略覆盖。
 
 *示例 4-1。通过全局事件时间窗口的重复丢弃窗格进行处理时间窗口*
 
 ```java
-PCollection<KV<Team, Integer>> 总计 = 输入
+PCollection<KV<Team, Integer>> totals = input
   .apply(Window.triggering(Repeatedly(AlignedDelay(ONE_MINUTE)))
                .discardingFiredPanes())
   .apply(Sum.integersPerKey());
+```
 ```
 
 当在流式运行器上针对我们两种不同的输入数据顺序执行时，结果如图 4-3 所示。以下是有关此图的一些有趣注释：
@@ -75,7 +76,6 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 - 由于处理时间窗口化对遇到输入数据的顺序很敏感，因此对于两个观察顺序中的每一个，每个“窗口”的结果都不同，即使事件本身在技术上在每个版本中发生在同一时间。在左边我们得到 12、18、18，而在右边我们得到 7、36、5。
 
 ![](./media/stsy_0403.mp4)
-
 <center><i>图 4-3。通过触发器的处理时间“窗口化”，相同输入的两个不同处理时间排序</i></center>
 
 
@@ -85,19 +85,19 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 
 - 时移
 
-  当元素到达时，它们的事件时间需要被入口时间覆盖。我们可以在 Beam 中通过提供一个新的 DoFn 来做到这一点，该 DoFn 通过 outputWithTimestamp 方法将元素的时间戳设置为当前时间。
+    当元素到达时，它们的事件时间需要被入口时间覆盖。我们可以在 Beam 中通过提供一个新的 DoFn 来做到这一点，该 DoFn 通过 outputWithTimestamp 方法将元素的时间戳设置为当前时间。
 
 - 开窗
 
-  返回使用标准事件时间固定窗口。
+    返回使用标准事件时间固定窗口。
 
 - 触发
 
-  因为进入时间提供了计算完美水印的能力，我们可以使用默认触发器，在这种情况下，当水印通过窗口末尾时，它会隐式触发一次。
+    因为进入时间提供了计算完美水印的能力，我们可以使用默认触发器，在这种情况下，当水印通过窗口末尾时，它会隐式触发一次。
 
 - 累积模式
 
-  因为我们每个窗口只有一个输出，所以累积模式无关紧要。
+    因为我们每个窗口只有一个输出，所以累积模式无关紧要。
 
 因此，实际代码可能类似于示例 4-2 中的代码。
 
@@ -105,14 +105,14 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 
 ```java
 PCollection<String> raw = IO.read().apply(ParDo.of(
-  新的 DoFn<String, String>() {
-    公共无效进程元素（ProcessContext c）{
+  new DoFn<String, String>() {
+    public void processElement(ProcessContext c) {
       c.outputWithTimestmap(new Instant());
     }
   });
-PCollection<KV<团队，整数>> 输入 =
+PCollection<KV<Team, Integer>> input =
   raw.apply(ParDo.of(new ParseFn());
-PCollection<KV<Team, Integer>> 总计 = 输入
+PCollection<KV<Team, Integer>> totals = input
   .apply(Window.info(FixedWindows.of(TWO_MINUTES))
   .apply(Sum.integersPerKey());
 ```
@@ -125,7 +125,6 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 - 因为使用进入时间时可能会出现完美的水印，所以实际水印与理想水印相匹配，向上和向右上升，坡度为 1。
 
 ![](./media/stsy_0404.mp4)
-
 <center><i>图 4-4。通过使用入口时间的处理时间窗口，在相同输入的两个不同处理时间排序上</i></center>
 
 
@@ -149,7 +148,6 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 图 4-5 显示了这方面的一个示例，五个独立的记录组合到会话窗口中，间隔超时为 60 分钟。 每条记录都以自己的 60 分钟窗口开始（原始会话）。 将重叠的原始会话合并在一起会产生两个较大的会话窗口，分别包含三个和两个记录。
 
 ![](./media/stsy_0405.png)
-
 <center><i>图 4-5。 未合并的原始会话窗口，以及由此产生的合并会话</i></center>
 
 他们在提供一般会话支持方面的关键见解是，根据定义，一个完整的会话窗口是一组较小的重叠窗口的组合，每个窗口包含一条记录，序列中的每个记录与下一个记录之间的间隔为不活动不大于预定义的超时。因此，即使我们观察到会话中的数据乱序，我们也可以简单地通过将任何重叠的窗口合并在一起来构建最终会话，以便在单个数据到达时将它们合并在一起。
@@ -157,7 +155,6 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 换个角度来看，考虑一下我们迄今为止一直在使用的例子。如果我们指定一分钟的会话超时，我们希望在数据中识别两个会话，如图 4-6 中的黑色虚线所示。这些会话中的每一个都捕获来自用户的活动爆发，会话中的每个事件与会话中的至少一个其他事件相隔不到一分钟。
 
 ![](./media/stsy_0406.png)
-
 <center><i>图 4-6。我们要计算的会话</i></center>
 
 
@@ -166,10 +163,10 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 *示例 4-3。带有会话窗口和撤回的早期/准时/延迟触发*
 
 ```java
-PCollection<KV<Team, Integer>> 总计 = 输入
+PCollection<KV<Team, Integer>> totals = input
   .apply(Window.into(Sessions.withGapDuration(ONE_MINUTE))
-               .触发（
-                 水印后（）
+               .triggering(
+                 AfterWatermark()
                    .withEarlyFirings(AlignedDelay(ONE_MINUTE))
                    .withLateFirings(AfterCount(1))))
   .apply(Sum.integersPerKey());
@@ -179,7 +176,6 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 在流式引擎上执行，你会得到如图 4-7 所示的结果（注意，我在黑色虚线中留下了注释预期的最终会话以供参考）。
 
 ![](./media/stsy_0407.mp4)
-
 <center><i>图 4-7。流媒体引擎上的会话窗口和撤回的早期和晚期触发</i></center>
 
 这里发生了很多事情，所以我将引导您完成其中的一些：
@@ -203,11 +199,11 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 
 - 窗口分配
 
-  这会将每个元素放入初始窗口。在极限情况下，这允许将每个元素放置在一个独特的窗口中，这非常强大。
+    这会将每个元素放入初始窗口。在极限情况下，这允许将每个元素放置在一个独特的窗口中，这非常强大。
 
 - （可选）窗口合并
 
-  这允许窗口在分组时间合并，这使得窗口可以随着时间的推移而演变，我们之前在会话窗口中看到了这一点。
+    这允许窗口在分组时间合并，这使得窗口可以随着时间的推移而演变，我们之前在会话窗口中看到了这一点。
 
 为了让您了解窗口策略到底有多简单，以及自定义窗口支持有多么有用，我们将详细研究 Beam 中固定窗口和会话的库存实现，然后考虑一些现实世界需要对这些主题进行自定义变体的用例。在此过程中，我们将看到创建自定义窗口策略是多么容易，以及当您的用例不太适合现有方法时，如何限制缺乏自定义窗口支持。
 
@@ -217,28 +213,29 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 
 - 任务
 
-  元素根据其时间戳以及窗口的大小和偏移参数放置到适当的固定窗口中。
+    元素根据其时间戳以及窗口的大小和偏移参数放置到适当的固定窗口中。
 
 - 合并
 
-  没有任何。
+    没有任何。
 
 代码的缩写版本如示例 4-4 所示。
 
 *示例 4-4。缩写的 FixedWindows 实现*
 
 ```java
-公共类 FixedWindows 扩展 WindowFn<Object, IntervalWindow> {
-  私人最终持续时间大小；
-  私人最终持续时间偏移；
-  公共集合<IntervalWindow> assignWindow(AssignContext c) {
-    长开始 = c.timestamp().getMillis() - c.timestamp()
-                   。加大尺码）
-                   .减（偏移量）
+public class FixedWindows extends WindowFn<Object, IntervalWindow> {
+  private final Duration size;
+  private final Duration offset;
+  public Collection<IntervalWindow> assignWindow(AssignContext c) {
+    long start = c.timestamp().getMillis() - c.timestamp()
+                   .plus(size)
+                   .minus(offset)
                    .getMillis() % size.getMillis();
     return Arrays.asList(IntervalWindow(new Instant(start), size));
   }
 }
+```
 ```
 
 请记住，在这里向您展示代码的目的并不是教您如何编写窗口策略（尽管揭开它们的神秘面纱并指出它们是多么简单）。这确实有助于对比支持一些相对基本的用例的相对难易程度，分别有和没有自定义窗口。现在让我们考虑两个这样的用例，它们是固定窗口主题的变体。
@@ -252,16 +249,14 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 *示例 4-5。水印完整性触发（同例 2-6）*
 
 ```java
-PCollection<KV<Team, Integer>> 总计 = 输入
+PCollection<KV<Team, Integer>> totals = input
   .apply(Window.into(FixedWindows.of(TWO_MINUTES))
                .triggering(AfterWatermark()))
-  .apply(Sum.integersPerKey());
+  .apply(Sum.integersPerKey()); 
 ```
-
 但在本例中，我们将并行查看来自同一数据集的两个不同键（见图 4-8）。我们将看到这两个键的输出都是对齐的，因为窗口在所有键上都是对齐的。结果，每次水印通过窗口末尾时，我们最终都会实现 N 个窗格，其中 N 是该窗口中具有更新的键的数量。在此示例中，N 为 2，这可能不会太痛苦。但是，当 N 开始订购数千、数百万或更多时，这种同步突发性可能会成为问题。
 
 ![](./media/stsy_0408.mp4)
-
 <center><i>图 4-8。对齐的固定窗口</i></center>
 
 在不需要跨窗口比较的情况下，通常更希望将窗口完成负载均匀分布在时间上。这使得系统负载更加可预测，从而可以减少处理峰值负载的配置要求。然而，在大多数系统中，未对齐的固定窗口仅如果系统为它们提供开箱即用的支持，则可用。2 但是使用自定义窗口支持，这是对默认固定窗口实现的相对简单的修改，以提供未对齐的固定窗口支持。我们要做的是继续保证组合在一起的所有元素的窗口（即具有相同键的窗口）具有相同的对齐方式，同时放宽不同键之间的对齐限制。代码更改为默认的固定窗口策略，类似于示例 4-6。
@@ -269,16 +264,16 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 *示例 4-6。缩写 UnalignedFixedWindows 实现*
 
 ```java
-公共类 UnalignedFixedWindows
-    扩展 WindowFn<KV<K, V>, IntervalWindow> {
-  私人最终持续时间大小；
-  私人最终持续时间偏移；
-  公共集合<IntervalWindow> assignWindow(AssignContext c) {
-    长 perKeyShift = hash(c.element().key()) % 大小；
-    长开始 = perKeyShift + c.timestamp().getMillis()
+public class UnalignedFixedWindows
+    extends WindowFn<KV<K, V>, IntervalWindow> {
+  private final Duration size;
+  private final Duration offset;
+  public Collection<IntervalWindow> assignWindow(AssignContext c) {
+    long perKeyShift = hash(c.element().key()) % size;
+    long start = perKeyShift + c.timestamp().getMillis()
                    - c.timestamp()
-                      。加大尺码）
-                      .减（偏移量）
+                      .plus(size)
+                      .minus(offset)
     return Arrays.asList(IntervalWindow(new Instant(start), size));
   }
 }
@@ -287,18 +282,15 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 通过此更改，具有相同键的所有元素的窗口都对齐了，3 但具有不同键的元素的窗口（通常）将不对齐，因此分散了窗口完成负载，但代价是键之间的比较也不太有意义.我们可以切换管道以使用我们的新窗口策略，如示例 4-7 所示。
 
 *示例 4-7。带有单个水印触发器的未对齐固定窗口*
-
 ```java
-PCollection<KV<Team, Integer>> 总计 = 输入
+PCollection<KV<Team, Integer>> totals = input
   .apply(Window.into(UnalignedFixedWindows.of(TWO_MINUTES))
                .triggering(AfterWatermark()))
   .apply(Sum.integersPerKey());
 ```
-
 然后你可以通过比较同一个数据集上的不同固定窗口对齐（在这种情况下，我选择了两个对齐之间的最大相移来最清楚地显示好处，因为在大量密钥中随机选择的阶段会产生类似的效果）。
 
 ![](./media/stsy_0409.mp4)
-
 <center><i>图 4-9。未对齐的固定窗口</i></center>
 
 
@@ -317,37 +309,35 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 *示例 4-8。支持每个元素窗口大小的修改（和缩写）FixedWindows 实现*
 
 ```java
-公共类 PerElementFixedWindows<T 扩展 HasWindowSize%gt;
-    扩展 WindowFn<T, IntervalWindow> {
-  私人最终持续时间偏移；
-  公共集合<IntervalWindow> assignWindow(AssignContext c) {
-    长 perElementSize = c.element().getWindowSize();
-    长开始 = perKeyShift + c.timestamp().getMillis()
+public class PerElementFixedWindows<T extends HasWindowSize%gt;
+    extends WindowFn<T, IntervalWindow> {
+  private final Duration offset;
+  public Collection<IntervalWindow> assignWindow(AssignContext c) {
+    long perElementSize = c.element().getWindowSize();
+    long start = perKeyShift + c.timestamp().getMillis()
                    - c.timestamp()
-                      。加大尺码）
-                      .减（偏移量）
+                      .plus(size)
+                      .minus(offset)
                       .getMillis() % size.getMillis();
-    返回 Arrays.asList(IntervalWindow(
-        新的即时（开始），perElementSize））；
+    return Arrays.asList(IntervalWindow(
+        new Instant(start), perElementSize));
   }
 }
 ```
-
 通过此更改，每个元素都被分配到具有适当大小的固定窗口，如元素本身携带的元数据所指示的那样。4 更改管道代码以使用此新策略再次变得微不足道，如示例 4-9所示。
 
 *示例 4-9。 具有单个水印触发器的每个元素的固定窗口大小*
 
 ```java
-PCollection<KV<Team, Integer>> 总计 = 输入
-   .apply(Window.into(PerElementFixedWindows.of(TWO_MINUTES))
-                .triggering(AfterWatermark()))
-   .apply(Sum.integersPerKey());
+PCollection<KV<Team, Integer>> totals = input
+  .apply(Window.into(PerElementFixedWindows.of(TWO_MINUTES))
+               .triggering(AfterWatermark()))
+  .apply(Sum.integersPerKey());
 ```
 
 然后查看运行中的这个管道（图 4-10），很容易看出 Key A 的元素都有两分钟的窗口大小，而 Key B 的元素有一分钟的窗口大小。
 
 ![](./media/stsy_0410.mp4)
-
 <center><i>图 4-10。 每键自定义大小的固定窗口</i></center>
 
 
@@ -370,31 +360,31 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 *示例 4-10。缩写会话实施*
 
 ```java
-公共类会话扩展 WindowFn<Object, IntervalWindow> {
-  私人最终持续时间 gapDuration；
-  公共集合<IntervalWindow> assignWindows(AssignContext c) {
-    返回 Arrays.asList(
-      新的 IntervalWindow(c.timestamp(), gapDuration));
+public class Sessions extends WindowFn<Object, IntervalWindow> {
+  private final Duration gapDuration;
+  public Collection<IntervalWindow> assignWindows(AssignContext c) {
+    return Arrays.asList(
+      new IntervalWindow(c.timestamp(), gapDuration));
   }
-  公共无效mergeWindows（MergeContext c）抛出异常{
+  public void mergeWindows(MergeContext c) throws Exception {
     List<IntervalWindow> sortedWindows = new ArrayList<>();
-    for (IntervalWindow 窗口：c.windows()) {
+    for (IntervalWindow window : c.windows()) {
       sortedWindows.add(window);
     }
     Collections.sort(sortedWindows);
-    List<MergeCandidate> 合并 = new ArrayList<>();
-    合并候选当前 = 新合并候选（）；
-    for (IntervalWindow 窗口: sortedWindows) {
+    List<MergeCandidate> merges = new ArrayList<>();
+    MergeCandidate current = new MergeCandidate();
+    for (IntervalWindow window : sortedWindows) {
       if (current.intersects(window)) {
-        当前.add（窗口）；
-      } 别的 {
-        合并。添加（当前）；
-        当前=新合并候选（窗口）；
+        current.add(window);
+      } else {
+        merges.add(current);
+        current = new MergeCandidate(window);
       }
     }
-    合并。添加（当前）；
-    for (MergeCandidate 合并：合并) {
-      合并。申请（c）；
+    merges.add(current);
+    for (MergeCandidate merge : merges) {
+      merge.apply(c);
     }
   }
 }
@@ -409,42 +399,42 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 *示例 4-11。缩写会话实施*
 
 ```java
-公共类 BoundedSessions 扩展 WindowFn<Object, IntervalWindow> {
-  私人最终持续时间 gapDuration；
-  私人最终持续时间 maxSize；
-  公共集合<IntervalWindow> assignWindows(AssignContext c) {
-    返回 Arrays.asList(
-      新的 IntervalWindow(c.timestamp(), gapDuration));
+public class BoundedSessions extends WindowFn<Object, IntervalWindow> {
+  private final Duration gapDuration;
+  private final Duration maxSize;
+  public Collection<IntervalWindow> assignWindows(AssignContext c) {
+    return Arrays.asList(
+      new IntervalWindow(c.timestamp(), gapDuration));
   }
-  私人持续时间窗口大小（间隔窗口窗口）{
-    返回窗口 == null
-      ?新时长(0)
-      ：新的持续时间（window.start（），window.end（））；
+  private Duration windowSize(IntervalWindow window) {
+    return window == null
+      ? new Duration(0)
+      : new Duration(window.start(), window.end());
   }
-  公共静态无效合并窗口（
-      WindowFn<?, IntervalWindow>.MergeContext c) 抛出异常 {
+  public static void mergeWindows(
+      WindowFn<?, IntervalWindow>.MergeContext c) throws Exception {
     List<IntervalWindow> sortedWindows = new ArrayList<>();
-    for (IntervalWindow 窗口：c.windows()) {
+    for (IntervalWindow window : c.windows()) {
       sortedWindows.add(window);
     }
     Collections.sort(sortedWindows);
-    List<MergeCandidate> 合并 = new ArrayList<>();
-    合并候选当前 = 新合并候选（）；
-    for (IntervalWindow 窗口: sortedWindows) {
+    List<MergeCandidate> merges = new ArrayList<>();
+    MergeCandidate current = new MergeCandidate();
+    for (IntervalWindow window : sortedWindows) {
       MergeCandidate next = new MergeCandidate(window);
       if (current.intersects(window)) {
-        当前.add（窗口）；
+        current.add(window);
         if (windowSize(current.union) <= (maxSize - gapDuration))
-          继续;
-        // 当前窗口超出范围，所以刷新并移动到下一个
-        下一个 = 新的 MergeCandidate();
+          continue;
+        // Current window exceeds bounds, so flush and move to next
+        next = new MergeCandidate();
       }
-      合并。添加（当前）；
-      当前=下一个；
+      merges.add(current);
+      current = next;
     }
-    合并。添加（当前）；
-    “ for (MergeCandidate 合并: 合并) {
-      合并。申请（c）；
+    merges.add(current);
+    “    for (MergeCandidate merge : merges) {
+      merge.apply(c);
     }
   }
 }
@@ -455,12 +445,12 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 *示例 4-12。通过 early/on-time/late API 提前、准时和延迟触发*
 
 ```java
-PCollection<KV<Team, Integer>> 总计 = 输入
+PCollection<KV<Team, Integer>> totals = input
   .apply(Window.into(BoundedSessions
                        .withGapDuration(ONE_MINUTE)
-                       .withMaxSize(三分钟))
-               .触发（
-                 水印后（）
+                       .withMaxSize(THREE_MINUTES))
+               .triggering(
+                 AfterWatermark()
                    .withEarlyFirings(AlignedDelay(ONE_MINUTE))
                    .withLateFirings(AfterCount(1))))
   .apply(Sum.integersPerKey());
