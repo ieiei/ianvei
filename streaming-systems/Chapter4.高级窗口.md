@@ -195,7 +195,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 到目前为止，我们主要讨论了预定义类型的窗口策略：固定、滑动和会话。您可以从标准类型的窗口中获得很多好处，但是有很多真实的用例能够定义自定义窗口策略可以真正节省时间（我们现在将看到其中三个）。
 
-今天的大多数系统不支持自定义窗口，其支持程度与 Beam 1 不同，因此我们专注于 Beam 方法。在 Beam 中，自定义窗口策略由两部分组成：
+今天的大多数系统不支持自定义窗口，其支持程度与 Beam [^1] 不同，因此我们专注于 Beam 方法。在 Beam 中，自定义窗口策略由两部分组成：
 
 - 窗口分配
 
@@ -259,7 +259,7 @@ PCollection<KV<Team, Integer>> totals = input
 ![](./media/stsy_0408.mp4)
 <center><i>图 4-8。对齐的固定窗口</i></center>
 
-在不需要跨窗口比较的情况下，通常更希望将窗口完成负载均匀分布在时间上。这使得系统负载更加可预测，从而可以减少处理峰值负载的配置要求。然而，在大多数系统中，未对齐的固定窗口仅如果系统为它们提供开箱即用的支持，则可用。2 但是使用自定义窗口支持，这是对默认固定窗口实现的相对简单的修改，以提供未对齐的固定窗口支持。我们要做的是继续保证组合在一起的所有元素的窗口（即具有相同键的窗口）具有相同的对齐方式，同时放宽不同键之间的对齐限制。代码更改为默认的固定窗口策略，类似于示例 4-6。
+在不需要跨窗口比较的情况下，通常更希望将窗口完成负载均匀分布在时间上。这使得系统负载更加可预测，从而可以减少处理峰值负载的配置要求。然而，在大多数系统中，未对齐的固定窗口仅如果系统为它们提供开箱即用的支持，则可用。[^2] 但是使用自定义窗口支持，这是对默认固定窗口实现的相对简单的修改，以提供未对齐的固定窗口支持。我们要做的是继续保证组合在一起的所有元素的窗口（即具有相同键的窗口）具有相同的对齐方式，同时放宽不同键之间的对齐限制。代码更改为默认的固定窗口策略，类似于示例 4-6。
 
 *示例 4-6。缩写 UnalignedFixedWindows 实现*
 
@@ -279,7 +279,7 @@ public class UnalignedFixedWindows
 }
 ```
 
-通过此更改，具有相同键的所有元素的窗口都对齐了，3 但具有不同键的元素的窗口（通常）将不对齐，因此分散了窗口完成负载，但代价是键之间的比较也不太有意义.我们可以切换管道以使用我们的新窗口策略，如示例 4-7 所示。
+通过此更改，具有相同键的所有元素的窗口都对齐了，[^3] 但具有不同键的元素的窗口（通常）将不对齐，因此分散了窗口完成负载，但代价是键之间的比较也不太有意义.我们可以切换管道以使用我们的新窗口策略，如示例 4-7 所示。
 
 *示例 4-7。带有单个水印触发器的未对齐固定窗口*
 ```java
@@ -324,7 +324,7 @@ public class PerElementFixedWindows<T extends HasWindowSize%gt;
   }
 }
 ```
-通过此更改，每个元素都被分配到具有适当大小的固定窗口，如元素本身携带的元数据所指示的那样。4 更改管道代码以使用此新策略再次变得微不足道，如示例 4-9所示。
+通过此更改，每个元素都被分配到具有适当大小的固定窗口，如元素本身携带的元数据所指示的那样。[^4] 更改管道代码以使用此新策略再次变得微不足道，如示例 4-9所示。
 
 *示例 4-9。 具有单个水印触发器的每个元素的固定窗口大小*
 
@@ -497,3 +497,12 @@ PCollection<KV<Team, Integer>> totals = input
 在第 3 章中与 Slava 一起深入研究水印并在这里对高级窗口进行了广泛调查之后，我们现在已经远远超出了多维鲁棒流处理的基础知识。至此，我们结束了对 Beam 模型以及本书第一部分的关注。
 
 接下来是 Reuven 关于一致性保证、一次性处理和副作用的第 5 章，之后我们开始进入第 6 章的第二部分，流和表。
+
+
+[^1]: As far as I know, Apache Flink is the only other system to support custom windowing to the extent that Beam does. And to be fair, its support extends even beyond that of Beam's, thanks to the ability to provide a custom window evictor. Head asplode.
+
+[^2]: And I'm not actually aware of any such systems at this time.
+
+[^3]: This naturally implies the use of keyed data, but because windowing is intrinsically tied to grouping by key anyway, that restriction isn't particularly burdensome.
+
+[^4]: And it's not critical that the element itself know the window size; you could just as easily look up and cache the appropriate window size for whatever the desired dimension is; for example, per-user.

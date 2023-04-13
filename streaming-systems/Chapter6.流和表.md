@@ -15,7 +15,7 @@
 
 流和表的基本思想来源于数据库世界。熟悉 SQL 的人都可能熟悉表及其核心属性，大致概括为：表包含数据的行和列，每一行由某种键唯一标识，显式或隐式。
 
-如果您回想起大学时的数据库系统课程，[1](ch06.html#idm139957178943264)，您可能会记得大多数数据库的数据结构是*仅附加日志*。当事务应用于数据库中的表时，这些事务会记录在日志中，然后将其内容串行应用于表以实现这些更新。在流和表命名法中，该日志实际上就是流。
+如果您回想起大学时的数据库系统课程，[^1] 您可能会记得大多数数据库的数据结构是*仅附加日志*。当事务应用于数据库中的表时，这些事务会记录在日志中，然后将其内容串行应用于表以实现这些更新。在流和表命名法中，该日志实际上就是流。
 
 从这个角度来看，我们现在了解如何从流中创建表：该表只是应用流中发现的更新的事务日志的结果。但是我们如何从一个表中创建一个流呢？本质上是相反的：流是表的变更日志。通常用于表到流转换的激励示例是*物化视图*。 SQL 中的物化视图允许您在表上指定查询，然后数据库系统将其本身显示为另一个一流的表。此物化视图本质上是该查询的缓存版本，数据库系统确保随着源表的内容随着时间的推移而始终保持最新状态。也许不出所料，物化视图是通过原始表的变更日志实现的；每当源表更改时，都会记录该更改。然后，数据库在物化视图查询的上下文中评估该更改，并将任何结果更改应用于目标物化视图表。
 
@@ -43,7 +43,7 @@
 
 - 表格是*静止的数据*。
 
-  这并不是说表格无论如何都是静态的。几乎所有有用的表格都以某种方式随着时间的推移而不断变化。但是在任何给定时间，表格的快照都提供了包含在一个整体中的数据集的某种图片。 [2](ch06.html#idm139957178916384) 这样，表格就充当了数据积累的概念休息场所并随着时间的推移被观察。因此，静态数据。
+  这并不是说表格无论如何都是静态的。几乎所有有用的表格都以某种方式随着时间的推移而不断变化。但是在任何给定时间，表格的快照都提供了包含在一个整体中的数据集的某种图片。 [^2] 这样，表格就充当了数据积累的概念休息场所并随着时间的推移被观察。因此，静态数据。
 
 - 流是*动态*的数据。
 
@@ -70,7 +70,7 @@
 
 - Map
 
-  这重复（和/或并行）使用来自预处理输入的单个键/值对[3](ch06.html#idm139957178894112)并输出零个或多个键/值对。
+  这重复（和/或并行）使用来自预处理输入的单个键/值对[^3] 并输出零个或多个键/值对。
 
 - MapWrite
 
@@ -94,7 +94,7 @@
 
 ### 映射为流/表
 
-因为我们以 static[4](ch06.html#idm139957178884320) 数据集开始和结束，所以应该清楚我们以表格开始并以表格结束。但是我们之间有什么？天真地，人们可能会认为它一直是桌子。毕竟，批处理（在概念上）已知会消耗和生成表。如果您将批处理作业视为执行经典 SQL 查询的粗略模拟，那感觉相对自然。但是，让我们一步一步地更仔细地观察真正发生的事情。
+因为我们以 static[^4] 数据集开始和结束，所以应该清楚我们以表格开始并以表格结束。但是我们之间有什么？天真地，人们可能会认为它一直是桌子。毕竟，批处理（在概念上）已知会消耗和生成表。如果您将批处理作业视为执行经典 SQL 查询的粗略模拟，那感觉相对自然。但是，让我们一步一步地更仔细地观察真正发生的事情。
 
 首先，MapRead 使用一个表并生成 *something*。 Map阶段接下来会消耗一些东西，所以如果我们想了解它的性质，一个好的起点是Map阶段API，它在Java中看起来像这样：
 
@@ -106,7 +106,7 @@ void map(KI key, VI value, Emit emitter);
 
 接下来，Map 阶段使用该流，然后做什么？因为 map 操作是一个元素转换，它不会做任何事情来停止移动元素并让它们静止。它可能会通过过滤掉一些元素或将一些元素分解成多个元素来改变流的有效基数，但是在 Map 阶段结束后，这些元素都保持相互独立。因此，可以肯定地说 Map 阶段既消耗流又产生流。
 
-Map阶段完成后，我们进入MapWrite阶段。正如我之前提到的，MapWrite 按键对记录进行分组，然后以该格式将它们写入持久存储。写入的 *persistent* 部分实际上在这一点上并不是绝对必要的，只要存在持久性 *somewhere* （即，如果上游输入被保存并且在失败的情况下可以从它们重新计算中间结果，类似于Spark 采用弹性分布式数据集 [RDD] 的方法）。 *重要的是记录被组合到某种数据存储中，无论是在内存中，在磁盘上，还是在你拥有的任何地方。这很重要，因为由于这种分组操作，以前在流中一个接一个地飞过的记录现在被放置在由它们的键指定的位置，从而允许每个键组作为它们的同调的弟兄姊妹来了。请注意这与前面提供的流到表转换的定义有多么相似：*随着时间的推移聚合更新流产生一个表*。 MapWrite 阶段通过按键对记录流进行分组，将这些数据置于静止状态，从而将流转换回表。[5](ch06.html#idm139957178623584) 酷！
+Map阶段完成后，我们进入MapWrite阶段。正如我之前提到的，MapWrite 按键对记录进行分组，然后以该格式将它们写入持久存储。写入的 *persistent* 部分实际上在这一点上并不是绝对必要的，只要存在持久性 *somewhere* （即，如果上游输入被保存并且在失败的情况下可以从它们重新计算中间结果，类似于Spark 采用弹性分布式数据集 [RDD] 的方法）。 *重要的是记录被组合到某种数据存储中，无论是在内存中，在磁盘上，还是在你拥有的任何地方。这很重要，因为由于这种分组操作，以前在流中一个接一个地飞过的记录现在被放置在由它们的键指定的位置，从而允许每个键组作为它们的同调的弟兄姊妹来了。请注意这与前面提供的流到表转换的定义有多么相似：*随着时间的推移聚合更新流产生一个表*。 MapWrite 阶段通过按键对记录流进行分组，将这些数据置于静止状态，从而将流转换回表。[^5] 酷！
 
 现在我们已经完成了 MapReduce 的一半，因此，使用 [图 6-1](#map_phases_in_a_mapreduce_data_in_a_table_are_converted)，让我们回顾一下到目前为止所看到的内容。
 
@@ -124,9 +124,9 @@ Map阶段完成后，我们进入MapWrite阶段。正如我之前提到的，Map
 
 尽管它*听起来*可能很有趣，但在这种情况下，Reduce 实际上只是一个美化的 Map 阶段，它恰好接收每个键的值列表而不是单个值。所以它仍然只是将单个（复合）记录映射到零个或多个新记录。这里也没有什么特别新的东西。
 
-ReduceWrite 是一个有点值得注意的。我们已经知道这个阶段必须将一个流转换为一个表，因为 Reduce 产生一个流并且最终输出是一个表。但这是怎么发生的？如果我告诉你这是将上一阶段的输出键分组到持久存储中的直接结果，就像我们在 MapWrite 中看到的那样，你可能会相信我，直到你记得我之前提到键关联是*可选的*减少阶段的功能。启用该功能后，ReduceWrite *本质上与 MapWrite 相同。[6](ch06.html#idm139957178611376) 但是如果禁用该功能并且 Reduce 的输出没有关联的键，那么究竟发生了什么让这些数据静止?
+ReduceWrite 是一个有点值得注意的。我们已经知道这个阶段必须将一个流转换为一个表，因为 Reduce 产生一个流并且最终输出是一个表。但这是怎么发生的？如果我告诉你这是将上一阶段的输出键分组到持久存储中的直接结果，就像我们在 MapWrite 中看到的那样，你可能会相信我，直到你记得我之前提到键关联是*可选的*减少阶段的功能。启用该功能后，ReduceWrite *本质上与 MapWrite 相同。[^6] 但是如果禁用该功能并且 Reduce 的输出没有关联的键，那么究竟发生了什么让这些数据静止?
 
-要了解发生了什么，重新考虑 SQL 表的语义是很有用的。尽管经常被推荐，但 SQL 表并不严格要求具有唯一标识每一行的主键。在无键表的情况下，插入的每一行都被认为是一个新的、独立的行（即使其中的数据与表中的一个或多个现有行相同），就好像有一个隐含的 AUTO_INCREMENT 字段是用作密钥（顺便说一句，这在大多数实现中实际上是在幕后发生的，即使在这种情况下，“密钥”可能只是一些从未暴露或预期用作逻辑标识符的物理块位置）。这种隐式的唯一键分配正是在 ReduceWrite 中使用无键数据发生的情况。从概念上讲，仍然存在一个按键分组操作；这就是让数据静止的原因。但是由于缺少用户提供的密钥，ReduceWrite 将每条记录视为具有新的、从未见过的密钥，并有效地将每条记录与其自身分组，从而再次产生静止数据。 [7](ch06.html #idm139957178608496)
+要了解发生了什么，重新考虑 SQL 表的语义是很有用的。尽管经常被推荐，但 SQL 表并不严格要求具有唯一标识每一行的主键。在无键表的情况下，插入的每一行都被认为是一个新的、独立的行（即使其中的数据与表中的一个或多个现有行相同），就好像有一个隐含的 AUTO_INCREMENT 字段是用作密钥（顺便说一句，这在大多数实现中实际上是在幕后发生的，即使在这种情况下，“密钥”可能只是一些从未暴露或预期用作逻辑标识符的物理块位置）。这种隐式的唯一键分配正是在 ReduceWrite 中使用无键数据发生的情况。从概念上讲，仍然存在一个按键分组操作；这就是让数据静止的原因。但是由于缺少用户提供的密钥，ReduceWrite 将每条记录视为具有新的、从未见过的密钥，并有效地将每条记录与其自身分组，从而再次产生静止数据。 [^7]
 
 看一下[图6-2](#map_and_reduce_phases_in_a_mapreduce)，它从流/表的角度展示了整个管道。你可以看到它是一个 TABLE → STREAM → STREAM → TABLE → STREAM → STREAM → TABLE 的序列。即使我们正在处理有界数据，即使我们正在做我们传统上认为的批处理，它实际上只是隐藏在流和表之下。
 
@@ -213,7 +213,7 @@ PCollection<KV<Team, Integer>> 总计 =
 
 查看图表的新流/表部分，如果我们所做的只是计算总和作为我们的最终结果（实际上并没有在管道中以任何其他方式进一步转换这些总和），那么我们使用分组创建的表操作有我们的答案，随着新数据的到来，随着时间的推移而发展。为什么我们不直接从那里读取我们的结果呢？
 
-这正是支持将流处理器作为数据库的人们所提出的观点[8](ch06.html#idm139957178492576)（主要是 Kafka 和 Flink 工作人员）：在管道中进行分组操作的任何地方，您都在创建一个表，其中包括该阶段该部分的有效输出值。如果这些输出值恰好是您的管道正在计算的最后一件事，那么如果您可以直接从该表中读取它们，则无需在其他地方重新实现它们。除了随着时间的推移提供对结果的快速和轻松访问之外，这种方法通过在管道中不需要额外的接收器阶段来实现输出，从而节省了计算资源，通过消除冗余数据存储来节省磁盘，并且不需要任何构建上述接收器阶段的工程工作。[9](ch06.html#idm139957178490944) 唯一的主要警告是，您需要注意确保只有数据处理管道能够对表进行修改。如果表中的值可能由于外部修改而从管道下发生变化，那么所有关于一致性保证的赌注都将失败。
+这正是支持将流处理器作为数据库的人们所提出的观点[^8]（主要是 Kafka 和 Flink 工作人员）：在管道中进行分组操作的任何地方，您都在创建一个表，其中包括该阶段该部分的有效输出值。如果这些输出值恰好是您的管道正在计算的最后一件事，那么如果您可以直接从该表中读取它们，则无需在其他地方重新实现它们。除了随着时间的推移提供对结果的快速和轻松访问之外，这种方法通过在管道中不需要额外的接收器阶段来实现输出，从而节省了计算资源，通过消除冗余数据存储来节省磁盘，并且不需要任何构建上述接收器阶段的工程工作。[^9] 唯一的主要警告是，您需要注意确保只有数据处理管道能够对表进行修改。如果表中的值可能由于外部修改而从管道下发生变化，那么所有关于一致性保证的赌注都将失败。
 
 一段时间以来，业内许多人一直在推荐这种方法，并且在各种场景中都得到了很好的应用。我们已经看到 Google 内部的 MillWheel 客户通过直接从基于 Bigtable 的状态表中提供数据来做同样的事情，并且我们正在添加一流的支持，以在 C++ 中从管道外部访问状态——我们在 Google 内部使用的基于 Apache Beam 的等价物（Google Flume）；希望这些概念也能在不久的将来进入 Apache Beam。
 
@@ -233,7 +233,7 @@ PCollection<KV<Team, Integer>> 总计 =
 
   这是使动态、数据驱动类型的窗口（例如会话）成为可能的逻辑。
 
-窗口分配的效果非常简单。当一条记录在概念上被放置到一个窗口中时，窗口的定义本质上与该记录的用户分配键相结合，以创建一个在分组时使用的隐式复合键。[10](ch06.html#idm139957178468752) 很简单。
+窗口分配的效果非常简单。当一条记录在概念上被放置到一个窗口中时，窗口的定义本质上与该记录的用户分配键相结合，以创建一个在分组时使用的隐式复合键。[^10] 很简单。
 
 为了完整起见，让我们再看一下 [Chapter 3](ch03.html#watermarks_chapter) 中的原始窗口示例，但从流和表的角度来看。如果您还记得，代码片段类似于 [Example 6-2](#summation_pipeline_chap_six_second) （这次省略了解析 *not* ）。
 
@@ -378,7 +378,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 到目前为止，我们讨论过的所有具体触发器的语义（事件时间、处理时间、计数、早/准/晚等组合）与从流中查看时所期望的一样/表的观点，所以它们不值得进一步讨论。但是，我们还没有花太多时间讨论经典批处理场景中的触发器是什么样的。现在我们了解了批处理管道的底层流/表拓扑是什么样的，这值得简要介绍一下。
 
-归根结底，经典批处理场景中使用的触发器只有一种类型：输入完成时触发的触发器。对于我们之前看到的 MapReduce 作业的初始 MapRead 阶段，该触发器在概念上将在管道启动后立即触发输入表中的所有数据，假设批处理作业的输入从开始吧。[11](ch06.html#idm139957178343024) 因此，输入源表将被转换为单个元素的流，之后 Map 阶段可以开始处理它们。
+归根结底，经典批处理场景中使用的触发器只有一种类型：输入完成时触发的触发器。对于我们之前看到的 MapReduce 作业的初始 MapRead 阶段，该触发器在概念上将在管道启动后立即触发输入表中的所有数据，假设批处理作业的输入从开始吧。[^11] 因此，输入源表将被转换为单个元素的流，之后 Map 阶段可以开始处理它们。
 
 对于流水线中间的表到流的转换，例如我们示例中的 ReduceRead 阶段，使用相同类型的触发器。然而，在这种情况下，触发器实际上必须等待表中的所有数据都完成（即，更通常所说的所有数据都被写入 shuffle），就像我们的示例批处理管道一样图 [6-4](#stream_and_tables_view_of_classic_batch_processing) 和 [6-6](#streams_and_tables_view_of_windowed_summation_on_a_batch_engine) 在发出最终结果之前等待输入结束。
 
@@ -398,7 +398,7 @@ PCollection<KV<Team, Integer>> totals = input
 
   这可以追溯到我在 [“批处理和流式传输效率差异”](ch01.html#batch_and_streaming_efficiency_differnces) 中所说的内容：除了效率增量（有利于批处理）和处理无限数据的自然能力（有利于流式传输）。我当时认为，大部分效率增量来自更大的捆绑包大小（为了吞吐量而显式妥协延迟）和更有效的 shuffle 实现（即流→表→流转换）的组合。从这个角度来看，应该有可能提供一个无缝集成两全其美的系统：一个提供自然处理无限数据的能力，但也可以在广泛的使用范围内平衡延迟、吞吐量和成本之间的紧张关系通过在幕后透明地调整包大小、随机播放实现和其他此类实现细节来实现。
 
-  这正是 Apache Beam 在 API 级别所做的事情。[12](ch06.html#idm139957178318224) 这里提出的论点是在执行引擎级别也有统一的空间。在这样的世界中，批处理和流式传输将不再是一回事，我们将能够一劳永逸地告别批处理 * 和 * 流式传输作为独立的概念。我们将只拥有通用数据处理系统，它结合了家族树中两个分支的最佳想法，为手头的特定用例提供最佳体验。某天。
+  这正是 Apache Beam 在 API 级别所做的事情。[^12] 这里提出的论点是在执行引擎级别也有统一的空间。在这样的世界中，批处理和流式传输将不再是一回事，我们将能够一劳永逸地告别批处理 * 和 * 流式传输作为独立的概念。我们将只拥有通用数据处理系统，它结合了家族树中两个分支的最佳想法，为手头的特定用例提供最佳体验。某天。
 
 此时，我们可以在扳机部分插入一个叉子。 完成。 在全面了解 Beam 模型和流和表理论之间的关系的过程中，我们只有一个短暂的停留：*累积*。
 
@@ -406,9 +406,9 @@ PCollection<KV<Team, Integer>> totals = input
 
 ### *如何*：积累
 
-在 [Chapter 2](ch02.html#the_what_where_when_and_how) 中，我们了解到三种累积模式（丢弃、累积、累积和收回[13](ch06.html#idm139957178308448)）告诉我们，当窗口在其生命过程中多次触发。幸运的是，这里与流和表的关系非常简单：
+在 [Chapter 2](ch02.html#the_what_where_when_and_how) 中，我们了解到三种累积模式（丢弃、累积、累积和收回[^13]）告诉我们，当窗口在其生命过程中多次触发。幸运的是，这里与流和表的关系非常简单：
 
-- *丢弃模式*要求系统在触发时丢弃窗口的先前值或保留先前值的副本并在下次窗口触发时计算增量。[14](ch06.html#idm139957178301392) （这种模式最好称为 Delta 模式。）
+- *丢弃模式*要求系统在触发时丢弃窗口的先前值或保留先前值的副本并在下次窗口触发时计算增量。[^14] （这种模式最好称为 Delta 模式。）
 
 - *累积模式*无需额外工作；触发时表中窗口的当前值就是发出的值。 （这种模式最好称为值模式。）
 
@@ -588,3 +588,33 @@ PCollection<KV<Team, Integer>> totals = input
 通过以这种方式对操作进行分类，了解数据如何随时间流经（并在其中逗留）给定管道变得微不足道。
 
 最后，也许也是最重要的一点，我们学到了这一点：当你从流和表的角度来看事物时，你会非常清楚地知道批处理和流在概念上实际上是同一个东西。有界或无界，都无所谓。从上到下是流和表格。
+
+
+
+[^1]: If you didn't go to college for computer science and you've made it this far in the book, you are likely either 1) my parents, 2) masochistic, or 3) very smart (and for the record, I'm not implying these groups are necessarily mutually exclusive; figure that one out if you can, Mom and Dad! \<winky-smiley/\>).
+
+[^2]: And note that in some cases, the tables themselves can accept time as a query parameter, allowing you to peer backward in time to snapshots of the table as it existed in the past.
+
+[^3]: Note that no guarantees are made about the keys of two successive records observed by a single mapper, because no key-grouping has occurred yet. The existence of the key here is really just to allow keyed datasets to be consumed in a natural way, and if there are no obvious keys for the input data, they'll all just share what is effectively a global null key.
+
+[^4]: Calling the inputs to a batch job "static" might be a bit strong. In reality, the dataset being consumed can be constantly changing as it's processed; that is, if you're reading directly from an HBase/Bigtable table within a timestamp range in which the data aren't guaranteed to be immutable. But in most cases, the recommended approach is to ensure that you're somehow processing a static snapshot of the input data, and any deviation from that assumption is at your own peril.
+
+[^5]: Note that grouping a stream by key is importantly distinct from simply *partitioning* that stream by key, which ensures that all records with the same key end up being processed by the same machine but doesn't do anything to put the records to rest. They instead remain in motion and thus continue on as a stream. A grouping operation is more like a partition-by-key followed by a write to the appropriate group for that partition, which is what puts them to rest and turns the stream into a table.
+
+[^6]: One giant difference, from an implementation perspective at least, being that ReduceWrite, knowing that keys have already been grouped together by MapWrite, and further knowing that Reduce is unable to alter keys for the case in which its outputs remain keyed, can simply accumulate the outputs generated by reducing the values for a single key in order to group them together, which is much simpler than the full-blown shuffle implementation required for a MapWrite phase.
+
+[^7]: Another way of looking at it is that there are two types of tables: updateable and appendable; this is the way the Flink folks have framed it for their Table API. But even though that's a great intuitive way of capturing the observed semantics of the two situations, I think it obscures the underlying nature of what's actually happening that causes a stream to come to rest as a table; that is, grouping.
+
+[^8]: Though as we can clearly see from this example, it's not just a streaming thing; you can get the same effect with a batch system if its state tables are world readable.
+
+[^9]: This is particularly painful if a sink for your storage system of choice doesn't exist yet; building proper sinks that can uphold consistency guarantees is a surprisingly subtle and difficult task.
+
+[^10]: This also means that if you place a value into multiple windows---for example, sliding windows---the value must conceptually be duplicated into multiple, independent records, one per window. Even so, it's possible in some cases for the underlying system to be smart about how it treats certain types of overlapping windows, thus optimize away the need for actually duplicating the value. Spark, for example, does this for sliding windows.
+
+[^11]: Note that this high-level conceptual view of how things work in batch pipelines belies the complexity of efficiently triggering an entire table of data at once, particularly when that table is sizeable enough to require a plurality of machines to process. The [SplittableDoFn API](https://s.apache.org/splittable-do-fn) recently added to Beam provides some insight into the mechanics involved.
+
+[^12]: And yes, if you blend batch and streaming together you get Beam, which is where that name came from originally. For reals.
+
+[^13]: This is why you should always use an Oxford comma.
+
+[^14]: Note that in the case of merging windows, in addition to merging the current values for the two windows to yield a merged current value, the previous values for those two windows would need to be merged, as well, to allow for the later calculation of a merged delta come triggering time.

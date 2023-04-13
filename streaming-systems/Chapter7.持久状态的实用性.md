@@ -39,7 +39,7 @@
 
 鉴于失败的必然性和应对失败的需要，持久状态可以被视为提供了两件事：
 
-- 根据临时输入的*正确性基础*。在处理有界数据时，假设输入永远存在通常是安全的；[1](ch07.html#idm139957178118480) 对于无界数据，这种假设通常不符合现实。持久状态允许您保留必要的中间信息位，以便在不可避免的情况发生时继续处理，即使您的输入源已经移动并忘记了它之前提供给您的记录。
+- 根据临时输入的*正确性基础*。在处理有界数据时，假设输入永远存在通常是安全的；[^1]
 
 - 作为应对故障的一部分，一种*最小化重复工作和持久化数据*的方法。无论您的输入是否是短暂的，当您的管道遇到机器故障时，必须重做故障机器上未在某处检查点的任何工作。根据管道及其输入的性质，这在两个方面可能代价高昂：重新处理期间执行的工作量，以及为支持重新处理而存储的输入数据量。
 
@@ -66,7 +66,7 @@
 
 我们探索的第一步，在始终持续存在的所有方面，是在管道中最直接的分组实现：输入的原始分组。这种情况下的分组操作通常类似于列表追加：任何时候一个新元素到达组中，它都会被追加到该组看到的元素列表中。
 
-在 Beam 中，这正是您将 `GroupByKey` 变换应用于 `PCollection` 时得到的结果。表示运动中的“PCollection”的流按键分组，以生成包含流中记录的静止表，[2](ch07.html#idm139957178086288) 组合在一起作为具有相同键的值列表。这显示在 `GroupByKey` 的 `PTransform` 签名中，它将输入声明为 `K`/`V` 对的`PCollection`，并将输出声明为 `K`/`Iterable` 对的集合：
+在 Beam 中，这正是您将 `GroupByKey` 变换应用于 `PCollection` 时得到的结果。表示运动中的“PCollection”的流按键分组，以生成包含流中记录的静止表，[^2] 组合在一起作为具有相同键的值列表。这显示在 `GroupByKey` 的 `PTransform` 签名中，它将输入声明为 `K`/`V` 对的`PCollection`，并将输出声明为 `K`/`Iterable` 对的集合：
 
 ```java
 class GroupByKey<K, V> extends PTransform<
@@ -147,7 +147,7 @@ CombineFn接受类型为 `InputT` 的输入，这些输入可以组合成称为 
 
     `组合（组合（a，b），c）==组合（a，组合（b，c））`
 
-  这些属性分别称为 *commutativity* 和 *associativity*。总之，[3](ch07.html#idm139957177912880) 它们实际上意味着我们可以以任意顺序和任意子分组自由组合元素和部分聚合。这允许我们以两种方式优化聚合：
+  这些属性分别称为 *commutativity* 和 *associativity*。总之，[^3] 它们实际上意味着我们可以以任意顺序和任意子分组自由组合元素和部分聚合。这允许我们以两种方式优化聚合：
 
   - 增量
 
@@ -210,7 +210,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 - 处理时间安排的灵活性；也就是说，能够将特定类型的处理发生的时间与我们关心的两个时间域中的时间进程绑定在一起：事件时间完整性和处理时间。触发器在这里提供了一组有限的灵活性，完整性触发器提供了一种将处理绑定到通过窗口末尾的水印的方法，而重复更新触发器提供了一种将处理绑定到处理时间域中的周期性进度的方法。但是对于某些用例（例如，某些类型的连接，您不必关心整个窗口的输入完整性，只需输入直到连接中特定记录的事件时间的完整性），触发器是不够的灵活的。因此，我们需要一个更通用的解决方案。
 
-  在 Beam 中，通过 *timers* 提供灵活的处理调度。[4](ch07.html#idm139957177840384) 计时器是一种特殊类型的状态，它在支持的时间域（事件时间或处理时间）中绑定特定时间点) 以及到达该时间点时要调用的方法。这样，特定的处理位可以延迟到将来更合适的时间。
+  在 Beam 中，通过 *timers* 提供灵活的处理调度。[^4] 计时器是一种特殊类型的状态，它在支持的时间域（事件时间或处理时间）中绑定特定时间点) 以及到达该时间点时要调用的方法。这样，特定的处理位可以延迟到将来更合适的时间。
 
 这三个特征的共同点是*灵活性*。相对不灵活的原始分组或增量组合方法可以很好地服务于特定的用例子集。但是，当处理他们相对狭窄的专业领域之外的任何事情时，这些选择往往会失败。发生这种情况时，您需要一个完全通用状态 API 的强大功能和灵活性，以便您优化对持久状态的利用。
 
@@ -238,7 +238,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 - 处理大量数据
 
-  我们不仅必须假设此管道将为大量独立用户处理数据，而且根据给定广告活动的数量和给定网站的受欢迎程度，我们可能需要存储大量印象和/或流量数据，因为我们试图建立归因证据。例如，存储每个用户 90 天的访问、印象和目标树[5](ch07.html#idm139957177786464) 数据，以便我们建立跨越多个月活动价值的归因，这并非闻所未闻.
+  我们不仅必须假设此管道将为大量独立用户处理数据，而且根据给定广告活动的数量和给定网站的受欢迎程度，我们可能需要存储大量印象和/或流量数据，因为我们试图建立归因证据。例如，存储每个用户 90 天的访问、印象和目标树[^5] 数据，以便我们建立跨越多个月活动价值的归因，这并非闻所未闻.
 
 - 防止垃圾邮件
 
@@ -694,3 +694,15 @@ private static TestStream<KV<String, VisitOrImpression>> createStream() {
 - *写入和读取粒度的灵活性*，允许根据用例调整任意点写入和读取的数据量，酌情最小化或最大化 I/O。
 
 - *处理调度的灵活性*，允许将处理的某些部分延迟到更合适的时间点，例如当输入被认为在事件时间的特定点完成时。
+
+
+
+[^1]: For some definition of "forever," typically at least "until we successfully complete execution of our batch pipeline and no longer require the inputs."
+
+[^2]: Recall that Beam doesn't currently expose these state tables directly; you must trigger them back into a stream to observe their contents as a new PCollection.
+
+[^3]: Or, as my colleague Kenn Knowles points out, if you take the definition as being commutativity across sets, the three-parameter version of commutativity is actually sufficient to also imply associativity: `COMBINE(a, b, c) == COMBINE(a, c, b) == COMBINE(b, a, c) == COMBINE(b, c, a) == COMBINE(c, a, b) == COMBINE(c, b, a)`. Math is fun.
+
+[^4]: And indeed, timers are the underlying feature used to implement most of the completeness and repeated updated triggers we discussed in [Chapter 2](#ch02.html#the_what_where_when_and_how){data-type="xref"} as well as garbage collection based on allowed lateness.
+
+[^5]: Thanks to the nature of web browsing, the visit trails we'll be analyzing are trees of URLs linked by HTTP referrer fields. In reality, they would end up being directed graphs, but for the sake of simplicity, we'll assume each page on our website has incoming links from exactly one other referring page on the site, thus yielding a simpler tree structure. Generalizing to graphs is a natural extension of the tree-based implementation, and only further drives home the points being made.

@@ -14,7 +14,7 @@
 
 在谈论流对于 SQL 的意义时，重要的是要牢记 SQL 的理论基础：关系代数。关系代数只是一种描述由命名的、类型化的元组组成的数据之间关系的数学方法。关系代数的核心是关系本身，它是这些元组的集合。在经典数据库术语中，关系类似于表，可以是物理数据库表、SQL 查询的结果、视图（物化或其他）等等；它是一组包含命名和类型化数据列的行。
 
-关系代数的一个更重要的方面是它的闭包属性：将关系代数中的任何运算符应用于任何有效关系 [1](ch08.html#idm139957175341792) 总是会产生另一个关系。换句话说，关系是关系代数的通用货币，所有运算符都将它们作为输入消费并作为输出产生。
+关系代数的一个更重要的方面是它的闭包属性：将关系代数中的任何运算符应用于任何有效关系 [^1] 总是会产生另一个关系。换句话说，关系是关系代数的通用货币，所有运算符都将它们作为输入消费并作为输出产生。
 
 从历史上看，许多在 SQL 中支持流式处理的尝试都未能满足闭包属性。它们将流与经典关系分开处理，提供新的运算符以在两者之间进行转换，并限制可以应用于其中之一的操作。这显着提高了任何此类流式 SQL 系统的采用门槛：潜在用户必须学习新的运算符并了解它们适用的地方和不适用的地方，并且同样地重新学习这个新世界中的适用性规则对于任何老运营商。更糟糕的是，这些系统中的大多数仍然无法提供我们想要的全套流语义，例如支持强大的无序处理和强大的时间连接支持（我们将在第 9 章中介绍后者） ]（ch09.html#streaming_joins））。因此，我认为基本上不可能命名任何已经真正广泛采用的现有流式 SQL 实现。此类流式 SQL 系统的额外认知开销和受限功能确保了它们仍然是一个利基企业。
 
@@ -22,7 +22,7 @@
 
 ### 时变关系
 
-切入正题，我在本章开头提到的妙语是：将流自然地集成到 SQL 中的关键是扩展关系，关系代数的核心数据对象，以表示一组数据*随着时间的推移* 而不是*特定时间点*的一组数据。更简洁地说，我们需要的不是*时间点*关系，而是*时变关系*。[2](ch08.html#idm139957175328912)
+切入正题，我在本章开头提到的妙语是：将流自然地集成到 SQL 中的关键是扩展关系，关系代数的核心数据对象，以表示一组数据*随着时间的推移* 而不是*特定时间点*的一组数据。更简洁地说，我们需要的不是*时间点*关系，而是*时变关系*。[^2]
 
 但什么是时变关系？让我们首先根据经典关系代数来定义它们，然后我们还将考虑它们与流和表理论的关系。
 
@@ -262,8 +262,8 @@
 
 现在让我们观察我们的时变关系作为一个流，因为它存在于几个不同的时间点。在此过程中的每一步，我们都会将 TVR 在该时间点的原始表格渲染与到该时间点的流的演变进行比较。要查看我们的时变关系的流渲染是什么样的，我们需要引入两个新的假设关键字：
 
-- 一个“STREAM”关键字，类似于我已经介绍过的“TABLE”关键字，它表明我们希望我们的查询返回一个逐个事件的流，以捕获时变关系随时间的演变。您可以将此视为随着时间的推移对关系应用每记录触发器。
-- 一个特殊的 `Sys.Undo`[3](ch08.html#idm139957175228928) 列，可以从 `STREAM` 查询中引用，以识别撤回的行。稍后会详细介绍这一点。
+- 一个`STREAM`关键字，类似于我已经介绍过的`TABLE`关键字，它表明我们希望我们的查询返回一个逐个事件的流，以捕获时变关系随时间的演变。您可以将此视为随着时间的推移对关系应用每记录触发器。
+- 一个特殊的 `Sys.Undo`[^3] 列，可以从 `STREAM` 查询中引用，以识别撤回的行。稍后会详细介绍这一点。
 
 因此，从 12:01 开始，我们将有以下内容：
 
@@ -303,7 +303,7 @@
 - 先前报告的总数 7 是不正确的。
 - 新的总数是 8。
 
-这就是特殊的“Sys.Undo”列允许我们做的事情：区分正常行和*收回*先前报告值的行。[4](ch08.html#idm139957175195248)
+这就是特殊的“Sys.Undo”列允许我们做的事情：区分正常行和*收回*先前报告值的行。[^4]
 
 `STREAM` 查询的一个特别好的特性是您可以开始看到所有这些与经典联机事务处理 (OLTP) 表的世界的关系：此查询的 `STREAM` 呈现本质上是捕获一系列 `INSERT ` 和 `DELETE` 操作，您可以使用它们在 OLTP 世界中随着时间的推移具体化这种关系（实际上，当您考虑它时，OLTP 表本身本质上是随时间变化的关系，通过 `INSERT` 的流随时间发生变化、“更新”和“删除”）。
 
@@ -346,9 +346,33 @@
 
 ```
 
+到这个时候，很明显 [`STREAM`]{.code_purple} 我们的时变关系的版本与 表版本：表捕获整个关系的快照 *在一个特定的时间点*，而流捕获的视图 对关系的个别更改 *over time*.[^5] 有趣的是，这意味着 [`STREAM`]{.code_purple} 渲染与我们的原始渲染有更多共同点， 基于表的 TVR [渲染]{.keep-together}：
+
+``` {data-type="programlisting"}
+12:07> SELECT TVR Name, SUM(Score) as Total, MAX(Time) as Time
+       FROM UserScores GROUP BY Name;
+---------------------------------------------------------
+|       [-inf, 12:01)       |       [12:01, 12:03)      |
+| ------------------------- | ------------------------- |
+| | Name  | Total | Time  | | | Name  | Total | Time  | |
+| ------------------------- | ------------------------- |
+| |       |       |       | | | Julie | 7     | 12:01 | |
+| |       |       |       | | |       |       |       | |
+| ------------------------- | ------------------------- |
+---------------------------------------------------------
+|       [12:03, 12:07)      |       [12:07, now)        |
+| ------------------------- | ------------------------- |
+| | Name  | Total | Time  | | | Name  | Total | Time  | |
+| ------------------------- | ------------------------- |
+| | Julie | 8     | 12:03 | | | Julie | 12    | 12:07 | |
+| | Frank | 3     | 12:03 | | | Frank | 3     | 12:03 | |
+| ------------------------- | ------------------------- |
+---------------------------------------------------------
+```
+
 事实上，可以肯定地说，`STREAM`查询只是提供了对存在于相应的基于表的`TVR`查询中的整个数据历史记录的替代呈现。 STREAM 渲染的价值在于它的简洁性：它仅捕获 TVR 中每个时间点关系快照之间的变化增量。 表序列`TVR`呈现的价值在于它提供的清晰度：它以突出其与经典关系的自然关系的格式捕获关系随时间的演变，并在这样做时提供简单明了的 流上下文中关系语义的定义以及流带来的额外时间维度。
 
-`STREAM` 和基于表格的 `TVR` 渲染之间的相似之处的另一个重要方面是，它们在编码的整体数据方面本质上是等效的。 这触及了其支持者长期以来鼓吹的流/表二元性的核心：流和表[6](ch08.html#idm139957175150208) 实际上只是同一枚硬币的两个不同面。 或者重新使用[第 6 章](ch06.html#streams_and_tables) 中的糟糕物理类比，流和表是随时间变化的关系，就像波和粒子是光：[7](ch08.html#idm139957175148368) 一个完整的时间 - 可变关系同时是表和流； 表和流只是同一概念的不同物理表现，具体取决于上下文。
+`STREAM` 和基于表格的 `TVR` 渲染之间的相似之处的另一个重要方面是，它们在编码的整体数据方面本质上是等效的。 这触及了其支持者长期以来鼓吹的流/表二元性的核心：流和表[^6] 实际上只是同一枚硬币的两个不同面。 或者重新使用[第 6 章](ch06.html#streams_and_tables) 中的糟糕物理类比，流和表是随时间变化的关系，就像波和粒子是光：[^7] 一个完整的时间 - 可变关系同时是表和流； 表和流只是同一概念的不同物理表现，具体取决于上下文。
 
 现在，重要的是要记住，只有当两个版本都编码相同的信息时，这种流/表的二元性才是正确的； 也就是说，当您拥有完全保真表或流时。 然而，在许多情况下，完全保真是不切实际的。 正如我之前提到的，对时变关系的完整历史进行编码，无论是流形式还是表格形式，对于大型数据源来说都是相当昂贵的。 TVR 的流和表表现以某种方式有损是很常见的。 表格通常只编码最新版本的 TVR； 那些支持临时或版本访问的通常将编码历史压缩到特定的时间点快照，和/或垃圾收集版本早于某个阈值。 类似地，流通常只对 TVR 演变的有限持续时间进行编码，通常是该历史的相对较新的部分。 像 Kafka 这样的持久流提供了对整个 TVR 进行编码的能力，但这同样是相对不常见的，超过某个阈值的数据通常会通过垃圾收集过程被丢弃。
 
@@ -376,7 +400,7 @@
 
 - *Sinks* *write* 表通常对它们*分组* 输入流的方式进行硬编码。 有时，这是通过给予用户一定程度的控制权的方式完成的； 例如，通过简单地对用户分配的键进行分组。 在其他情况下，分组可能是隐式定义的； 例如，在将没有自然键的输入数据写入分片输出源时，通过随机物理分区号进行分组。 与来源一样，它实际上仅取决于给定接收器的实用性以及接收器的作者试图解决的用例。
 
-- 对于*分组/取消分组操作*，与源和接收器相比，Beam 为用户提供了完全的灵活性，可以让他们将数据分组到表中并将它们取消分组回到流中。 这是设计使然。 分组操作的灵活性是必要的，因为数据分组的方式是定义管道的算法的关键组成部分。 取消分组的灵活性很重要，这样应用程序才能以适合手头用例的方式调整生成的流。[8](ch08.html#idm139957175101104)
+- 对于*分组/取消分组操作*，与源和接收器相比，Beam 为用户提供了完全的灵活性，可以让他们将数据分组到表中并将它们取消分组回到流中。 这是设计使然。 分组操作的灵活性是必要的，因为数据分组的方式是定义管道的算法的关键组成部分。 取消分组的灵活性很重要，这样应用程序才能以适合手头用例的方式调整生成的流。[^8]
 
 然而，这里有一个问题。 请记住[图 8-1](#stream_bias_in_the_beam_model_approach)，Beam 模型天生就偏向于流。 因此，尽管可以将分组操作直接干净地应用于流（这是 Beam 的`GroupByKey`操作），但该模型从不提供可以直接应用触发器的一流表对象。 因此，必须在其他地方应用触发器。 这里基本上有两个选项：
 
@@ -399,7 +423,7 @@
 
 ### SQL 模型：偏向表的方法
 
-与 Beam 模型的流偏向方法相反，SQL 历来采用表偏向方法：查询应用于表，并且总是产生新表。 这类似于我们在[第 6 章](ch06.html#streams_and_tables) 中使用 MapReduce 看到的批处理模型，[9](ch08.html#idm139957174835696) 但是考虑一个像我们这样的具体示例会很有用 刚刚查看了梁模型。
+与 Beam 模型的流偏向方法相反，SQL 历来采用表偏向方法：查询应用于表，并且总是产生新表。 这类似于我们在[第 6 章](ch06.html#streams_and_tables) 中使用 MapReduce 看到的批处理模型，[^9] 但是考虑一个像我们这样的具体示例会很有用 刚刚查看了梁模型。
 
 考虑以下非规范化 SQL 表：
 
@@ -464,7 +488,7 @@ UserScores (user, team, score, timestamp)
 
 输入表（即源，在梁模型术语中）
 
-- 这些总是在特定时间点[10](ch08.html#idm139957174793216)（通常是查询执行时间）隐式触发，以生成包含当时表快照的有界流。 这也与经典批处理所获得的相同； 例如，我们在 [第 6 章](ch06.html#streams_and_tables) 中看到的 MapReduce 案例。
+- 这些总是在特定时间点[^10]（通常是查询执行时间）隐式触发，以生成包含当时表快照的有界流。 这也与经典批处理所获得的相同； 例如，我们在 [第 6 章](ch06.html#streams_and_tables) 中看到的 MapReduce 案例。
 
 输出表（即汇，梁模型术语）
 
@@ -482,7 +506,7 @@ UserScores (user, team, score, timestamp)
 
 鉴于经典 SQL 查询与经典批处理的相似程度，可能很容易将 SQL 固有的表偏差视为不以任何方式支持流处理的 SQL 产物。 但这样做会忽略这样一个事实，即数据库支持特定类型的流处理已经有一段时间了：*物化视图*。 物化视图是一种视图，它被物理地物化为一个表，并随着源表的发展由数据库*随*时间保持最新。 请注意，这听起来与我们对时变关系的定义非常相似。 物化视图的迷人之处在于，它们向 SQL 添加了一种非常有用的流处理形式，而没有显着改变其操作方式，包括其固有的表偏差。
 
-例如，让我们考虑一下我们在 [图 8-4](#table_bias_with_a_final_having_clause) 中看到的查询。 我们可以将这些查询更改为`CREATE MATERIALIZED VIEW`[11](ch08.html#idm139957174770912) 语句：
+例如，让我们考虑一下我们在 [图 8-4](#table_bias_with_a_final_having_clause) 中看到的查询。 我们可以将这些查询更改为`CREATE MATERIALIZED VIEW`[^11] 语句：
 
 ```
     CREATE MATERIALIZED VIEW TeamAndScoreView AS
@@ -513,7 +537,7 @@ UserScores (user, team, score, timestamp)
 - *分组/取消分组操作* 与经典批处理查询的功能相同，唯一的区别是使用 `SCAN-AND-STREAM` 触发器而不是 `SNAPSHOT` 触发器来进行隐式取消分组操作。
 
 
-在这个例子中，很明显 SQL 固有的表偏差不仅仅是 SQL 仅限于批处理的产物：[12](ch08.html#idm139957174741168) 物化视图赋予 SQL 执行特定类型流处理的能力 方法没有任何重大变化，包括对表格的固有偏见。 经典 SQL 只是一个偏表模型，无论您是将它用于批处理还是流处理。
+在这个例子中，很明显 SQL 固有的表偏差不仅仅是 SQL 仅限于批处理的产物：[^12] 物化视图赋予 SQL 执行特定类型流处理的能力 方法没有任何重大变化，包括对表格的固有偏见。 经典 SQL 只是一个偏表模型，无论您是将它用于批处理还是流处理。
 
 
 
@@ -559,7 +583,7 @@ UserScores (user, team, score, timestamp)
 
 ### 时间运算符
 
-健壮的无序处理的基础是事件时间戳：捕获事件发生时间而不是事件观察时间的一小段元数据。 在 SQL 世界中，事件时间通常只是给定 TVR 的另一列数据，它本身就存在于源数据本身中。[13](ch08.html#idm139957174688160) 从这个意义上说，实现记录的想法 记录本身内的事件时间是 SQL 已经通过在常规列中放置时间戳来自然处理的。
+健壮的无序处理的基础是事件时间戳：捕获事件发生时间而不是事件观察时间的一小段元数据。 在 SQL 世界中，事件时间通常只是给定 TVR 的另一列数据，它本身就存在于源数据本身中。[^13] 从这个意义上说，实现记录的想法 记录本身内的事件时间是 SQL 已经通过在常规列中放置时间戳来自然处理的。
 
 在我们继续之前，让我们看一个例子。 为了帮助将所有这些 SQL 内容与我们之前在本书中探索过的概念联系起来，我们恢复了运行示例，即对团队不同成员的九个分数求和以获得该团队的总分。 如果您还记得的话，当绘制在 X = 事件时间/Y = 处理时间轴上时，这些分数看起来像 [图 8-6](#data_points_in_our_running_example)。
 
@@ -806,7 +830,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 这就引出了一个问题：如果我们可以使用现有的 SQL 结构隐式窗口化，为什么还要费心支持显式窗口化结构呢？ 有两个原因，在这个例子中只有第一个是显而易见的（我们将在本章后面看到另一个原因）：
 
-1. 窗口化为您处理窗口计算数学。 当您直接指定宽度和滑动等基本参数而不是自己计算窗口数学时，始终如一地把事情做好要容易得多。[14](ch08.html#idm139957174580832)
+1. 窗口化为您处理窗口计算数学。 当您直接指定宽度和滑动等基本参数而不是自己计算窗口数学时，始终如一地把事情做好要容易得多。[^14]
 2. 窗口化允许更复杂的动态分组（如会话）的简洁表达。 尽管 SQL 在技术上能够表达定义会话窗口的每个元素在某些时间间隙的另一个元素关系，但相应的咒语是分析函数、自连接和数组取消嵌套的混乱 不能合理地期望凡人能够自己召唤。
 
 除了已经存在的临时窗口功能之外，两者都是在 SQL 中提供一流窗口结构的令人信服的论据。
@@ -1041,7 +1065,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 也就是说，累积模式有一些主要缺点。 事实上，正如我们在 [第 2 章](ch02.html#the_what_where_when_and_how) 中所讨论的那样，由于过度计数，对于具有两个或多个分组操作序列的任何查询/管道来说，它都是完全错误的。 允许在允许包含多个串行分组操作的查询的系统中使用一行的多个修订的唯一明智的方法是它是否在默认情况下以 *accumulating 和 retracting* 模式运行。 否则，由于盲目合并单个行的多个修订，您会遇到给定输入记录多次包含在单个聚合中的问题。
 
-因此，当我们谈到将累积模式语义合并到 SQL 世界中的问题时，最符合我们提供直观和自然体验的目标的选项是系统是否在幕后默认使用撤回。[15](ch08 .html#idm139957174420112)正如我之前介绍“Sys.Undo”专栏时所指出的那样，如果您不关心撤回（如本节之前的示例所示），则无需请求撤回 . 但如果你真的要他们，他们应该在那里。
+因此，当我们谈到将累积模式语义合并到 SQL 世界中的问题时，最符合我们提供直观和自然体验的目标的选项是系统是否在幕后默认使用撤回。[^15]正如我之前介绍“Sys.Undo”专栏时所指出的那样，如果您不关心撤回（如本节之前的示例所示），则无需请求撤回 . 但如果你真的要他们，他们应该在那里。
 
 
 
@@ -1136,7 +1160,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 <center><i>Figure 8-14. Session window summation with accumulation and retractions</center></i>
 
-最后，以 SQL 形式。 对于 SQL 版本，我们假设系统默认在幕后使用撤回，然后每当我们请求特殊的“Sys.Undo”列时，单独的撤回行就会在流中具体化。[16](ch08. html#idm139957174363856）正如我最初描述的那样，该列的价值在于它允许我们区分撤回行（在 `Sys.Undo` 列中标记为 `undo`）和正常行（在 `Sys.Undo` 列中未标记） 在这里为了更清晰的对比，尽管它们可以很容易地标记为“重做”，而不是）：
+最后，以 SQL 形式。 对于 SQL 版本，我们假设系统默认在幕后使用撤回，然后每当我们请求特殊的“Sys.Undo”列时，单独的撤回行就会在流中具体化。[^16]正如我最初描述的那样，该列的价值在于它允许我们区分撤回行（在 `Sys.Undo` 列中标记为 `undo`）和正常行（在 `Sys.Undo` 列中未标记） 在这里为了更清晰的对比，尽管它们可以很容易地标记为“重做”，而不是）：
 
 ```
 12:00> SELECT STREAM SUM(Score) as Total,
@@ -1167,7 +1191,7 @@ PCollection<KV<Team, Integer>> totals = input
 ................. [12:00, 12:10] .................
 ```
 
-包括撤回在内，会话流不再仅包括新会话，还包括已被替换的旧会话的撤回。 使用这个流，随着时间的推移在 HBase 中正确地建立会话集是微不足道的 [17](ch08.html#idm139957174352128)：您只需在新会话到达时编写它们（未标记的“重做”行）并在它们到达时删除旧会话 被缩回（`undo` 行）。 好多了！
+包括撤回在内，会话流不再仅包括新会话，还包括已被替换的旧会话的撤回。 使用这个流，随着时间的推移在 HBase 中正确地建立会话集是微不足道的 [^17]：您只需在新会话到达时编写它们（未标记的“重做”行）并在它们到达时删除旧会话 被缩回（`undo` 行）。 好多了！
 
 
 
@@ -1187,7 +1211,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 其次，我们探讨了 Beam 模型和当今存在的经典 SQL 模型中固有的偏见，得出的结论是 Beam 采用面向流的方法，而 SQL 采用面向表的方法。
 
-最后，我们研究了向 SQL 添加对强大流处理的支持所需的假设语言扩展，[18](ch08.html#idm139957174325392) 以及一些精心选择的默认值，这些默认值可以大大减少对这些扩展的使用需求 :
+最后，我们研究了向 SQL 添加对强大流处理的支持所需的假设语言扩展，[^18] 以及一些精心选择的默认值，这些默认值可以大大减少对这些扩展的使用需求 :
 
 - 表/流选择
 
@@ -1231,10 +1255,50 @@ PCollection<KV<Team, Integer>> totals = input
 
    `Sys.EmitIndex`
 
-   - 此行的发射版本的从零开始的索引。[19](ch08.html#idm139957174288112)
+   - 此行的发射版本的从零开始的索引。[^19]
 
    `Sys.Undo`
 
    - 该行是正常行还是撤回（`undo`）。 默认情况下，系统应该在幕后操作撤回，因为任何时候可能存在一系列多个分组操作都是必要的。 如果在将 TVR 渲染为流时未投影`Sys.Undo`列，则只会返回普通行，从而提供一种在*累积*和*累积和缩回*模式之间切换的简单方法。
 
 使用 SQL 进行流处理并不困难。 事实上，SQL 中的流处理已经以物化视图的形式非常普遍。 重要的部分实际上归结为捕获数据集/关系随时间的演变（通过时变关系），提供在物理表或这些时变关系的流表示之间进行选择的方法，并提供对时间进行推理的工具 （开窗、水印和触发器）我们在整本书中一直在讨论。 而且，至关重要的是，您需要良好的默认设置，以最大限度地减少这些扩展在实践中需要使用的频率。
+
+
+
+^[1](#ch08.html#idm139957175341792-marker)^ What I mean by "valid relation" here is simply a relation for which the application of a given operator is well formed. For example, for the SQL query `SELECT x FROM y`​, a valid relation y would be any relation containing an attribute/column named x. Any relation not containing a such-named attribute would be invalid and, in the case of a real database system, would yield a query execution error.
+
+^[2](#ch08.html#idm139957175328912-marker)^ Much credit to Julian Hyde for this name and succinct rendering of the concept.
+
+^[3](#ch08.html#idm139957175228928-marker)^ Note that the `Sys.Undo` name used here is riffing off the concise [undo/redo nomenclature from Apache Flink](https://flink.apache.org/news/2017/04/04/dynamic-tables.html), which I think is a very clean way to capture the ideas of retraction and nonretraction rows.
+
+^[4](#ch08.html#idm139957175195248-marker)^ Now, in this example, it's not too difficult to figure out that the new value of 8 should replace the old value of 7, given that the mapping is 1:1. But we'll see a more complicated example later on when we talk about sessions that is much more difficult to handle without having retractions as a guide.
+
+^[5](#ch08.html#idm139957175168000-marker)^ And indeed, this is a key point to remember. There are some systems that advocate treating streams and tables as identical, claiming that we can simply treat streams like never-ending tables. That statement is accurate inasmuch as the true underlying primitive is the time-varying relation, and all relational operations may be applied equally to any time-varying relation, regardless of whether the actual physical manifestation is a stream or a table. But that sort of approach conflates the two very different types of views that tables and streams provide for a given time-varying relation. Pretending that two very different things are the same might seem simple on the surface, but it's not a road toward understanding, clarity, and correctness.
+
+^[6](#ch08.html#idm139957175150208-marker)^ Here referring to tables in the sense of tables that can vary over time; that is, the table-based TVRs we've been looking at.
+
+^[7](#ch08.html#idm139957175148368-marker)^ This one courtesy Julian Hyde.
+
+^[8](#ch08.html#idm139957175101104-marker)^ Though there are a number of efforts in flight across various projects that are trying to simplify the specification of triggering/ungrouping semantics. The most compelling proposal, made independently within both the Flink and Beam communities, is that triggers should simply be specified at the outputs of a pipeline and automatically propagated up throughout the pipeline. In this way, one would describe only the desired shape of the streams that actually create materialized output; the shape of all other streams in the pipeline would be implicitly derived from there.
+
+^[9](#ch08.html#idm139957174835696-marker)^ Though, of course, a single SQL query has vastly more expressive power than a single MapReduce, given the far less-confining set of operations and composition options available.
+
+^[10](#ch08.html#idm139957174793216-marker)^ Note that we're speaking conceptually here; there are of course a multitude of optimizations that can be applied in actual execution; for example, looking up specific rows via an index rather than scanning the entire table.
+
+^[11](#ch08.html#idm139957174770912-marker)^ It's been brought to my attention multiple times that the "`MATERIALIZED`" aspect of these queries is just an optimization: semantically speaking, these queries could just as easily be replaced with generic `CREATE VIEW` statements, in which case the database might instead simply rematerialize the entire view each time it is referenced. This is true. The reason I use the `MATERIALIZED` variant here is that the semantics of a materialized view are to incrementally update the view table in response to a stream of changes, which is indicative of the streaming nature behind them. That said, the fact that you can instead provide a similar experience by re-executing a bounded query each time a view is accessed provides a nice link between streams and tables as well as a link between streaming systems and the way batch systems have been historically used for processing data that evolves over time. You can either incrementally process changes as they occur or you can reprocess the entire input dataset from time to time. Both are valid ways of processing an evolving table of data.
+
+^[12](#ch08.html#idm139957174741168-marker)^ Though it's probably fair to say that SQL's table bias is likely an artifact of SQL's *roots* in batch processing.
+
+^[13](#ch08.html#idm139957174688160-marker)^ For some use cases, capturing and using the current processing time for a given record as its event time going forward can be useful (for example, when logging events directly into a TVR, where the time of ingress is the natural event time for that record).
+
+^[14](#ch08.html#idm139957174580832-marker)^ Maths are easy to get wrong.
+
+^[15](#ch08.html#idm139957174420112-marker)^ It's sufficient for retractions to be used by default and not simply always because the system only needs the *option* to use retractions. There are specific use cases; for example, queries with a single grouping operation whose results are being written into an external storage system that supports per-key updates, where the system can detect retractions are not needed and disable them as an optimization.
+
+^[16](#ch08.html#idm139957174363856-marker)^ Note that it's a little odd for the simple addition of a new column in the `SELECT` statement to result in a new rows appearing in a query. A fine alternative approach would be to require `Sys.Undo` rows to be filtered out via a `WHERE` clause when not needed.
+
+^[17](#ch08.html#idm139957174352128-marker)^ Not that this triviality applies only in cases for which eventual consistency is sufficient. If you need to always have a globally coherent view of all sessions at any given time, you must 1) be sure to write/delete (via tombstones) each session at its emit time, and 2) only ever read from the HBase table at a timestamp that is less than the output watermark from your pipeline (to synchronize reads against the multiple, independent writes/deletes that happen when sessions merge). Or better yet, cut out the middle person and serve the sessions from your state tables directly.
+
+^[18](#ch08.html#idm139957174325392-marker)^ To be clear, they're not all hypothetical. Calcite has support for the windowing constructs described in this chapter.
+
+^[19](#ch08.html#idm139957174288112-marker)^ Note that the definition of "index" becomes complicated in the case of merging windows like sessions. A reasonable approach is to take the maximum of all of the previous sessions being merged together and increment by one.

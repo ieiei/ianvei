@@ -11,7 +11,7 @@
 
 为了给我们一些具体的推理，让我们考虑许多不同类型的连接，因为它们应用于以下数据集，方便地命名为“Left”和“Right”以匹配通用命名法：
 
-```
+``` sql
 12:10> SELECT TABLE * FROM Left;        12:10> SELECT TABLE * FROM Right;
 --------------------                    --------------------
 | Num | Id | Time  |                    | Num | Id | Time  |
@@ -48,17 +48,17 @@
 
 现在，加入他们自己。 ANSI SQL 定义了五种类型的连接：`FULL OUTER`、`LEFT OUTER`、`RIGHT OUTER`、`INNER` 和 `CROSS`。 我们深入研究前四个，并在下一段中简要讨论最后一个。 我们还谈到了另外两个有趣但不太常见（并且不太支持，至少使用标准语法）的变体：`ANTI` 和 `SEMI` 连接。
 
-从表面上看，这听起来有很多变化。 但正如您将看到的，核心连接实际上只有一种类型：`FULL OUTER`连接。 `CROSS` 连接只是一个带有空洞的 true 连接谓词的 `FULL OUTER` 连接； 也就是说，它返回左表中的一行与右表中的行的所有可能配对。 所有其他连接变体都简单地简化为`FULL OUTER`连接的某个逻辑子集。[1](ch09.html#idm139957174228496)因此，在您了解所有不同连接类型之间的共性后，它就变成了 将它们全部记在脑海中要容易得多。 它还使在流式传输的上下文中对它们的推理变得更加简单。
+从表面上看，这听起来有很多变化。 但正如您将看到的，核心连接实际上只有一种类型：`FULL OUTER`连接。 `CROSS` 连接只是一个带有空洞的 true 连接谓词的 `FULL OUTER` 连接； 也就是说，它返回左表中的一行与右表中的行的所有可能配对。 所有其他连接变体都简单地简化为`FULL OUTER`连接的某个逻辑子集。[^1]因此，在您了解所有不同连接类型之间的共性后，它就变成了 将它们全部记在脑海中要容易得多。 它还使在流式传输的上下文中对它们的推理变得更加简单。
 
 开始之前的最后一点注意事项：我们将主要考虑最多 1:1 基数的 equi 连接，我的意思是连接谓词是一个相等语句并且每一侧最多有一个匹配行 的加入。 这使示例简单明了。 当我们到达`SEMI`连接时，我们将扩展我们的示例以考虑具有任意 N:M 基数的连接，这将使我们能够观察更多任意谓词连接的行为。
 
 ### FULL OUTER
 
-因为它们构成了每个其他变体的概念基础，所以我们首先看一下`FULL OUTER`连接。 外部连接体现了对“连接”一词的相当自由和乐观的解释：`FULL OUTER` 的结果——连接两个数据集本质上是两个数据集中的完整行列表，[2](ch09.html#idm139957174216640) with rows 在共享相同连接键的两个数据集中组合在一起，但任何一方的不匹配行都包括未连接。
+因为它们构成了每个其他变体的概念基础，所以我们首先看一下`FULL OUTER`连接。 外部连接体现了对“连接”一词的相当自由和乐观的解释：`FULL OUTER` 的结果——连接两个数据集本质上是两个数据集中的完整行列表，[^2] with rows 在共享相同连接键的两个数据集中组合在一起，但任何一方的不匹配行都包括未连接。
 
 例如，如果我们`FULL OUTER`——将我们的两个示例数据集连接到一个仅包含连接 ID 的新关系中，结果将如下所示：
 
-```
+``` SQL
 12:10> SELECT TABLE 
          Left.Id as L, 
          Right.Id as R,
@@ -78,7 +78,7 @@
 
 当然，这只是这个`FULL OUTER`-join 关系的一个时间点快照，是在所有数据都到达系统之后拍摄的。 我们来这里是为了了解流式连接，根据定义，流式连接涉及到额外的时间维度。 正如我们从 [第 8 章](ch08.html#streaming_sql) 中了解到的，如果我们想要了解给定的数据集/关系如何随时间变化，我们想用时变关系 (TVR) 来说话。 因此，为了最好地了解联接如何随时间演变，现在让我们看一下此联接的完整 TVR（每个快照关系之间的变化以黄色突出显示）：
 
-```sql
+``` SQL
 12:10> SELECT TVR
          Left.Id as L,
          Right.Id as R,
@@ -109,8 +109,7 @@
 
 而且，正如您随后可能期望的那样，此 TVR 的流渲染将捕获每个快照之间的特定增量：
 
-```
-
+``` SQL
 12:00> SELECT STREAM 
          Left.Id as L,
          Right.Id as R, 
@@ -144,48 +143,76 @@
 
 `LEFT OUTER` 连接只是一个 `FULL OUTER` 连接，删除了右侧数据集中任何未连接的行。 通过采用原始的“FULL OUTER”连接并将要过滤的行灰显，可以最清楚地看到这一点。 对于“LEFT OUTER”连接，它看起来像下面这样，其中左侧未连接的每一行都从原始“FULL OUTER”连接中过滤掉：
 
-```
-                                         12:00> SELECT STREAM Left.Id as L, 
-12:10> SELECT TABLE                               Right.Id as R,
-         Left.Id as L,                            Sys.EmitTime as Time, 
-         Right.Id as R                            Sys.Undo as Undo 
-       FROM Left LEFT OUTER JOIN Right          FROM Left LEFT OUTER JOIN Right
-       ON L.Num = R.Num;                        ON L.Num = R.Num;
----------------                          ------------------------------
-| L    | R    |                          | L    | R    | Time  | Undo |
----------------                          ------------------------------
-| L1   | null |                          | null | R2   | 12:01 |      |
-| L2   | R2   |                          | L1   | null | 12:02 |      |
-| L3   | R3   |                          | L3   | null | 12:03 |      |
-| null | R4   |                          | L3   | null | 12:04 | undo |
----------------                          | L3   | R3   | 12:04 |      |
-                                         | null | R4   | 12:05 |      |
-                                         | null | R2   | 12:06 | undo |
-                                         | L2   | R2   | 12:06 |      |
-                                         ....... [12:00, 12:10] .......
+``` SQL
+                                         
+12:10> SELECT TABLE                      
+         Left.Id as L,                   
+         Right.Id as R                   
+       FROM Left LEFT OUTER JOIN Right   
+       ON L.Num = R.Num;                 
+---------------                          
+| L    | R    |                          
+---------------                          
+| L1   | null |                          
+| L2   | R2   |                          
+| L3   | R3   |                          
+| null | R4   |                          
+---------------                          
+                                         
+12:00> SELECT STREAM Left.Id as L, 
+         Right.Id as R,
+         Sys.EmitTime as Time, 
+         Sys.Undo as Undo 
+       FROM Left LEFT OUTER JOIN Right
+       ON L.Num = R.Num;
+------------------------------
+| L    | R    | Time  | Undo |
+------------------------------
+| null | R2   | 12:01 |      |
+| L1   | null | 12:02 |      |
+| L3   | null | 12:03 |      |
+| L3   | null | 12:04 | undo |
+| L3   | R3   | 12:04 |      |
+| null | R4   | 12:05 |      |
+| null | R2   | 12:06 | undo |
+| L2   | R2   | 12:06 |      |
+....... [12:00, 12:10] .......
 ```
 
 要查看表和流在实践中的实际情况，让我们再次查看相同的查询，但这次完全省略了灰色行：
 
+``` SQL
+                                         
+12:10> SELECT TABLE                      
+         Left.Id as L,                   
+         Right.Id as R                   
+       FROM Left LEFT OUTER JOIN Right   
+       ON L.Num = R.Num;                 
+---------------                          
+| L    | R    |                          
+---------------                          
+| L1   | null |                          
+| L2   | R2   |                          
+| L3   | R3   |                          
+---------------                          
+                                         
+                                         
+12:00> SELECT STREAM Left.Id as L, 
+         Right.Id as R,
+         Sys.EmitTime as Time, 
+         Sys.Undo as Undo 
+       FROM Left LEFT OUTER JOIN Right
+       ON L.Num = R.Num;
+------------------------------
+| L    | R    | Time  | Undo |
+------------------------------
+| L1   | null | 12:02 |      |
+| L3   | null | 12:03 |      |
+| L3   | null | 12:04 | undo |
+| L3   | R3   | 12:04 |      |
+| L2   | R2   | 12:06 |      |
+....... [12:00, 12:10] .......
 ```
-                                         12:00> SELECT STREAM Left.Id as L, 
-12:10> SELECT TABLE                               Right.Id as R,
-         Left.Id as L,                            Sys.EmitTime as Time, 
-         Right.Id as R                            Sys.Undo as Undo 
-       FROM Left LEFT OUTER JOIN Right          FROM Left LEFT OUTER JOIN Right
-       ON L.Num = R.Num;                        ON L.Num = R.Num;
----------------                          ------------------------------
-| L    | R    |                          | L    | R    | Time  | Undo |
----------------                          ------------------------------
-| L1   | null |                          | L1   | null | 12:02 |      |
-| L2   | R2   |                          | L3   | null | 12:03 |      |
-| L3   | R3   |                          | L3   | null | 12:04 | undo |
----------------                          | L3   | R3   | 12:04 |      |
-                                         | L2   | R2   | 12:06 |      |
-                                         ....... [12:00, 12:10] .......
-```
-
-
 
 
 
@@ -193,7 +220,7 @@
 
 `RIGHT OUTER` 连接与左连接相反：在完全外连接中，来自左侧数据集的所有未连接的行都被右出，*咳嗽*，删除：
 
-```
+``` SQL
                                          12:00> SELECT STREAM Left.Id as L, 
 12:10> SELECT TABLE                               Right.Id as R,
          Left.Id as L,                            Sys.EmitTime as Time, 
@@ -216,7 +243,7 @@
 
 在这里，我们看到呈现为实际`RIGHT OUTER`连接的查询将如何出现：
 
-```
+``` SQL
                                          12:00> SELECT STREAM Left.Id as L, 
 12:10> SELECT TABLE                               Right.Id as R,
          Left.Id as L,                            Sys.EmitTime as Time, 
@@ -242,7 +269,7 @@
 
 `INNER` 联接本质上是 `LEFT OUTER` 和 `RIGHT OUTER` 联接的交集。 或者，从减法的角度考虑，从原始`FULL OUTER`连接中删除以创建`INNER`连接的行是从`LEFT OUTER`和`RIGHT OUTER`连接中删除的行的并集。 因此，`INNER`连接中不存在任一侧未连接的所有行：
 
-```
+``` SQL
                                          12:00> SELECT STREAM Left.Id as L, 
 12:10> SELECT TABLE                               Right.Id as R,
          Left.Id as L,                            Sys.EmitTime as Time, 
@@ -265,7 +292,7 @@
 
 再一次，更简洁地呈现为 `INNER` 连接在现实中的样子：
 
-```
+``` SQL
                                          12:00> SELECT STREAM Left.Id as L, 
 12:10> SELECT TABLE                               Right.Id as R,
          Left.Id as L,                            Sys.EmitTime as Time, 
@@ -286,7 +313,7 @@
 
 `ANTI` 连接是 `INNER` 连接的反面：它们包含所有 *unjoined* 行。 并非所有 SQL 系统都支持干净的`ANTI`连接语法，但为了清楚起见，我将在此处使用最直接的语法：
 
-```
+``` SQL
                                          12:00> SELECT STREAM Left.Id as L, 
 12:10> SELECT TABLE                               Right.Id as R,
          Left.Id as L,                            Sys.EmitTime as Time, 
@@ -308,7 +335,7 @@
 ```
 
 `ANTI` 连接的流渲染有点有趣的是，它最终包含一堆错误的开始和最终确实连接的行的撤回； 事实上，`ANTI`join 和 `INNER` join 一样轻量级的撤回。 更简洁的版本看起来像这样：
-```
+``` SQL
                                         12:00> SELECT STREAM Left.Id as L, 
 12:10> SELECT TABLE                               Right.Id as R,
          Left.Id as L,                            Sys.EmitTime as Time, 
@@ -333,7 +360,7 @@
 
 我们现在来到 `SEMI` 连接，而 `SEMI` 连接有点奇怪。 乍一看，它们基本上看起来像内部联接，其中联接值的一侧被删除了。 而且，事实上，在 `:` 的基数关系是 N:M 且 M ≤ 1 的情况下，这是可行的（请注意，我们将使用 keep=`Left`, dropped=`Right` 用于所有示例 跟随）。 例如，在我们目前使用的`Left`和`Right`数据集（连接数据的基数为 0:1、1:0 和 1:1）上，`INNER`和`SEMI` 连接变体看起来相同：
 
-```
+``` SQL
 12:10> SELECT TABLE            12:10> SELECT TABLE
   Left.Id as L                   Left.Id as L
 FROM Left INNER JOIN           FROM Left SEMI JOIN
@@ -352,7 +379,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 为了清楚地看到这一点，让我们切换到一对稍微复杂的输入关系，突出显示其中包含的行的 N:M 连接基数。 在这些关系中，`N_M`列说明左右两边之间行的基数关系，`Id`列（如前所述）为每个输入关系中的每一行提供唯一的标识符：
 
-```
+``` SQL
 12:15> SELECT TABLE * FROM LeftNM;    12:15> SELECT TABLE * FROM RightNM;
 ---------------------                 ---------------------
 | N_M | Id  |  Time |                 | N_M | Id  |  Time |
@@ -371,7 +398,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 使用这些输入，FULL OUTER 联接扩展为如下所示：
 
-```
+``` SQL
                                        12:00> SELECT STREAM
                                                 COALESCE(LeftNM.N_M, 
 12:15> SELECT TABLE                                      RightNM.N_M) as N_M, 
@@ -415,7 +442,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 但是回到“SEMI”连接的微妙之处。 使用这些数据集，过滤后的`INNER`连接和`SEMI`连接之间的区别变得更加清晰：`INNER`连接为 N:M 基数 M > 1 的任何行产生重复值， 而 `SEMI` 连接没有（请注意，我在 `INNER` 连接版本中用红色突出显示了重复的行，并以灰色包含了在相应的 `INNER` 中省略的完整外部连接部分和 `SEMI` 版本）：
 
-```sql
+``` SQL
 12:15> SELECT TABLE                       12:15> SELECT TABLE
          COALESCE(LeftNM.N_M,                      COALESCE(LeftNM.N_M,
                   RightNM.N_M) as N_M,                      RightNM.N_M) as N_M,
@@ -441,7 +468,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 或者，更简洁地呈现：
 
-```
+``` SQL
 12:15> SELECT TABLE                       12:15> SELECT TABLE
          COALESCE(LeftNM.N_M,                      COALESCE(LeftNM.N_M,
                   RightNM.N_M) as N_M,                      RightNM.N_M) as N_M,
@@ -465,7 +492,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 然后，`STREAM`渲染提供了一些关于哪些行被过滤掉的上下文——它们只是后来到达的重复行（从被投影的列的角度来看）：
 
-```
+``` SQL
 12:00> SELECT STREAM                        12:00> SELECT STREAM
          COALESCE(LeftNM.N_M,                        COALESCE(LeftNM.N_M,
                   RightNM.N_M) as N_M,                        RightNM.N_M) as N_M,
@@ -503,7 +530,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 再一次，简洁地呈现：
 
-```
+``` SQL
 12:00> SELECT STREAM                        12:00> SELECT STREAM
          COALESCE(LeftNM.N_M,                        COALESCE(LeftNM.N_M,
                   RightNM.N_M) as N_M,                        RightNM.N_M) as N_M,
@@ -528,12 +555,9 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 ```
 
 
-
-`***12:15> SELECT TABLE                       12:15> SELECT TABLE\***         ***COALESCE(LeftNM.N_M,                      COALESCE(LeftNM.N_M,\***                  ***RightNM.N_M) as N_M,                      RightNM.N_M) as N_M,\***         ***LeftNM.Id as L                            LeftNM.Id as L\***       ***FROM LeftNM INNER JOIN RightNM            FROM LeftNM SEMI JOIN RightNM\***       ***ON LeftNM.N_M = RightNM.N_M;              ON LeftNM.N_M = RightNM.N_M;\*** ---------------------                     --------------------- | N_M | L    | R    |                     | N_M | L    | R    | ---------------------                     --------------------- | 0:1 | null | R1   |                     | 0:1 | null | R1   | | 1:0 | L2   | null |                     | 1:0 | L2   | null | | 1:1 | L3   | R3   |                     | 1:1 | L3   | R3   | | 1:2 | L4   | R5A  |                     | 1:2 | L4   | R5A  | | 1:2 | L4   | R5B  |                     | 1:2 | L4   | R5B  | | 2:1 | L5A  | R5   |                     | 2:1 | L5A  | R5   | | 2:1 | L5B  | R5   |                     | 2:1 | L5B  | R5   | | 2:2 | L6A  | R6A  |                     | 2:2 | L6A  | R6A  | | 2:2 | L6A  | R6B  |                     | 2:2 | L6A  | R6B  | | 2:2 | L6B  | R6A  |                     | 2:2 | L6B  | R6A  | | 2:2 | L6B  | R6B  |                     | 2:2 | L6B  | R6B  | ---------------------                     --------------------- `Or, rendered more succinctly:`***12:15> SELECT TABLE                       12:15> SELECT TABLE\***         ***COALESCE(LeftNM.N_M,                      COALESCE(LeftNM.N_M,\***                  ***RightNM.N_M) as N_M,                      RightNM.N_M) as N_M,\***         ***LeftNM.Id as L                            LeftNM.Id as L\***       ***FROM LeftNM INNER JOIN RightNM            FROM LeftNM SEMI JOIN RightNM\***       ***ON LeftNM.N_M = RightNM.N_M;              ON LeftNM.N_M = RightNM.N_M;\*** -------------                             ------------- | N_M | L   |                             | N_M | L   | -------------                             ------------- | 1:1 | L3  |                             | 1:1 | L3  | | 1:2 | L4  |                             | 1:2 | L4  | | 1:2 | L4  |                             | 2:1 | L5A | | 2:1 | L5A |                             | 2:1 | L5B | | 2:1 | L5B |                             | 2:2 | L6A | | 2:2 | L6A |                             | 2:2 | L6B | | 2:2 | L6A |                             ------------- | 2:2 | L6B | | 2:2 | L6B | ------------- `The `STREAM` renderings then provide a bit of context as to which rows are filtered out—they are simply the later-arriving duplicate rows (from the perspective of the columns being projected):`***12:00> SELECT STREAM                        12:00> SELECT STREAM\***         ***COALESCE(LeftNM.N_M,                        COALESCE(LeftNM.N_M,\***                  ***RightNM.N_M) as N_M,                        RightNM.N_M) as N_M,\***         ***LeftNM.Id as L                              LeftNM.Id as L\***         ***Sys.EmitTime as Time,                       Sys.EmitTime as Time,\***         ***Sys.Undo as Undo,                           Sys.Undo as Undo,\***       ***FROM LeftNM INNER JOIN RightNM              FROM LeftNM SEMI JOIN RightNM\***       ***ON LeftNM.N_M = RightNM.N_M;                ON LeftNM.N_M = RightNM.N_M;\*** ------------------------------------        ------------------------------------ | N_M | L    | R    | Time  | Undo |        | N_M | L    | R    | Time  | Undo | ------------------------------------        ------------------------------------ | 1:1 | L3   | null | 12:01 |      |        | 1:1 | L3   | null | 12:01 |      | | 0:1 | null | R1   | 12:02 |      |        | 0:1 | null | R1   | 12:02 |      | | 1:2 | null | R4A  | 12:03 |      |        | 1:2 | null | R4A  | 12:03 |      | | 1:2 | null | R4B  | 12:04 |      |        | 1:2 | null | R4B  | 12:04 |      | | 1:2 | null | R4A  | 12:05 | undo |        | 1:2 | null | R4A  | 12:05 | undo | | 1:2 | null | R4B  | 12:05 | undo |        | 1:2 | null | R4B  | 12:05 | undo | | 1:2 | L4   | R4A  | 12:05 |      |        | 1:2 | L4   | R4A  | 12:05 |      | | 1:2 | L4   | R4B  | 12:05 |      |        | 1:2 | L4   | R4B  | 12:05 |      | | 2:1 | null | R5   | 12:06 |      |        | 2:1 | null | R5   | 12:06 |      | | 1:0 | L2   | null | 12:07 |      |        | 1:0 | L2   | null | 12:07 |      | | 2:1 | null | R5   | 12:08 | undo |        | 2:1 | null | R5   | 12:08 | undo | | 2:1 | L5B  | R5   | 12:08 |      |        | 2:1 | L5B  | R5   | 12:08 |      | | 2:1 | L5A  | R5   | 12:09 |      |        | 2:1 | L5A  | R5   | 12:09 |      | | 2:2 | L6B  | null | 12:10 |      |        | 2:2 | L6B  | null | 12:10 |      | | 2:2 | L6B  | null | 12:10 | undo |        | 2:2 | L6B  | null | 12:10 | undo | | 2:2 | L6B  | R6A  | 12:11 |      |        | 2:2 | L6B  | R6A  | 12:11 |      | | 2:2 | L6A  | R6A  | 12:12 |      |        | 2:2 | L6A  | R6A  | 12:12 |      | | 2:2 | L6A  | R6B  | 12:13 |      |        | 2:2 | L6A  | R6B  | 12:13 |      | | 2:2 | L6B  | R6B  | 12:13 |      |        | 2:2 | L6B  | R6B  | 12:13 |      | | 1:1 | L3   | null | 12:14 | undo |        | 1:1 | L3   | null | 12:14 | undo | | 1:1 | L3   | R3   | 12:14 |      |        | 1:1 | L3   | R3   | 12:14 |      | .......... [12:00, 12:15] ..........       .......... [12:00, 12:15] .......... `And again, rendered succinctly:`***12:00> SELECT STREAM                        12:00> SELECT STREAM\***         ***COALESCE(LeftNM.N_M,                        COALESCE(LeftNM.N_M,\***                  ***RightNM.N_M) as N_M,                        RightNM.N_M) as N_M,\***         ***LeftNM.Id as L                              LeftNM.Id as L\***         ***Sys.EmitTime 
-
 正如我们在许多示例过程中看到的那样，流连接确实没有什么特别之处。 考虑到我们对流和表的了解，它们的功能完全符合我们的预期，连接流会随着时间的推移捕获连接的历史记录。 这与连接表形成对比，连接表只是捕获特定时间点存在的整个连接的快照，因为我们可能更习惯了。
 
-但是，更重要的是，通过流表理论的视角来观察连接已经更加清晰了。 核心底层连接原语是`FULL OUTER`连接，它是一个流→表分组操作，将关系中所有连接和未连接的行收集在一起。 我们详细查看的所有其他变体（`LEFT OUTER`、`RIGHT OUTER`、`INNER`、`ANTI` 和 `SEMI`）只是在 `FULL OUTER` 之后的连接流上添加额外的过滤层加入。[3](ch09.html#idm139957173841152)
+但是，更重要的是，通过流表理论的视角来观察连接已经更加清晰了。 核心底层连接原语是`FULL OUTER`连接，它是一个流→表分组操作，将关系中所有连接和未连接的行收集在一起。 我们详细查看的所有其他变体（`LEFT OUTER`、`RIGHT OUTER`、`INNER`、`ANTI` 和 `SEMI`）只是在 `FULL OUTER` 之后的连接流上添加额外的过滤层加入。[^3]
 
 # Windowed Joins
 
@@ -557,7 +581,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 窗口连接将时间维度添加到连接标准本身中。 这样做时，窗口用于将要连接的行集的范围限定为仅包含在窗口时间间隔内的行。 举个例子可能会更清楚地看到这一点，所以让我们把原来的`Left`表和`Right`表放在五分钟的固定窗口中：
 
-```sql
+``` SQL
 12:10> SELECT TABLE *,                     12:10> SELECT TABLE *,
        TUMBLE(Time, INTERVAL '5' MINUTE)          TUMBLE(Time, INTERVAL '5' MINUTE)
        as Window FROM Left;                       as Window FROM Right
@@ -574,7 +598,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 通过将连接的时间区域限定为固定的五分钟间隔，我们将数据集分成两个不同的时间窗口：`[12:00, 12:05)`和`[12:05, 12:10)` . 然后将我们之前观察到的完全相同的连接逻辑应用于这些区域，对于`L2`和`R2`行落入不同区域的情况，会产生略有不同的结果。 在基本层面上，这就是窗口连接的全部内容。
 
-```
+``` SQL
                                  12:10> SELECT TABLE 
                                           Left.Id as L,
                                           Right.Id as R,
@@ -602,7 +626,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 将非窗口连接和窗口连接作为流进行比较时，差异也很明显。 正如我在下面的示例中强调的那样，它们的主要区别在于最后几行。 未开窗的一侧完成了`Num = 2`的连接，除了为已完成的`L2，R2`连接生成一个新行之外，还为未连接的`R2`行产生了一个缩回。 另一方面，有窗口的一侧只是产生一个未连接的 `L2` 行，因为 `L2` 和 `R2` 落在不同的五分钟窗口内：
 
-```
+``` SQL
                                  12:10> SELECT STREAM 
                                           Left.Id as L,
                                           Right.Id as R,
@@ -634,7 +658,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 至此，我们现在了解了开窗对`FULL OUTER`连接的影响。 通过应用我们在本章前半部分学到的规则，很容易推导出`LEFT OUTER`、`RIGHT OUTER`、`INNER`、`ANTI`和`SEMI`连接的窗口变体。 我将把这些推导中的大部分作为练习留给你来完成，但举一个例子，我们了解到，`LEFT OUTER` 连接只是连接左侧带有空列的 `FULL OUTER` 连接 删除（再次突出显示`L2`和`R2`行以比较差异）：
 
-```
+``` SQL
                                  12:10> SELECT TABLE 
                                           Left.Id as L,
                                           Right.Id as R,
@@ -668,9 +692,9 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 ### 时间有效性窗口
 
-时间有效性窗口适用于关系中的行有效地将时间划分为给定值有效的区域的情况。 更具体地说，想象一个执行货币转换的金融系统。[4](ch09.html#idm139957173727936) 这样的系统可能包含一个时变关系，用于捕获各种类型货币的当前转换率。 例如，可能存在从不同货币转换为日元的关系，如下所示：
+时间有效性窗口适用于关系中的行有效地将时间划分为给定值有效的区域的情况。 更具体地说，想象一个执行货币转换的金融系统。[^4] 这样的系统可能包含一个时变关系，用于捕获各种类型货币的当前转换率。 例如，可能存在从不同货币转换为日元的关系，如下所示：
 
-```
+``` SQL
 12:10> SELECT TABLE * FROM YenRates;
 --------------------------------------
 | Curr | Rate | EventTime | ProcTime |
@@ -685,7 +709,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 为了强调我所说的时间有效性窗口“有效地将时间划分为给定值有效的区域”的意思，请仅考虑该关系中的欧元兑日元汇率：
 
-```
+``` SQL
 12:10> SELECT TABLE * FROM YenRates WHERE Curr = "Euro";
 --------------------------------------
 | Curr | Rate | EventTime | ProcTime |
@@ -698,10 +722,9 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 从数据库工程的角度来看，我们理解这些值并不意味着将欧元转换为日元的汇率恰好在 12:00 时为 114 ¥/€，在 12:03 时为 116 ¥/€，在 12 时为 119 ¥/€： 06，其他时间未定义。 相反，我们知道此表的目的是捕捉欧元到日元的兑换率在 12:00 之前未定义的事实，从 12:00 到 12:03 为 114 ¥/€，从 12 开始为 116 ¥/€： 03 点到 12:06 点，之后是 119 ¥/€。 或者在时间轴上绘制：
 
-```
-        Undefined              114 ¥/€                116 ¥/€              119 ¥/€
-|----[-inf, 12:00)----|----[12:00, 12:03)----|----[12:03, 12:06)----|----[12:06, now)----→
-```
+|    Undefined        |      114 ¥/€         |       116 ¥/€        |    119 ¥/€
+| :---: | :---: | :---: |
+|----[-inf, 12:00)----|----[12:00, 12:03)----|----[12:03, 12:06)----|----[12:06, now)----→|
 
 现在，如果我们提前知道所有的比率，我们就可以在行数据本身中明确地捕获这些区域。 但是，如果我们需要增量地建立这些区域，仅基于给定速率生效的开始时间，我们就会遇到问题：给定行的区域将随着时间的推移而变化，具体取决于它之后的行。 即使数据按顺序到达，这也是一个问题（因为每次新汇率到达时，之前的汇率从永远有效变为有效，直到新汇率到达时间），但如果它们可以到达则进一步复杂 *故障*。 例如，使用前面的`YenRates`表中的处理时间顺序，我们的表将有效表示随时间变化的时间线序列如下：
 
@@ -720,12 +743,11 @@ Range of processing time | Event-time validity timeline during that range of pro
                          |
                          |      Undefined          114 ¥/€            116 ¥/€           119 ¥/€
          [12:09:07, now) | |--[-inf, 12:00)--|--[12:00, 12:03)--|--[12:03, 12:06)--|--[12:06, +inf)→
-
 ```
 
 或者，如果我们想将其呈现为随时间变化的关系（每个快照关系之间的变化以黄色突出显示）：
 
-```
+``` SQL
 12:10> SELECT TVR * FROM YenRatesWithRegion ORDER BY EventTime;
 ---------------------------------------------------------------------------------------------
 |              [-inf, 12:06:23)               |            [12:06:23, 12:07:33)             |
@@ -750,7 +772,7 @@ Range of processing time | Event-time validity timeline during that range of pro
 
 为了实际看到这一点，让我们看一个动画。 如果这是一个 Beam 管道，它可能看起来像下面这样：
 
-```
+``` Java
 PCollection<Currency, Decimal> yenRates = ...;
 PCollection<Decimal> validYenRates = yenRates
     .apply(Window.into(new ValidityWindows())
@@ -763,11 +785,11 @@ PCollection<Decimal> validYenRates = yenRates
 
 <center><i>Figure 9-1. Temporal validity windowing over time</center></i>
 
-该动画强调了时间有效性的一个关键方面：缩小窗口。 有效性窗口必须能够随着时间的推移而缩小，从而缩小其有效性的范围并将其中包含的任何数据拆分到两个新窗口中。 有关部分实施示例，请参阅 [GitHub 上的代码片段](http://bit.ly/2N7Nn3A)。[5](ch09.html#idm139957173684048)
+该动画强调了时间有效性的一个关键方面：缩小窗口。 有效性窗口必须能够随着时间的推移而缩小，从而缩小其有效性的范围并将其中包含的任何数据拆分到两个新窗口中。 有关部分实施示例，请参阅 [GitHub 上的代码片段](http://bit.ly/2N7Nn3A)。[^5]
 
 在 SQL 术语中，这些有效性窗口的创建将类似于以下内容（使用假设的“VALIDITY_WINDOW”构造），将其视为一个表：
 
-```
+``` SQL
 12:10> SELECT TABLE 
          Curr,
          MAX(Rate) as Rate,
@@ -791,7 +813,7 @@ PCollection<Decimal> validYenRates = yenRates
 >
 > Note that it’s possible to describe validity windows in standard SQL using a three-way self-join:
 >
-> ```
+> ``` SQL
 > SELECT
 >   r1.Curr,
 >   MAX(r1.Rate) AS Rate,
@@ -814,7 +836,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 或者，也许更有趣的是，将其视为一个流：
 
-```
+``` SQL
 12:00> SELECT STREAM
          Curr,
          MAX(Rate) as Rate,
@@ -845,7 +867,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 为了探索时间有效性连接的语义，假设我们的金融应用程序包含另一个时变关系，一个跟踪从各种货币到日元的货币兑换订单的关系：
 
-```
+``` SQL
 12:10> SELECT TABLE * FROM YenOrders;
 ----------------------------------------
 | Curr | Amount | EventTime | ProcTime |
@@ -861,7 +883,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 为了简单起见，和以前一样，让我们关注欧元转换：
 
-```
+``` SQL
 12:10> SELECT TABLE * FROM YenOrders WHERE Curr = "Euro";
 ----------------------------------------
 | Curr | Amount | EventTime | ProcTime |
@@ -874,7 +896,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 我们希望将这些订单稳健地连接到`YenRates`关系，将`YenRates`中的行视为定义有效窗口。 因此，我们实际上想要加入我们在上一节末尾构建的“YenRates”关系的有效性窗口版本：
 
-```
+``` SQL
 12:10> SELECT TABLE
          Curr,
          MAX(Rate) as Rate,
@@ -895,7 +917,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 幸运的是，在我们将转换率放入有效窗口后，这些汇率和`YenOrders`关系之间的窗口连接给了我们想要的东西：
 
-```
+``` SQL
 12:10> WITH ValidRates AS
          (SELECT
             Curr,
@@ -929,7 +951,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 也就是说，这个关系的简单快照视图是在所有值都已到达且尘埃落定之后拍摄的，掩盖了此连接的复杂性。 要真正了解这里发生了什么，我们需要查看完整的 TVR。 首先，回想一下有效性窗口转换率关系实际上比以前的简单表快照视图可能让您相信的要复杂得多。 作为参考，这里是有效性窗口关系的`STREAM`版本，它更好地突出了这些转化率随时间的演变：
 
-```
+``` SQL
 12:00> SELECT STREAM
          Curr,
          MAX(Rate) as Rate,
@@ -956,7 +978,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 因此，如果我们查看有效性窗口连接的完整 TVR，您会发现随着时间的推移，此连接的相应演变要复杂得多，这是由于 加入：
 
-```
+``` SQL
 12:10> WITH ValidRates AS
          (SELECT
             Curr,
@@ -1015,7 +1037,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 特别是，5 欧元订单的结果最初报价为 570 ¥，因为该订单（发生在 12:05）最初属于 114 ¥/€ 费率的有效窗口。 但是，当事件时间 12:03 的 116 ¥/€ 费率出现故障时，5 € 订单的结果必须从 570 ¥ 更新为 580 ¥。 如果您以流的形式观察连接的结果，这一点也很明显（这里我用红色突出显示了不正确的 570 ¥，并以蓝色突出显示了 570 ¥ 的撤回和随后的 580 ¥ 更正值）：
 
-```
+``` SQL
 12:00> WITH ValidRates AS
          (SELECT
             Curr,
@@ -1060,7 +1082,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 值得一提的是，由于使用了`FULL OUTER`连接，这是一个相当混乱的流。 实际上，当将转换订单作为流使用时，您可能并不关心未连接的行； 切换到 `INNER` 连接有助于消除这些行。 您可能也不关心费率窗口发生变化的情况，但实际转化价值不受影响。 通过从流中删除速率窗口，我们可以进一步减少它的冗长：
 
-```
+``` SQL
 12:00> WITH ValidRates AS
          (SELECT
             Curr,
@@ -1099,7 +1121,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 
 
-![img](./media/stsy_0902.mp4)
+![](./media/stsy_0902.mp4)
 
 <center><i>Figure 9-2. Temporal validity join, converting Euros to Yen with per-record triggering</center></i>
 
@@ -1109,7 +1131,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 然而，在我们结束之前，事实证明这个例子也提供了一个机会来强调我提到的第二点：窗口连接可以为水印提供一个有意义的参考点。 要了解这有何用处，想象一下更改先前的查询以将隐式默认的每条记录触发器替换为显式水印触发器，该触发器仅在水印通过连接中的有效性窗口末尾时触发一次（假设我们有一个水印 可用于我们的输入 TVR，准确跟踪事件时间中这些关系的完整性，以及知道如何考虑这些水印的执行引擎）。 现在，我们的流不再包含多个输出和因乱序到达的费率而撤回，我们最终可以得到一个包含每个订单的单个正确转换结果的流，这显然比以前更理想：
 
-```
+``` SQL
 12:00> WITH ValidRates AS
          (SELECT
             Curr,
@@ -1146,7 +1168,7 @@ PCollection<Decimal> validYenRates = yenRates
 
 
 
-![img](./media/stsy_0903.mp4)
+![](./media/stsy_0903.mp4)
 
 <center><i>Figure 9-3. Temporal validity join, converting Euros to Yen with watermark triggering</center></i>
 
@@ -1167,3 +1189,14 @@ PCollection<Decimal> validYenRates = yenRates
 最后，我们深入探讨了一种关于加入的更有趣和有用的窗口类型：时间有效性窗口。 我们看到时间有效性窗口如何非常自然地将时间划分为给定值的有效性区域，仅基于这些值发生变化的特定时间点。 我们了解到，在有效性窗口内加入需要一个窗口框架，该框架支持可以随时间拆分的窗口，这是目前现有的流媒体系统不支持的。 我们看到了有效性窗口是如何简洁地让我们以稳健、自然的方式解决将货币兑换率和订单的 TVR 连接在一起的问题。
 
 连接通常是数据处理、流式传输或其他方面中比较令人生畏的方面之一。 然而，通过了解连接的理论基础以及我们如何直接从该基础推导出所有不同类型的连接，连接就变得不那么可怕了，即使流式处理增加了额外的时间维度。
+
+
+[^1]: From a conceptual perspective, at least. There are many different ways to implement each of these types of joins, some of which are likely much more efficient than performing an actual `FULL OUTER` join and then filtering down its results, especially when the rest of the query and the distribution of the data are taken into consideration.
+
+[^2]: Again, ignoring what happens when there are duplicate join keys; more on this when we get to `SEMI` joins.
+
+[^3]: From a conceptual perspective, at least. There are, of course, many different ways to implement each of these types of joins, some of which might be much more efficient than performing an actual `FULL OUTER` join and then filtering down its results, depending on the rest of the query and the distribution of the data.
+
+[^4]: Note that the example data and the temporal join use case motivating it are lifted almost wholesale from Julian Hyde's excellent ["Streams, joins, and temporal tables"](http://bit.ly/2MoNqaS) document.
+
+[^5]: It's a partial implementation because it only works if the windows exist in isolation, as in [Figure 9-1](#ch09.html#temporal_validity_windowing_over_time_chap_nine){data-type="xref"}. As soon as you mix the windows with other data, such as the joining examples below, you would need some mechanism for splitting the data from the shrunken window into two separate windows, which Beam does not currently provide.

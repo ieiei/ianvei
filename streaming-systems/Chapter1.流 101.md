@@ -35,7 +35,7 @@
 鉴于精心设计的流式处理系统与任何现有批处理引擎一样能够（在技术上更是如此）产生正确、一致、可重复的结果，我更愿意将术语“流式处理”隔离为一个非常具体的含义：
 流系统
 
-​		一种在设计时考虑到无限数据集的数据处理引擎。
+​		一种在设计时考虑到无限数据集的数据处理引擎。[^1]
 
 如果我想谈论低延迟、近似或推测结果，我会使用这些特定的词，而不是不准确地称它们为“流式传输”。
 在讨论可能遇到的不同类型的数据时，精确的术语也很有用。 从我的角度来看，有两个重要的（和正交的）维度定义了给定数据集的形状：*基数和构成*。
@@ -58,7 +58,7 @@
 
 ​	数据集在特定时间点的整体视图。 SQL 系统传统上处理表。
 
-流 
+流 [^2]
 
 ​	数据集随时间演变的逐个元素视图。 数据处理系统的 MapReduce 沿袭传统上处理的是流。 
 
@@ -84,7 +84,7 @@
 
 ​		这使您与批次平价。在核心，正确性归结为一致的存储。流系统需要一种随着时间的推移能一直检查持久状态的方法（Kreps 在他的“为什么本地状态是流处理中的基本原语”一文中谈到了这一点），并且它必须设计得足够好，以在机器故障的情况下保持一致。几年前，当 Spark Streaming 首次出现在公共大数据场景中时，它是一个在原本黑暗的流媒体世界中保持一致性的灯塔。值得庆幸的是，从那以后情况有了很大的改善，但令人惊讶的是，仍有多少流媒体系统在没有强一致性的情况下勉强过关。
 
-​		重申一下——因为这一点很重要：精确一次处理需要强一致性，这是正确性所必需的，这是任何有机会达到或超过批处理系统功能的系统的要求。除非你真的不关心你的结果，否则我恳请你避开任何不提供强一致性状态的流系统。批处理系统不需要您提前验证它们是否能够产生正确的答案；不要将时间浪费在无法满足相同标准的流媒体系统上。
+​		重申一下——因为这一点很重要：精确一次处理需要强一致性[^3]，这是正确性所必需的，这是任何有机会达到或超过批处理系统功能的系统的要求。除非你真的不关心你的结果，否则我恳请你避开任何不提供强一致性状态的流系统。批处理系统不需要您提前验证它们是否能够产生正确的答案；不要将时间浪费在无法满足相同标准的流媒体系统上。
 
 ​		如果您想了解更多关于如何在流系统中获得强一致性的信息，我建议您查看 MillWheel、Spark Streaming 和 Flink 快照论文。这三个人都花费了大量时间讨论一致性。 Reuven 将在第 5 章深入探讨一致性保证，如果您仍然发现自己渴望更多，那么在文献和其他地方有大量关于该主题的优质信息。
 
@@ -115,7 +115,7 @@
 
 <center><i>图 1-1。 时域映射。 x 轴代表系统中的事件时间完整性； 即，事件时间中的时间 X，到该时间为止，事件时间小于 X 的所有数据都已被观察到。 y轴代表处理时间的进度； 也就是说，数据处理系统在执行时观察到的正常时钟时间。</i></center>
 
-在图 1-1 中，斜率为 1 的黑色虚线代表理想情况，其中处理时间和事件时间完全相等； 红线代表现实。 在此示例中，系统在处理时间开始时稍有滞后，在中间更接近理想状态，然后在接近结束时再次滞后。 乍一看，该图中有两种类型的偏斜可见，每种都在不同的时域中：
+[^4]在图 1-1 中，斜率为 1 的黑色虚线代表理想情况，其中处理时间和事件时间完全相等； 红线代表现实。 在此示例中，系统在处理时间开始时稍有滞后，在中间更接近理想状态，然后在接近结束时再次滞后。 乍一看，该图中有两种类型的偏斜可见，每种都在不同的时域中：
 
 处理时间
 		理想和红线之间的垂直距离是处理时间域中的滞后。 该距离告诉您在给定时间的事件发生与处理时间之间观察到的延迟（处理时间）。 这可能是这两种偏差中更自然和更直观的一种。
@@ -123,7 +123,7 @@
 事件时间
 		理想线和红线之间的水平距离是此时管道中的事件时间偏移量。 它会告诉您当前的管道距离理想（事件时间）有多远。
 
-实际上，任何给定时间点的处理时间延迟和事件时间偏差都是相同的； 它们只是看待同一件事的两种方式。5 关于滞后/偏差的重要结论是：因为事件时间和处理时间之间的整体映射不是静态的（即滞后/偏差可以随时间任意变化） ，这意味着如果您关心数据的事件时间（即事件实际发生的时间），则不能仅在管道观察到数据的时间范围内分析数据。 不幸的是，这是许多为无限数据设计的系统历来的运作方式。 为了应对无界数据集的无限本质，这些系统通常提供一些对输入数据进行窗口化的概念。我们稍后会更深入地讨论窗口化，但它本质上意味着将数据集沿时间边界分割成有限的部分。 如果您关心正确性并且有兴趣在事件时间的上下文中分析您的数据，那么您不能像许多系统那样使用处理时间（即处理时间窗口）来定义这些时间边界； 由于处理时间和事件时间之间没有一致的相关性，您的一些事件时间数据最终会出现在错误的处理时间窗口中（由于分布式系统的固有滞后，许多类型的输入的在线/离线性质 来源等），就像把正确性扔到了窗外。 我们将在接下来的部分以及本书的其余部分中的一些示例中更详细地研究这个问题。
+实际上，任何给定时间点的处理时间延迟和事件时间偏差都是相同的； 它们只是看待同一件事的两种方式。[^5] 关于滞后/偏差的重要结论是：因为事件时间和处理时间之间的整体映射不是静态的（即滞后/偏差可以随时间任意变化） ，这意味着如果您关心数据的事件时间（即事件实际发生的时间），则不能仅在管道观察到数据的时间范围内分析数据。 不幸的是，这是许多为无限数据设计的系统历来的运作方式。 为了应对无界数据集的无限本质，这些系统通常提供一些对输入数据进行窗口化的概念。我们稍后会更深入地讨论窗口化，但它本质上意味着将数据集沿时间边界分割成有限的部分。 如果您关心正确性并且有兴趣在事件时间的上下文中分析您的数据，那么您不能像许多系统那样使用处理时间（即处理时间窗口）来定义这些时间边界； 由于处理时间和事件时间之间没有一致的相关性，您的一些事件时间数据最终会出现在错误的处理时间窗口中（由于分布式系统的固有滞后，许多类型的输入的在线/离线性质 来源等），就像把正确性扔到了窗外。 我们将在接下来的部分以及本书的其余部分中的一些示例中更详细地研究这个问题。
 
 不幸的是，按事件时间窗口显示时，情况也不是很乐观。 在无限数据的上下文中，无序和变量偏斜会导致事件时间窗口的完整性问题：在处理时间和事件时间之间缺乏可预测的映射，如何确定何时观察到给定事件时间的所有数据 X？ 对于许多现实世界的数据源，您根本做不到。 但是当今使用的绝大多数数据处理系统都依赖于某种完整性概念，这使它们在应用于无界数据集时处于严重劣势。
 
@@ -141,10 +141,11 @@
 ![stsy_0102](./media/stsy_0102.png)
 
 <center><i>图 1-2。 使用经典批处理引擎进行有界数据处理。 左侧有限的非结构化数据池通过数据处理引擎运行，从而在右侧产生相应的结构化数据。</i></center>
-图 1-2。使用经典批处理引擎进行有界数据处理。左侧的有限非结构化数据池通过数据处理引擎运行，从而在右侧产生相应的结构化数据。
+
 尽管作为该方案的一部分，您可以实际计算的内容当然有无限的变化，但整体模型非常简单。更有趣的是处理无界数据集的任务。现在让我们看看通常处理无界数据的各种方式，从传统批处理引擎使用的方法开始，然后是针对无界数据设计的系统（例如大多数流式引擎或微批处理引擎）可以采用的方法。
 
 #### 无限数据：批处理
+
 批处理引擎虽然没有明确地设计为考虑无界数据，但自从首次构思批处理系统以来，它一直被用于处理无界数据集。正如您所料，这些方法围绕着将无界数据分割成适合批处理的有界数据集的集合。
 
 ##### 固定窗户
@@ -158,6 +159,7 @@
 ![stsy_0103](./media/stsy_0103.png)
 
 <center><i>图 1-3。 通过具有经典批处理引擎的临时固定窗口进行无界数据处理。 一个无界数据集被预先收集到有限的、固定大小的有界数据窗口中，然后通过经典批处理引擎的连续运行进行处理。</i></center>
+
 ##### 会话
 
 当您尝试使用批处理引擎将无限数据处理为更复杂的窗口策略（如会话）时，这种方法会更加失败。会话通常被定义为由不活动间隙终止的活动时段（例如，对于特定用户）。使用典型的批处理引擎计算会话时，您通常会得到多个批处理拆分的会话，如图 1-4 中的红色标记所示。我们可以通过增加批量大小来减少拆分次数，但代价是延迟增加。另一种选择是添加额外的逻辑来拼接以前运行的会话，但代价是进一步的复杂性。
@@ -165,8 +167,8 @@
 ![](./media/stsy_0104.png)
 
 <center><i>图 1-4。通过带有经典批处理引擎的临时固定窗口将无限数据处理到会话中。无界数据集预先收集到有限的、固定大小的有界数据窗口中，然后通过连续运行经典批处理引擎将其细分为动态会话窗口。</i></center>
+
 无论哪种方式，使用经典的批处理引擎来计算会话都不太理想。一个更好的方法是以流的方式建立会话，我们稍后会看到。
-无限数据：流式传输
 
 #### 无限数据：流式传输
 
@@ -189,6 +191,7 @@
 ![stsy_0105.png](./media/stsy_0105.png)
 
 <center><i>图 1-5。 过滤无界数据。 不同类型的数据集合（从左到右流动）被过滤成一个包含单一类型的同质集合。</i></center>
+
 ##### *内连接*
 
 另一个与时间无关的示例是内部连接，如图 1-6 所示。 连接两个无界数据源时，如果您只关心来自两个数据源的元素到达时的连接结果，则逻辑中没有时间元素。 从一个来源看到一个值后，您可以简单地将其缓冲为持久状态； 只有在来自其他来源的第二个值到达后，您才需要发出连接的记录。 （实际上，您可能需要某种针对未发出的部分连接的垃圾收集策略，这可能是基于时间的。但对于很少或没有未完成连接的用例，这样的事情可能不是问题。）
@@ -221,8 +224,9 @@
 
 
 让我们仔细看看每个策略：
+
 固定窗户（又名翻滚窗户）
-       我们之前讨论了固定窗口。固定窗口将时间切成具有固定大小时间长度的片段。通常（如图 1-9 所示），固定窗口的段会均匀地应用于整个数据集，这是对齐窗口的一个示例。在某些情况下，需要为不同的数据子集（例如，每个键）对窗口进行相移，以便随着时间的推移更均匀地分散窗口完成负载，这是未对齐窗口的一个示例，因为它们在数据中有所不同。 6
+       我们之前讨论了固定窗口。固定窗口将时间切成具有固定大小时间长度的片段。通常（如图 1-9 所示），固定窗口的段会均匀地应用于整个数据集，这是对齐窗口的一个示例。在某些情况下，需要为不同的数据子集（例如，每个键）对窗口进行相移，以便随着时间的推移更均匀地分散窗口完成负载，这是未对齐窗口的一个示例，因为它们在数据中有所不同。 [^6]
 
 滑动窗（又名跳窗）
 
@@ -231,7 +235,7 @@
 会话
        动态窗口的一个示例，会话由一系列事件组成，这些事件由大于某个超时的不活动间隙终止。会话通常用于通过将一系列时间相关的事件（例如，一次观看的一系列视频）组合在一起来分析用户随时间的行为。会话很有趣，因为它们的长度不能先验地定义；它们取决于所涉及的实际数据。它们也是未对齐窗口的典型示例，因为会话在不同的数据子集（例如，不同的用户）之间实际上永远不会相同。
 
-我们之前讨论的两个时间域（处理时间和事件时间）本质上是我们关心的两个域。7 窗口化在这两个域中都有意义，所以让我们详细了解每个域，看看它们有何不同。因为处理时间窗口在历史上更为普遍，我们将从那里开始。
+我们之前讨论的两个时间域（处理时间和事件时间）本质上是我们关心的两个域。[^7] 窗口化在这两个域中都有意义，所以让我们详细了解每个域，看看它们有何不同。因为处理时间窗口在历史上更为普遍，我们将从那里开始。
 
 *按处理时间开窗*
 
@@ -268,6 +272,7 @@
 ![](./media/stsy_0110.png)
 
 <center><i>图 1-10 显示了一个将无界源窗口化为一小时固定窗口的示例。</i></center>
+
 图 1-10 中的黑色箭头标出了两个特别有趣的数据。 每个到达的处理时间窗口与每一位数据所属的事件时间窗口不匹配。 因此，如果将这些数据窗口化到关注事件时间的用例的处理时间窗口中，则计算结果将是不正确的。 如您所料，事件时间正确性是使用事件时间窗口的一件好事。
 无界数据源上的事件时间窗口化的另一个好处是，您可以创建动态大小的窗口，例如会话，而不会在固定窗口上生成会话时观察到任意拆分（正如我们之前在“无界数据”中的会话示例中看到的那样 : Streaming”），如图 1-11 所示。
 
@@ -298,3 +303,21 @@
 - 通过批处理和流引擎查看当今常用的有界和无界数据的主要数据处理方法，将无界方法大致分为：时间不可知、近似、按处理时间开窗和按事件时间开窗。
 
 接下来，我们深入研究 Beam 模型的细节，从概念上了解我们如何在四个相关轴上分解数据处理的概念：什么、在哪里、何时以及如何。我们还详细研究了在多个场景中处理一个简单、具体的示例数据集，突出了 Beam 模型支持的多个用例，以及一些具体的 API 来让我们在现实中扎根。这些示例将有助于深入理解本章中介绍的事件时间和处理时间的概念，同时探索水印等新概念。
+
+
+
+
+[^1]: For completeness, it's perhaps worth calling out that this definition includes both true streaming as well as microbatch implementations. For those of you who aren't familiar with microbatch systems, they are streaming systems that use repeated executions of a batch processing engine to process unbounded data. Spark Streaming is the canonical example in the industry.
+
+[^2]: Readers familiar with my original ["Streaming 101"](https://oreil.ly/2JBfN7X) article might recall that I rather emphatically encouraged the abandonment of the term "stream" when referring to datasets. That never caught on, which I initially thought was due to its catchiness and pervasive existing usage. In retrospect, however, I think I was simply wrong. There actually is great value in distinguishing between the two different types of dataset constitutions: tables and streams. Indeed, most of the second half of this book is dedicated to understanding the relationship between those two.
+
+[^3]: If you're unfamiliar with what I mean when I say *exactly-once*, it's referring to a specific type of consistency guarantee that certain data processing frameworks provide. Consistency guarantees are typically bucketed into three main classes: at-most-once processing, at-least-once processing, and exactly-once processing. Note that the names in use here refer to the effective semantics as observed within the outputs generated by the pipeline, not the actual number of times a pipeline might process (or attempt to process) any given record. For this reason, the term *effectively-once* is sometimes used instead of exactly-once, since it's more representative of the underlying nature of things. Reuven covers these concepts in much more detail in [Chapter 5](#ch05.html#exactly_once_and_side_effects){data-type="xref"}.
+
+[^4]: Since the original publication of "Streaming 101," numerous individuals have pointed out to me that it would have been more intuitive to place processing time on the x-axis and event time on the y-axis. I do agree that swapping the two axes would initially feel more natural, as event time seems like the dependent variable to processing time's independent variable. However, because both variables are monotonic and intimately related, they're effectively interdependent variables. So I think from a technical perspective you just have to pick an axis and stick with it. Math is confusing (especially outside of North America, where it suddenly becomes plural and gangs up on you).
+
+[^5]: This result really shouldn't be surprising (but was for me, hence why I'm pointing it out), because we're effectively creating a right triangle with the ideal line when measuring the two types of skew/lag. Maths are cool.
+
+[^6]: We look at aligned fixed windows in detail in [Chapter 2](#ch02.html#the_what_where_when_and_how){data-type="xref"}, and unaligned fixed windows in [Chapter 4](#ch04.html#advanced_windowing){data-type="xref"}.
+
+[^7]: If you poke around enough in the academic literature or SQL-based streaming systems, you'll also come across a third windowing time domain: *tuple-based windowing* (i.e., windows whose sizes are counted in numbers of elements). However, tuple-based windowing is essentially a form of processing-time windowing in which elements are assigned monotonically increasing timestamps as they arrive at the system. As such, we won't discuss tuple-based windowing in detail any further.
+

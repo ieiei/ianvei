@@ -22,7 +22,7 @@
 
 这个分布上有一个关键点，位于“in-flight”分布的最左边，对应于我们管道中任何未处理消息的最旧事件时间戳。我们使用这个值来定义水印：
 
-*水印是尚未完成的最古老作品的单调递增时间戳。*
+*水印是尚未完成的最古老[^1]作品的单调递增时间戳。*
 
 此定义提供了两个使其有用的基本属性：
 
@@ -59,7 +59,7 @@
 
 按时间排序的静态日志集
 
- 一个静态大小的时序日志输入源（例如，具有一组静态分区的 Apache Kafka 主题，其中源的每个分区包含单调递增的事件时间）将是相对简单的源，可在其上创建完美的水印。为此，源将简单地跟踪跨已知和静态源分区集的未处理数据的最小事件时间（即，每个分区中最近读取的记录的最小事件时间）。
+ 一个静态大小[^2]的时序日志输入源（例如，具有一组静态分区的 Apache Kafka 主题，其中源的每个分区包含单调递增的事件时间）将是相对简单的源，可在其上创建完美的水印。为此，源将简单地跟踪跨已知和静态源分区集的未处理数据的最小事件时间（即，每个分区中最近读取的记录的最小事件时间）。
  
  与前面提到的入口时间戳类似，系统完全知道接下来会出现哪些时间戳，这要归功于已知静态分区集的事件时间会单调增加这一事实。这实际上是有界无序处理的一种形式；已知分区集的无序量受这些分区中观察到的最小事件时间的限制。
 
@@ -100,7 +100,7 @@
 
 水印是在输入源处创建的，如上一节所述。然后，它们在概念上随着数据流经系统而流经系统。3 您可以跟踪不同粒度级别的水印。对于包含多个不同阶段的管道，每个阶段都可能跟踪自己的水印，其值是它之前的所有输入和阶段的函数。因此，管道中较晚的阶段将具有更远的过去的水印（因为他们看到的整体输入较少）。
 
-我们可以在管道中任何单个操作或阶段的边界处定义水印。这不仅有助于了解管道中每个阶段的相对进展，而且有助于独立并尽快为每个阶段分配及时的结果。我们对阶段边界处的水印给出以下定义：
+我们可以在管道中任何单个操作或阶段的边界处定义水印[^3]。这不仅有助于了解管道中每个阶段的相对进展，而且有助于独立并尽快为每个阶段分配及时的结果。我们对阶段边界处的水印给出以下定义：
 
 - 输入水印，它捕获该阶段上游所有内容的进度（即，该阶段的输入完成程度）。对于源，输入水印是一个特定于源的函数，它为输入数据创建水印。对于非源阶段，输入水印定义为其所有上游源和阶段的所有分片/分区/实例的输出水印的最小值。
 - 一个输出水印，它捕获阶段本身的进度，本质上定义为阶段的输入水印和阶段内所有非延迟数据活动消息的事件时间的最小值。究竟“活跃”包含什么在某种程度上取决于给定阶段实际执行的操作以及流处理系统的实现。它通常包括为聚合缓冲但尚未在下游实现的数据、正在传输到下游阶段的未决输出数据等。
@@ -203,7 +203,7 @@ PCollection<Float> averageSessionLengths = PCollectionList
 
 在图 3-5 中，我忽略了输出时间戳的一些细节。但是，如果您仔细查看图中的第二阶段，您会发现第一阶段的每个输出都被分配了一个与其窗口结束相匹配的时间戳。尽管这是输出时间戳的一个相当自然的选择，但它并不是唯一有效的选择。正如你在本章前面所知道的，水印永远不允许向后移动。鉴于该限制，您可以推断给定窗口的有效时间戳范围从窗口中最早的非迟到记录的时间戳开始（因为只有非迟到的记录才能保证保持水印）并一直延伸到正无穷大.这是相当多的选择。然而，在实践中，在大多数情况下，往往只有几个选择是有意义的：
 
-- 窗口的尽头
+- 窗口的尽头[^4]
 
     如果您希望输出时间戳代表窗口边界，则使用窗口结束是唯一安全的选择。正如我们稍后将看到的，它还允许所有选项中最平滑的水印进展。
 
@@ -292,7 +292,7 @@ PCollection<Float> averageSessionLengths = PCollectionList
 
 到目前为止，我们关注的是通过阶段中活动消息的最小事件时间来衡量的水印。跟踪最小值允许系统知道所有较早的时间戳都已被考虑在内。另一方面，我们可以考虑活动消息的事件时间戳的整个分布，并利用它来创建更细粒度的触发条件。
 
-不考虑分布的最小点，我们可以取分布的任何百分位，并说我们保证已经处理了具有较早时间戳的所有事件的这个百分比。
+不考虑分布的最小点，我们可以取分布的任何百分位，并说我们保证已经处理了具有较早时间戳的所有事件的这个百分比[^5]。
 
 这个方案有什么好处？如果业务逻辑“大部分”正确就足够了，百分位水印提供了一种机制，与我们通过丢弃水印分布长尾中的异常值来跟踪最小事件时间相比，水印可以更快、更平稳地推进.图 3-9 显示了事件时间的紧凑分布，其中第 90 个百分位水印接近第 100 个百分位。图 3-10 展示了异常值进一步落后的情况，因此第 90 个百分位水印明显领先于第 100 个百分位。通过丢弃水印中的异常数据，百分位水印仍然可以跟踪大部分分布，而不会被异常值延迟。
 
@@ -375,7 +375,7 @@ Google Cloud Dataflow 通过集中式聚合器代理执行聚合。我们可以�
 
 #### 案例研究：Apache Flink 中的水印
 
-Apache Flink 是一个开源流处理框架，用于分布式、高性能、始终可用和准确的数据流应用程序。可以使用 Flink 运行器运行 Beam 程序。在此过程中，Beam 依赖于 Flink 中的水印等流处理概念的实现。与通过集中式水印聚合器代理实现水印聚合的 Google Cloud Dataflow 不同，Flink 在带内执行水印跟踪和聚合
+Apache Flink 是一个开源流处理框架，用于分布式、高性能、始终可用和准确的数据流应用程序。可以使用 Flink 运行器运行 Beam 程序。在此过程中，Beam 依赖于 Flink 中的水印等流处理概念的实现。与通过集中式水印聚合器代理实现水印聚合的 Google Cloud Dataflow 不同，Flink 在带内执行水印跟踪和聚合[^6]
 
 为了理解它是如何工作的，让我们看一个 Flink 管道，如图 3-18 所示。
 
@@ -463,3 +463,16 @@ Pub/Sub 面临哪些挑战？因为 Pub/Sub 不保证排序，所以我们必须
 在这一点上，我们已经探索了如何使用消息的事件时间来给出流处理系统中进度的稳健定义。我们看到了这种进展概念随后如何帮助我们回答事件时间处理发生在哪里以及处理时间结果何时实现的问题。具体来说，我们研究了水印是如何在源头创建的、数据摄取到管道中的点，然后在整个管道中传播，以保留允许何时何地回答问题的基本保证。我们还研究了更改输出窗口时间戳对水印的影响。最后，我们探讨了在大规模构建水印时的一些实际系统注意事项。
 
 现在我们已经对水印如何在幕后工作有了坚实的基础，我们可以深入了解它们可以为我们做什么，因为我们在第 4 章中使用窗口和触发来回答更复杂的查询。
+
+
+[^1]: Note the additional mention of monotonicity; we have not yet discussed how to achieve this. Indeed the discussion thus far makes no mention of monotonicity. If we considered exclusively the oldest in-flight event time, the watermark would not always be monotonic, as we have made no assumptions about our input. We return to this discussion later on.
+
+[^2]: To be precise, it's not so much that the number of logs need be static as it is that the number of logs at any given time be known a priori by the system. A more sophisticated input source composed of a dynamically chosen number of inputs logs, such as [Pravega](http://pravega.io), could just as well be used for constructing a perfect watermark. It's only when the number of logs that exist in the dynamic set at any given time is unknown (as in the example in the next section) that one must fall back on a heuristic watermark.
+
+[^3]: Note that by saying "flow through the system," I don't necessarily imply they flow along the same path as normal data. They might (as in Apache Flink), but they might also be transmitted out-of-band (as in MillWheel/Cloud Dataflow).
+
+[^4]: The *start* of the window is not a safe choice from a watermark correctness perspective because the first element in the window often comes *after* the beginning of the window itself, which means that the watermark is not guaranteed to have been held back as far as the start of the window.
+
+[^5]: The percentile watermark triggering scheme described here is not currently implemented by Beam; however, other systems such as MillWheel implement this.
+
+[^6]: For more information on Flink watermarks, see the [Flink documentation on the subject.](https://ci.apache.org/projects/flink/flink-docs-release-1.3/dev/event_time.html)

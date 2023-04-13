@@ -6,7 +6,7 @@
 
 在本章中，我们现在将进一步关注第 1 章中的数据处理模式，但更详细，并在具体示例的背景下进行。 当我们完成时，我们将涵盖我认为是稳健的无序数据处理所需的核心原则和概念； 这些是推理时间的工具，真正让你超越了经典的批处理。
 
-为了让您了解实际情况，我使用了 Apache Beam 代码片段，并结合延时图 1 来提供概念的可视化表示。 Apache Beam 是一个用于批处理和流处理的统一编程模型和可移植层，具有一组不同语言（例如 Java 和 Python）的具体 SDK。 然后，使用 Apache Beam 编写的管道可以在任何受支持的执行引擎（Apache Apex、Apache Flink、Apache Spark、Cloud Dataflow 等）上可移植地运行。
+为了让您了解实际情况，我使用了 Apache Beam 代码片段，并结合延时图 [^1] 来提供概念的可视化表示。 Apache Beam 是一个用于批处理和流处理的统一编程模型和可移植层，具有一组不同语言（例如 Java 和 Python）的具体 SDK。 然后，使用 Apache Beam 编写的管道可以在任何受支持的执行引擎（Apache Apex、Apache Flink、Apache Spark、Cloud Dataflow 等）上可移植地运行。
 
 我在这里使用 Apache Beam 作为示例不是因为这是一本 Beam 书（它不是），而是因为它最完整地体现了本书中描述的概念。 回到最初编写“Streaming 102”的时候（当它仍然是来自 Google Cloud Dataflow 的 Dataflow 模型而不是来自 Apache Beam 的 Beam 模型时），它实际上是唯一存在的系统，它提供了所有必要的表达量 我们将在这里介绍的示例。 一年半之后，我很高兴地说发生了很大的变化，大多数主要系统已经或正在转向支持一个看起来很像本书中描述的模型。 因此请放心，我们在此介绍的概念虽然是通过 Beam 镜头了解的，但将同样适用于您将遇到的大多数其他系统。
 
@@ -41,7 +41,7 @@
 - 在处理时间内，结果何时实现？ 这个问题是通过使用触发器和（可选）水印来回答的。 这个主题有无限的变化，但最常见的模式是那些涉及重复更新的模式（即物化视图语义），那些仅在认为相应的输入完成后才利用水印为每个窗口提供单个输出的模式（即 ，基于每个窗口应用的经典批处理语义），或两者的某种组合。
 - 结果的细化如何关联？ 这个问题由所使用的累积类型来回答：丢弃（其中结果都是独立且不同的），累积（其中后来的结果建立在先前的结果之上），或累积和收回（其中累积值加上收回 发出先前触发的值）。
 
-在本书的其余部分，我们将更详细地研究这些问题中的每一个。 而且，是的，我将把这个配色方案放在地上，试图清楚地说明哪些概念与 What/Where/When/How 成语中的哪个问题相关。 不客气<winky-smiley/>。
+在本书的其余部分，我们将更详细地研究这些问题中的每一个。 而且，是的，我将把这个配色方案放在地上，试图清楚地说明哪些概念与 What/Where/When/How 成语中的哪个问题相关。 不客气<winky-smiley/>。[^2]
 
 ### 批处理基础：what和where
 
@@ -484,6 +484,7 @@ PCollection<KV<Team, Integer>> totals = input
 <center><i>图 2-14 结合了图 2-9、2-11 的最终帧（仅启发式），并并排显示了三种模式的良好视觉对比。</i></center>
 
 “正如你可以想象的那样，按顺序呈现的模式（丢弃、累积、累积和收回）在存储和计算成本方面都越来越昂贵。 为此，累积模式的选择为沿着正确性、延迟和成本轴进行权衡提供了另一个维度。
+
 ## 总结
 
 完成本章后，您现在了解了强大的流处理的基础知识，并准备好走向世界并做出令人惊奇的事情。当然，还有八章焦急等待你的关注，所以希望你不要像现在这样，这一刻。但无论如何，让我们回顾一下我们刚刚介绍的内容，以免您在匆忙前进时忘记任何内容。首先，我们触及的主要概念：
@@ -530,3 +531,23 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 综上所述，在这一点上，我们实际上只研究了一种类型的窗口：事件时间的固定窗口。 众所周知，窗口化有许多维度，在我们使用 Beam 模型结束之前，我想至少再谈两个维度。 然而，首先，我们将稍微绕道深入水印的世界，因为这些知识将有助于构建未来的讨论（并且本身就很有趣）。 进入斯拉瓦，舞台右侧...
+
+
+
+[^1]: If you're fortunate enough to be reading the Safari version of the book, you have full-blown time-lapse animations just like in ["Streaming 102"](http://oreil.ly/1TV7YGU). For print, Kindle, and other ebook versions, there are static images with a link to animated versions on the web.
+
+[^2]: Bear with me here. Fine-grained emotional expressions via composite punctuation (i.e., emoticons) are strictly forbidden in O'Reilly publications \<​winky-smiley/\>.
+
+[^3]: And indeed, we did just that with the original triggers feature in Beam. In retrospect, we went a bit overboard. Future iterations will be simpler and easier to use, and in this book I focus only on the pieces that are likely to remain in some form or another.
+
+[^4]: More accurately, the input to the function is really the state at time *P* of everything upstream of the point in the pipeline where the watermark is being observed: the input source, buffered data, data actively being processed, and so on; but conceptually it's simpler to think of it as a mapping from processing time to event time.
+
+[^5]: Note that I specifically chose to omit the value of 9 from the heuristic watermark because it will help me to make some important points about late data and watermark lag. In reality, a heuristic watermark might be just as likely to omit some other value(s) instead, which in turn could have significantly less drastic effect on the watermark. If winnowing late-arriving data from the watermark is your goal (which is very valid in some cases, such as abuse detection, for which you just want to see a significant majority of the data as quickly as possible), you don't necessarily want a heuristic watermark rather than a perfect watermark. What you really want is a percentile watermark, which explicitly drops some percentile of late-arriving data from its calculations. See [Chapter 3](#ch03.html#watermarks_chapter){data-type="xref"}.
+
+[^6]: Which isn't to say there aren't use cases that care primarily about correctness and not so much about latency; in those cases, using an accurate watermark​ as the sole driver of output from a pipeline is a reasonable approach.
+
+[^7]: And, as we know from before, this assertion is either guaranteed, in the case of a perfect watermark being used, or an educated guess, in the case of a heuristic watermark.
+
+[^8]: You might note that there should logically be a fourth mode: discarding and retracting. That mode isn't terribly useful in most cases, so I don't discuss it further here.
+
+[^9]: In retrospect, it probably would have been clearer to choose a different set of names that are more oriented toward the observed nature of data in the materialized stream (e.g., "output modes") rather than names describing the state management semantics that yield those data. Perhaps: discarding mode → delta mode, accumulating mode → value mode, accumulating and retracting mode → value and retraction mode? However, the discarding/accumulating/accumulating and retracting names are enshrined in the 1.x and 2.x lineages of the Beam Model, so I don't want to introduce potential confusion in the book by deviating. Also, it's very likely accumulating modes will blend into the background more with Beam 3.0 and the introduction of [sink triggers](https://s.apache.org/beam-sink-triggers); more on this when we discuss SQL in [Chapter 8](#ch08.html#streaming_sql){data-type="xref"}.
