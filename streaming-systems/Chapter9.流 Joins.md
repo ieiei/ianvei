@@ -144,76 +144,45 @@
 `LEFT OUTER` 连接只是一个 `FULL OUTER` 连接，删除了右侧数据集中任何未连接的行。 通过采用原始的“FULL OUTER”连接并将要过滤的行灰显，可以最清楚地看到这一点。 对于“LEFT OUTER”连接，它看起来像下面这样，其中左侧未连接的每一行都从原始“FULL OUTER”连接中过滤掉：
 
 ``` SQL
-                                         
-12:10> SELECT TABLE                      
-         Left.Id as L,                   
-         Right.Id as R                   
-       FROM Left LEFT OUTER JOIN Right   
-       ON L.Num = R.Num;                 
----------------                          
-| L    | R    |                          
----------------                          
-| L1   | null |                          
-| L2   | R2   |                          
-| L3   | R3   |                          
-| null | R4   |                          
----------------                          
-                                         
-12:00> SELECT STREAM Left.Id as L, 
-         Right.Id as R,
-         Sys.EmitTime as Time, 
-         Sys.Undo as Undo 
-       FROM Left LEFT OUTER JOIN Right
-       ON L.Num = R.Num;
-------------------------------
-| L    | R    | Time  | Undo |
-------------------------------
-| null | R2   | 12:01 |      |
-| L1   | null | 12:02 |      |
-| L3   | null | 12:03 |      |
-| L3   | null | 12:04 | undo |
-| L3   | R3   | 12:04 |      |
-| null | R4   | 12:05 |      |
-| null | R2   | 12:06 | undo |
-| L2   | R2   | 12:06 |      |
-....... [12:00, 12:10] .......
+                                         12:00> SELECT STREAM Left.Id as L, 
+12:10> SELECT TABLE                               Right.Id as R,
+         Left.Id as L,                            Sys.EmitTime as Time, 
+         Right.Id as R                            Sys.Undo as Undo 
+       FROM Left LEFT OUTER JOIN Right          FROM Left LEFT OUTER JOIN Right
+       ON L.Num = R.Num;                        ON L.Num = R.Num;
+---------------                          ------------------------------
+| L    | R    |                          | L    | R    | Time  | Undo |
+---------------                          ------------------------------
+| L1   | null |                          | null | R2   | 12:01 |      |
+| L2   | R2   |                          | L1   | null | 12:02 |      |
+| L3   | R3   |                          | L3   | null | 12:03 |      |
+| null | R4   |                          | L3   | null | 12:04 | undo |
+---------------                          | L3   | R3   | 12:04 |      |
+                                         | null | R4   | 12:05 |      |
+                                         | null | R2   | 12:06 | undo |
+                                         | L2   | R2   | 12:06 |      |
+                                         ....... [12:00, 12:10] .......
 ```
 
 要查看表和流在实践中的实际情况，让我们再次查看相同的查询，但这次完全省略了灰色行：
 
 ``` SQL
-                                         
-12:10> SELECT TABLE                      
-         Left.Id as L,                   
-         Right.Id as R                   
-       FROM Left LEFT OUTER JOIN Right   
-       ON L.Num = R.Num;                 
----------------                          
-| L    | R    |                          
----------------                          
-| L1   | null |                          
-| L2   | R2   |                          
-| L3   | R3   |                          
----------------                          
-                                         
-                                         
-12:00> SELECT STREAM Left.Id as L, 
-         Right.Id as R,
-         Sys.EmitTime as Time, 
-         Sys.Undo as Undo 
-       FROM Left LEFT OUTER JOIN Right
-       ON L.Num = R.Num;
-------------------------------
-| L    | R    | Time  | Undo |
-------------------------------
-| L1   | null | 12:02 |      |
-| L3   | null | 12:03 |      |
-| L3   | null | 12:04 | undo |
-| L3   | R3   | 12:04 |      |
-| L2   | R2   | 12:06 |      |
-....... [12:00, 12:10] .......
+                                         12:00> SELECT STREAM Left.Id as L, 
+12:10> SELECT TABLE                               Right.Id as R,
+         Left.Id as L,                            Sys.EmitTime as Time, 
+         Right.Id as R                            Sys.Undo as Undo 
+       FROM Left LEFT OUTER JOIN Right          FROM Left LEFT OUTER JOIN Right
+       ON L.Num = R.Num;                        ON L.Num = R.Num;
+---------------                          ------------------------------
+| L    | R    |                          | L    | R    | Time  | Undo |
+---------------                          ------------------------------
+| L1   | null |                          | L1   | null | 12:02 |      |
+| L2   | R2   |                          | L3   | null | 12:03 |      |
+| L3   | R3   |                          | L3   | null | 12:04 | undo |
+---------------                          | L3   | R3   | 12:04 |      |
+                                         | L2   | R2   | 12:06 |      |
+                                         ....... [12:00, 12:10] .......
 ```
-
 
 
 ### RIGHT OUTER
