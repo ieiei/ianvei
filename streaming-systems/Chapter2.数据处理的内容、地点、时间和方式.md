@@ -168,7 +168,7 @@ PCollection<KV<Team, Integer>> totals =
 
 触发器为以下问题提供了答案：“在处理时间内，结果何时实现？”触发器声明窗口的输出何时应该在处理时间内发生（尽管触发器本身可能会根据其他时间域中发生的事情做出这些决定，例如在事件时间域中进行的水印，正如我们将在一些时刻）。窗口的每个特定输出称为窗口的窗格。
 
-尽管可以想象相当广泛的可能触发语义3，但从概念上讲，只有两种通常有用的触发器类型，“而实际应用几乎总是归结为使用一种或两者的组合：
+尽管可以想象相当广泛的可能触发语义3，但从概念上讲，只有两种通常有用的触发器类型，而实际应用几乎总是归结为使用一种或两者的组合：
 
 - 重复更新触发器
 
@@ -269,7 +269,7 @@ PCollection<KV<Team, Integer>> totals =
 
 现在，水印的一个有趣特性是它们是一类函数，这意味着有多个不同的函数 F(P) → E 可以满足水印的属性，并取得不同程度的成功。正如我之前提到的，对于您完全了解输入数据的情况，可以构建完美的水印，这是理想的情况。但是对于您对输入缺乏完全了解或计算完美水印的计算成本太高的情况，您可能会选择使用启发式方法来定义您的水印。我想在这里说明的一点是，使用的给定水印算法独立于管道本身。我们不打算在这里详细讨论实现水印的意义（Slava 在第 3 章中这样做了）。现在，为了帮助理解给定输入集可以应用不同水印的想法，让我们看一下示例 2-6 中的管道，当在相同数据集上执行但使用两种不同的水印实现时（图 2- 10）：左侧是完美水印；右侧是启发式水印。
 
-在这两种情况下，当水印通过窗口的末端时，窗口就会被物化。正如您所料，完美的水印完美地捕捉了随着时间的推移管道的事件时间完整性。相比之下，用于右侧启发式水印的特定算法没有考虑到 9 的值，5 这极大地改变了物化输出的形状，无论是在输出延迟还是正确性方面（从不正确的答案中可以看出） “为 [12:00, 12:02) 窗口提供的 5 个）。
+在这两种情况下，当水印通过窗口的末端时，窗口就会被物化。正如您所料，完美的水印完美地捕捉了随着时间的推移管道的事件时间完整性。相比之下，用于右侧启发式水印的特定算法没有考虑到 9 的值，5 这极大地改变了物化输出的形状，无论是在输出延迟还是正确性方面（从不正确的答案中可以看出）为 [12:00, 12:02) 窗口提供的 5 个）。
 
 图 2-9 中的水印触发器与我们在图 2-5 到 2-7 中看到的重复更新触发器之间的最大区别在于，水印为我们提供了一种推理输入完整性的方法。在系统实现给定窗口的输出之前，我们知道系统还不相信输入是完整的。这对于您想要推断输入中缺少数据或缺少数据的用例尤其重要。
 
@@ -362,12 +362,12 @@ PCollection<KV<Team, Integer>> totals = input
 
 - 表示处理时间中当前位置的粗黑线现在用刻度线进行注释，表示所有活动窗口的延迟范围（在事件时间中）。
 
-- 当水印超过一个窗口的延迟范围时，该窗口关闭，这意味着该窗口的所有状态都被丢弃。我留下一个虚线矩形，显示窗口关闭时覆盖的时间范围（在两个域中），一条小尾巴向右延伸，表示“窗口的延迟范围（用于与水印对比）。
+- 当水印超过一个窗口的延迟范围时，该窗口关闭，这意味着该窗口的所有状态都被丢弃。我留下一个虚线矩形，显示窗口关闭时覆盖的时间范围（在两个域中），一条小尾巴向右延伸，表示窗口的延迟范围（用于与水印对比）。
 - 仅对于这个图表，我为第一个窗口添加了一个额外的延迟数据，值为 6。6 是延迟的，但仍在允许的延迟范围内，因此被合并到值为 11 的更新结果中。但是 9 , 到达延迟范围之外，所以它被简单地丢弃了。
 
 ![](./media/stsy_0212.mp4)
 
-<center><i>“图 2-12.允许迟到早/准时/晚开火”</i></center>
+<center><i>图 2-12.允许迟到早/准时/晚开火</i></center>
 
 关于延迟范围的最后两个附注：
 
@@ -483,7 +483,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 <center><i>图 2-14 结合了图 2-9、2-11 的最终帧（仅启发式），并并排显示了三种模式的良好视觉对比。</i></center>
 
-“正如你可以想象的那样，按顺序呈现的模式（丢弃、累积、累积和收回）在存储和计算成本方面都越来越昂贵。 为此，累积模式的选择为沿着正确性、延迟和成本轴进行权衡提供了另一个维度。
+正如你可以想象的那样，按顺序呈现的模式（丢弃、累积、累积和收回）在存储和计算成本方面都越来越昂贵。 为此，累积模式的选择为沿着正确性、延迟和成本轴进行权衡提供了另一个维度。
 
 ## 总结
 
@@ -534,20 +534,20 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
-[^1]: If you're fortunate enough to be reading the Safari version of the book, you have full-blown time-lapse animations just like in ["Streaming 102"](http://oreil.ly/1TV7YGU). For print, Kindle, and other ebook versions, there are static images with a link to animated versions on the web.
+[^1]：如果你有幸读到这本书的 Safari 版本，你将拥有完整的延时动画，就像 ["Streaming 102"](http://oreil.ly/1TV7YGU) . 对于印刷版、Kindle 和其他电子书版本，网络上有静态图像和指向动画版本的链接。
 
-[^2]: Bear with me here. Fine-grained emotional expressions via composite punctuation (i.e., emoticons) are strictly forbidden in O'Reilly publications \<​winky-smiley/\>.
+[^2]：请耐心等待。 O'Reilly 出版物 \<winky-smiley/\> 严格禁止通过复合标点符号（即表情符号）进行细粒度的情感表达。
 
-[^3]: And indeed, we did just that with the original triggers feature in Beam. In retrospect, we went a bit overboard. Future iterations will be simpler and easier to use, and in this book I focus only on the pieces that are likely to remain in some form or another.
+[^3]：事实上，我们正是使用 Beam 中的原始触发器功能做到了这一点。 现在回想起来，我们有点过火了。 未来的迭代将更简单、更易于使用，在本书中，我只关注可能以某种形式保留的部分。
 
-[^4]: More accurately, the input to the function is really the state at time *P* of everything upstream of the point in the pipeline where the watermark is being observed: the input source, buffered data, data actively being processed, and so on; but conceptually it's simpler to think of it as a mapping from processing time to event time.
+[^4]：更准确地说，函数的输入实际上是在观察水印的管道上游点上游的所有内容在时间 *P* 的状态：输入源、缓冲数据、正在处理的数据、 等等; 但从概念上讲，将其视为从处理时间到事件时间的映射会更简单。
 
-[^5]: Note that I specifically chose to omit the value of 9 from the heuristic watermark because it will help me to make some important points about late data and watermark lag. In reality, a heuristic watermark might be just as likely to omit some other value(s) instead, which in turn could have significantly less drastic effect on the watermark. If winnowing late-arriving data from the watermark is your goal (which is very valid in some cases, such as abuse detection, for which you just want to see a significant majority of the data as quickly as possible), you don't necessarily want a heuristic watermark rather than a perfect watermark. What you really want is a percentile watermark, which explicitly drops some percentile of late-arriving data from its calculations. See [Chapter 3](#ch03.html#watermarks_chapter){data-type="xref"}.
+[^5]：请注意，我特别选择从启发式水印中省略 9 的值，因为它会帮助我提出一些关于延迟数据和水印滞后的重要观点。 实际上，启发式水印可能会忽略一些其他值，而这反过来可能对水印产生的影响要小得多。 如果从水印中筛选迟到的数据是你的目标（这在某些情况下非常有效，例如滥用检测，你只想尽快看到大部分数据），你不一定 想要启发式水印而不是完美水印。 您真正想要的是一个百分位水印，它明确地从其计算中删除一些迟到数据的百分位。 参见[第3章](Chapter3.水印.md#watermarks_chapter)
 
-[^6]: Which isn't to say there aren't use cases that care primarily about correctness and not so much about latency; in those cases, using an accurate watermark​ as the sole driver of output from a pipeline is a reasonable approach.
+[^6]：这并不是说没有主要关心正确性而不关心延迟的用例； 在这些情况下，使用准确的水印作为管道输出的唯一驱动程序是一种合理的方法。
 
-[^7]: And, as we know from before, this assertion is either guaranteed, in the case of a perfect watermark being used, or an educated guess, in the case of a heuristic watermark.
+[^7]：而且，正如我们之前所知，在使用完美水印的情况下，该断言是有保证的，或者在启发式水印的情况下是有根据的猜测。
 
-[^8]: You might note that there should logically be a fourth mode: discarding and retracting. That mode isn't terribly useful in most cases, so I don't discuss it further here.
+[^8]：您可能会注意到，逻辑上应该有第四种模式：丢弃和收回。 在大多数情况下，该模式并不是很有用，因此我不会在这里进一步讨论它。
 
-[^9]: In retrospect, it probably would have been clearer to choose a different set of names that are more oriented toward the observed nature of data in the materialized stream (e.g., "output modes") rather than names describing the state management semantics that yield those data. Perhaps: discarding mode → delta mode, accumulating mode → value mode, accumulating and retracting mode → value and retraction mode? However, the discarding/accumulating/accumulating and retracting names are enshrined in the 1.x and 2.x lineages of the Beam Model, so I don't want to introduce potential confusion in the book by deviating. Also, it's very likely accumulating modes will blend into the background more with Beam 3.0 and the introduction of [sink triggers](https://s.apache.org/beam-sink-triggers); more on this when we discuss SQL in [Chapter 8](#ch08.html#streaming_sql){data-type="xref"}.
+[^9]：回想起来，选择一组不同的名称可能会更清楚，这些名称更面向物化流中数据的观察性质（例如，“输出模式”），而不是描述状态管理的名称 产生这些数据的语义。 或许：丢弃模式→delta模式，累加模式→取值模式，累加退模式→取值回退模式？ 但是，丢弃/累积/累积和收回名称在 Beam 模型的 1.x 和 2.x 血统中都有体现，因此我不想通过偏离在书中引入潜在的混淆。 此外，随着 Beam 3.0 和 [sink triggers](https://s.apache.org/beam-sink-triggers) 的引入，累积模式很可能会更多地融入背景； 当我们在 [第8章](Chapter8.流 SQL.md#streaming_sql) 中讨论 SQL 时会对此进行更多介绍

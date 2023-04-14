@@ -1,12 +1,12 @@
 # Chapter6.流和表
 
-您已经到达了本书中我们讨论流和表的部分。如果您还记得，在 [第 1 章](ch01.html#streaming_one_oh_one) 中，我们简要讨论了两个重要但正交的数据维度：*基数*和*构成*。到目前为止，我们一直严格关注基数方面（有界与无界），而忽略了构成方面（流与表）。这使我们能够了解无界数据集的引入带来的挑战，而不必过多担心真正推动事物运作方式的低级细节。我们现在将扩大我们的视野，看看宪法的附加维度带来了什么。
+您已经到达了本书中我们讨论流和表的部分。如果您还记得，在 [第 1 章](Chapter1.流 101.md#streaming_one_oh_one) 中，我们简要讨论了两个重要但正交的数据维度：*基数*和*构成*。到目前为止，我们一直严格关注基数方面（有界与无界），而忽略了构成方面（流与表）。这使我们能够了解无界数据集的引入带来的挑战，而不必过多担心真正推动事物运作方式的低级细节。我们现在将扩大我们的视野，看看宪法的附加维度带来了什么。
 
 虽然有点牵强，但考虑这种方法转变的一种方法是将经典力学与量子力学的关系进行比较。你知道他们在物理课上是如何教你一堆经典力学的东西，比如牛顿理论等等，然后在你认为你或多或少地掌握了这些东西之后，他们会过来告诉你，这都是废话，经典物理学只给你部分图片，实际上还有另外一种叫做量子力学的东西，它真正解释了事物在较低层次上是如何工作的，但是试图同时教你两者来使事情复杂化是没有意义的，而且......哦等等......我们还没有完全调和两者之间的一切，所以只是眯着眼看它并相信我们这一切都有意义吗？嗯，这很像，除了你的大脑会受到更少的伤害，因为物理比数据处理更难，而且你不必眯着眼睛看任何东西并假装它是有道理的，因为它最终确实很好地结合在一起，这真的很酷。
 
 因此，在适当设置好舞台的情况下，本章的重点是双重的：
 
-- 试图描述 Beam 模型（正如我们在本书中所描述的那样）和“流和表”理论（由 [Martin Kleppmann](http://bit. ly/2LO0cik) 和 [Jay Kreps](http://bit.ly/2sX0bl8) 等，但基本上起源于数据库世界）。事实证明，流和表理论在描述作为 Beam 模型基础的低级概念方面做得很有启发性。此外，在考虑如何将健壮的流处理概念清晰地集成到 SQL 中（我们在 [第 8 章](ch08.html#streaming_sql) 中考虑的内容）时，清楚地了解它们之间的关系特别有用。
+- 试图描述 Beam 模型（正如我们在本书中所描述的那样）和“流和表”理论（由 [Martin Kleppmann](http://bit. ly/2LO0cik) 和 [Jay Kreps](http://bit.ly/2sX0bl8) 等，但基本上起源于数据库世界）。事实证明，流和表理论在描述作为 Beam 模型基础的低级概念方面做得很有启发性。此外，在考虑如何将健壮的流处理概念清晰地集成到 SQL 中（我们在 [第 8 章](Chapter8.流 SQL.md#streaming_sql) 中考虑的内容）时，清楚地了解它们之间的关系特别有用。
 - 用糟糕的物理类比轰炸你，以获得纯粹的乐趣。写一本书是很多工作；你必须在这里和那里找到小快乐才能让你继续前进。
 
 
@@ -170,7 +170,7 @@ ReduceWrite 是一个有点值得注意的。我们已经知道这个阶段必�
 
 ### *什么*：转换
 
-在 [Chapter 3](ch03.html#watermarks_chapter) 中，我们了解到转换告诉我们*什么*管道正在计算；也就是说，无论是构建模型、计算总和、过滤垃圾邮件等等。我们在前面的 MapReduce 示例中看到，六个阶段中有四个回答了 *what* 问题：
+在 [Chapter 3](Chapter3.水印.md#watermarks_chapter) 中，我们了解到转换告诉我们*什么*管道正在计算；也就是说，无论是构建模型、计算总和、过滤垃圾邮件等等。我们在前面的 MapReduce 示例中看到，六个阶段中有四个回答了 *what* 问题：
 
 - Map 和 Reduce 都分别对输入流中的每个键/值或键/值列表对应用了管道作者的元素转换，产生了一个新的转换流。
 - MapWrite 和 ReduceWrite 都根据该阶段分配的键（可能是隐式的，在可选的 Reduce 情况下）对前一阶段的输出进行分组，并在这样做时将输入流转换为输出表。
@@ -185,7 +185,7 @@ ReduceWrite 是一个有点值得注意的。我们已经知道这个阶段必�
 
    这些操作（如我们在 MapWrite 和 ReduceWrite 中看到的）接受记录流并以某种方式将它们组合在一起，从而将流转换为表。分组转换的示例是连接、聚合、列表/集合累积、更改日志应用程序、直方图创建、机器学习模型训练等。
 
-为了更好地了解所有这些是如何联系在一起的，让我们看一下 [图 2-2](ch02.html#types_of_transformations) 的更新版本，我们首先开始研究转换。为了避免您跳回那里查看我们正在讨论的内容，<a name="summation_pipeline_key_value_data_are_read">[示例 6-1]</a> 包含我们正在使用的代码片段。
+为了更好地了解所有这些是如何联系在一起的，让我们看一下 [图 2-2](Chapter2.数据处理的内容、地点、时间和方式.md#types_of_transformations) 的更新版本，我们首先开始研究转换。为了避免您跳回那里查看我们正在讨论的内容，<a name="summation_pipeline_key_value_data_are_read">[示例 6-1]</a> 包含我们正在使用的代码片段。
 
 *示例 6-1。求和管道*
 
@@ -209,7 +209,7 @@ PCollection<KV<Team, Integer>> 总计 =
 <center><i>图 6-4。经典批处理的流和表视图</i></center>
 
 
-在此可视化的流和表格版本中，时间的流逝表现为随着时间的推移在处理时间维度（y 轴）中向下滚动图形区域。以这种方式渲染的好处是它非常清楚地指出了非分组操作和分组操作之间的区别。与我们之前的图表不同，其中我省略了管道中除“Sum.integersByKey”之外的所有初始转换，我在这里也包含了初始解析操作，因为解析操作的非分组方面提供了一个很好的对比总和的分组方面。从这个角度来看，很容易看出两者之间的区别。非分组操作不会阻止流中元素的运动，因此会在另一侧产生另一个流。相反，分组操作使流中的所有元素都处于静止状态，因为它将它们一起添加到最终总和中。由于此示例在有界数据的批处理引擎上运行，因此仅在达到输入结束后才会发出最终结果。正如我们在 [Chapter 2](ch02.html#the_what_where_when_and_how) 中所指出的，这个示例对于有界数据来说已经足够了，但是在无界数据的上下文中过于局限，因为理论上输入永远不会结束。但真的不够吗？
+在此可视化的流和表格版本中，时间的流逝表现为随着时间的推移在处理时间维度（y 轴）中向下滚动图形区域。以这种方式渲染的好处是它非常清楚地指出了非分组操作和分组操作之间的区别。与我们之前的图表不同，其中我省略了管道中除`Sum.integersByKey`之外的所有初始转换，我在这里也包含了初始解析操作，因为解析操作的非分组方面提供了一个很好的对比总和的分组方面。从这个角度来看，很容易看出两者之间的区别。非分组操作不会阻止流中元素的运动，因此会在另一侧产生另一个流。相反，分组操作使流中的所有元素都处于静止状态，因为它将它们一起添加到最终总和中。由于此示例在有界数据的批处理引擎上运行，因此仅在达到输入结束后才会发出最终结果。正如我们在 [Chapter 2](Chapter2.数据处理的内容、地点、时间和方式.md#the_what_where_when_and_how) 中所指出的，这个示例对于有界数据来说已经足够了，但是在无界数据的上下文中过于局限，因为理论上输入永远不会结束。但真的不够吗？
 
 查看图表的新流/表部分，如果我们所做的只是计算总和作为我们的最终结果（实际上并没有在管道中以任何其他方式进一步转换这些总和），那么我们使用分组创建的表操作有我们的答案，随着新数据的到来，随着时间的推移而发展。为什么我们不直接从那里读取我们的结果呢？
 
@@ -223,7 +223,7 @@ PCollection<KV<Team, Integer>> 总计 =
 
 ### *在哪里*：窗口化
 
-正如我们从 [Chapter 3](ch03.html#watermarks_chapter) 中了解到的，窗口化告诉我们事件时间分组发生的*位置*。结合我们之前的经验，我们因此也可以推断它必须在流到表的转换中发挥作用，因为分组是驱动表创建的原因。窗口化实际上有两个方面与流/表理论交互：
+正如我们从 [Chapter 3](Chapter3.水印.md#watermarks_chapter) 中了解到的，窗口化告诉我们事件时间分组发生的*位置*。结合我们之前的经验，我们因此也可以推断它必须在流到表的转换中发挥作用，因为分组是驱动表创建的原因。窗口化实际上有两个方面与流/表理论交互：
 
 - 窗口分配
 
@@ -235,7 +235,7 @@ PCollection<KV<Team, Integer>> 总计 =
 
 窗口分配的效果非常简单。当一条记录在概念上被放置到一个窗口中时，窗口的定义本质上与该记录的用户分配键相结合，以创建一个在分组时使用的隐式复合键。[^10] 很简单。
 
-为了完整起见，让我们再看一下 [Chapter 3](ch03.html#watermarks_chapter) 中的原始窗口示例，但从流和表的角度来看。如果您还记得，代码片段类似于 [Example 6-2](#summation_pipeline_chap_six_second) （这次省略了解析 *not* ）。
+为了完整起见，让我们再看一下 [Chapter 3](Chapter3.水印.md#watermarks_chapter) 中的原始窗口示例，但从流和表的角度来看。如果您还记得，代码片段类似于 [Example 6-2](#summation_pipeline_chap_six_second) （这次省略了解析 *not* ）。
 
 *示例 6-2。求和管道*
 
@@ -281,11 +281,11 @@ PCollection<KV<Team, Integer>> 总计 = 输入
 
 ### *When*：触发器
 
-我们在 [Chapter 3](ch03.html#watermarks_chapter) 中了解到，我们使用触发器来指示 *何时* 窗口的内容将被具体化（水印为某些类型的触发器提供输入完整性的有用信号）。将数据组合到一个窗口中后，我们使用触发器来指示何时应将数据发送到下游。在流/表术语中，我们理解分组意味着流到表的转换。从那里可以看出触发器是分组的补充，这是一个相对较小的飞跃。换句话说，就是我们之前所掌握的“解组”操作。触发器是驱动表到流转换的原因。
+我们在 [Chapter 3](Chapter3.水印.md#watermarks_chapter) 中了解到，我们使用触发器来指示 *何时* 窗口的内容将被具体化（水印为某些类型的触发器提供输入完整性的有用信号）。将数据组合到一个窗口中后，我们使用触发器来指示何时应将数据发送到下游。在流/表术语中，我们理解分组意味着流到表的转换。从那里可以看出触发器是分组的补充，这是一个相对较小的飞跃。换句话说，就是我们之前所掌握的“解组”操作。触发器是驱动表到流转换的原因。
 
 在流/表术语中，触发器是应用于表的特殊过程，允许该表中的数据被具体化以响应相关事件。这么说来，它们实际上听起来与经典的数据库触发器非常相似。确实，这里的名字选择并非巧合。它们本质上是一样的。当您指定一个触发器时，您实际上是在编写代码，然后随着时间的推移对状态表中的每一行进行评估。当该触发器触发时，它会获取当前在表中静止的相应数据并将它们置于运动状态，从而产生一个新流。
 
-让我们回到我们的例子。我们将从 [第 2 章](ch02.html#the_what_where_when_and_how) 中的简单每条记录触发器开始，它只是在每次新记录到达时发出一个新结果。该示例的代码和事件时间/处理时间可视化显示在 [示例 6-3](#triggering_repeatedly_with_every_record_chap_six) 中。 [图 6-7](#per_record_triggering_on_a_streaming_engine_chap_six) 展示了结果。
+让我们回到我们的例子。我们将从 [第 2 章](Chapter2.数据处理的内容、地点、时间和方式.md#the_what_where_when_and_how) 中的简单每条记录触发器开始，它只是在每次新记录到达时发出一个新结果。该示例的代码和事件时间/处理时间可视化显示在 [示例 6-3](#triggering_repeatedly_with_every_record_chap_six) 中。 [图 6-7](#per_record_triggering_on_a_streaming_engine_chap_six) 展示了结果。
 
 *示例 6-3。每条记录重复触发*
 
@@ -314,7 +314,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
-为了更好地理解静止/运动中的关系，让我们在触发示例中跳到 [Chapter 2](ch02.html#the_what_where_when_and_how) 中的基本水印完整性流示例，它在完成时简单地发出结果 (由于水印通过了窗口的末端）。该示例的代码和事件时间/处理时间可视化显示在 [Example 6-4](#watermark_completeness_trigger_chap_six) 中（请注意，为了简洁和便于比较，我在这里仅显示启发式水印版本）和 [图 6-9](#event_time_processing_time_view_of_windowed_summation_with_a_heuristic_watermark_on_a_streaming_engine) 说明了结果。
+为了更好地理解静止/运动中的关系，让我们在触发示例中跳到 [Chapter 2](Chapter2.数据处理的内容、地点、时间和方式.md#the_what_where_when_and_how) 中的基本水印完整性流示例，它在完成时简单地发出结果 (由于水印通过了窗口的末端）。该示例的代码和事件时间/处理时间可视化显示在 [Example 6-4](#watermark_completeness_trigger_chap_six) 中（请注意，为了简洁和便于比较，我在这里仅显示启发式水印版本）和 [图 6-9](#event_time_processing_time_view_of_windowed_summation_with_a_heuristic_watermark_on_a_streaming_engine) 说明了结果。
 
 *示例 6-4。水印完整性触发*
 
@@ -396,7 +396,7 @@ PCollection<KV<Team, Integer>> totals = input
 
   鉴于我们在这篇文章中学到的知识，应该清楚批处理和流系统之间的主要语义区别在于增量触发表的能力。但即便如此，这并不是真正的语义差异，而是更多的延迟/吞吐量权衡（因为批处理系统通常以更高的结果延迟为代价为您提供更高的吞吐量）。
 
-  这可以追溯到我在 [“批处理和流式传输效率差异”](ch01.html#batch_and_streaming_efficiency_differnces) 中所说的内容：除了效率增量（有利于批处理）和处理无限数据的自然能力（有利于流式传输）。我当时认为，大部分效率增量来自更大的捆绑包大小（为了吞吐量而显式妥协延迟）和更有效的 shuffle 实现（即流→表→流转换）的组合。从这个角度来看，应该有可能提供一个无缝集成两全其美的系统：一个提供自然处理无限数据的能力，但也可以在广泛的使用范围内平衡延迟、吞吐量和成本之间的紧张关系通过在幕后透明地调整包大小、随机播放实现和其他此类实现细节来实现。
+  这可以追溯到我在 [“批处理和流式传输效率差异”](Chapter1.流 101.md#batch_and_streaming_efficiency_differnces) 中所说的内容：除了效率增量（有利于批处理）和处理无限数据的自然能力（有利于流式传输）。我当时认为，大部分效率增量来自更大的捆绑包大小（为了吞吐量而显式妥协延迟）和更有效的 shuffle 实现（即流→表→流转换）的组合。从这个角度来看，应该有可能提供一个无缝集成两全其美的系统：一个提供自然处理无限数据的能力，但也可以在广泛的使用范围内平衡延迟、吞吐量和成本之间的紧张关系通过在幕后透明地调整包大小、随机播放实现和其他此类实现细节来实现。
 
   这正是 Apache Beam 在 API 级别所做的事情。[^12] 这里提出的论点是在执行引擎级别也有统一的空间。在这样的世界中，批处理和流式传输将不再是一回事，我们将能够一劳永逸地告别批处理 * 和 * 流式传输作为独立的概念。我们将只拥有通用数据处理系统，它结合了家族树中两个分支的最佳想法，为手头的特定用例提供最佳体验。某天。
 
@@ -406,7 +406,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 ### *如何*：积累
 
-在 [Chapter 2](ch02.html#the_what_where_when_and_how) 中，我们了解到三种累积模式（丢弃、累积、累积和收回[^13]）告诉我们，当窗口在其生命过程中多次触发。幸运的是，这里与流和表的关系非常简单：
+在 [Chapter 2](Chapter2.数据处理的内容、地点、时间和方式.md#the_what_where_when_and_how) 中，我们了解到三种累积模式（丢弃、累积、累积和收回[^13]）告诉我们，当窗口在其生命过程中多次触发。幸运的是，这里与流和表的关系非常简单：
 
 - *丢弃模式*要求系统在触发时丢弃窗口的先前值或保留先前值的副本并在下次窗口触发时计算增量。[^14] （这种模式最好称为 Delta 模式。）
 
@@ -590,31 +590,30 @@ PCollection<KV<Team, Integer>> totals = input
 最后，也许也是最重要的一点，我们学到了这一点：当你从流和表的角度来看事物时，你会非常清楚地知道批处理和流在概念上实际上是同一个东西。有界或无界，都无所谓。从上到下是流和表格。
 
 
+[^1]：如果你上的大学不是计算机科学专业，而你在书中已经读到这里，你可能是 1) 我的父母，2) 受虐狂，或 3) 非常聪明（而且对于 记录下来，我并不是说这些组必然是相互排斥的；如果可以的话，找出一个，爸爸妈妈！\<winky-smiley/\>)。
 
-[^1]: If you didn't go to college for computer science and you've made it this far in the book, you are likely either 1) my parents, 2) masochistic, or 3) very smart (and for the record, I'm not implying these groups are necessarily mutually exclusive; figure that one out if you can, Mom and Dad! \<winky-smiley/\>).
+[^2]：请注意，在某些情况下，表本身可以接受时间作为查询参数，从而允许您及时向后查看表过去存在的快照。
 
-[^2]: And note that in some cases, the tables themselves can accept time as a query parameter, allowing you to peer backward in time to snapshots of the table as it existed in the past.
+[^3]：请注意，不能保证单个映射器观察到的两个连续记录的键，因为尚未发生键分组。 这里键的存在实际上只是为了让键控数据集以自然的方式被使用，如果输入数据没有明显的键，它们将共享一个有效的全局空键。
 
-[^3]: Note that no guarantees are made about the keys of two successive records observed by a single mapper, because no key-grouping has occurred yet. The existence of the key here is really just to allow keyed datasets to be consumed in a natural way, and if there are no obvious keys for the input data, they'll all just share what is effectively a global null key.
+[^4]：将批处理作业的输入称为“静态”可能有点强。 实际上，正在使用的数据集在处理过程中可能会不断变化； 也就是说，如果您直接从时间戳范围内的 HBase/Bigtable 表中读取，其中的数据不能保证是不可变的。 但在大多数情况下，推荐的方法是确保您以某种方式处理输入数据的静态快照，任何偏离该假设的行为都由您自己承担风险。
 
-[^4]: Calling the inputs to a batch job "static" might be a bit strong. In reality, the dataset being consumed can be constantly changing as it's processed; that is, if you're reading directly from an HBase/Bigtable table within a timestamp range in which the data aren't guaranteed to be immutable. But in most cases, the recommended approach is to ensure that you're somehow processing a static snapshot of the input data, and any deviation from that assumption is at your own peril.
+[^5]：请注意，按键对流进行分组与按键对流进行简单的 *分区* 有重要区别，后者确保具有相同键的所有记录最终由同一台机器处理，但不会做任何事情来放置 休息的记录。 相反，它们保持运动状态，因此继续作为一条流。 分组操作更像是按键分区，然后写入该分区的适当组，这就是让它们休息并将流变成表的原因。
 
-[^5]: Note that grouping a stream by key is importantly distinct from simply *partitioning* that stream by key, which ensures that all records with the same key end up being processed by the same machine but doesn't do anything to put the records to rest. They instead remain in motion and thus continue on as a stream. A grouping operation is more like a partition-by-key followed by a write to the appropriate group for that partition, which is what puts them to rest and turns the stream into a table.
+[^6]：一个巨大的区别，至少从实现的角度来看，是 ReduceWrite，它知道键已经被 MapWrite 组合在一起，并且进一步知道 Reduce 无法在其输出保持键控的情况下更改键 ，可以简单地累积通过减少单个键的值生成的输出，以便将它们组合在一起，这比 MapWrite 阶段所需的完整洗牌实现要简单得多。
 
-[^6]: One giant difference, from an implementation perspective at least, being that ReduceWrite, knowing that keys have already been grouped together by MapWrite, and further knowing that Reduce is unable to alter keys for the case in which its outputs remain keyed, can simply accumulate the outputs generated by reducing the values for a single key in order to group them together, which is much simpler than the full-blown shuffle implementation required for a MapWrite phase.
+[^7]：另一种看待它的方式是，有两种类型的表：可更新的和可追加的； 这就是 Flink 人员为他们的 Table API 构建它的方式。 但是，尽管这是捕获两种情况下观察到的语义的一种非常直观的方式，但我认为它掩盖了导致流作为表静止的实际发生情况的潜在性质； 即分组。
 
-[^7]: Another way of looking at it is that there are two types of tables: updateable and appendable; this is the way the Flink folks have framed it for their Table API. But even though that's a great intuitive way of capturing the observed semantics of the two situations, I think it obscures the underlying nature of what's actually happening that causes a stream to come to rest as a table; that is, grouping.
+[^8]：尽管从这个例子中我们可以清楚地看到，它不仅仅是一个流媒体的东西； 如果批处理系统的状态表是世界可读的，则可以使用批处理系统获得相同的效果。
 
-[^8]: Though as we can clearly see from this example, it's not just a streaming thing; you can get the same effect with a batch system if its state tables are world readable.
+[^9]：如果您选择的存储系统的接收器尚不存在，这将特别痛苦； 构建可以维护一致性保证的适当接收器是一项非常微妙和困难的任务。
 
-[^9]: This is particularly painful if a sink for your storage system of choice doesn't exist yet; building proper sinks that can uphold consistency guarantees is a surprisingly subtle and difficult task.
+[^10]：这也意味着，如果您将一个值放入多个窗口（例如，滑动窗口），则该值在概念上必须复制到多个独立的记录中，每个窗口一个。 即便如此，在某些情况下，底层系统可能会聪明地处理某些类型的重叠窗口，从而优化实际复制值的需要。 例如，Spark 为滑动窗口执行此操作。
 
-[^10]: This also means that if you place a value into multiple windows---for example, sliding windows---the value must conceptually be duplicated into multiple, independent records, one per window. Even so, it's possible in some cases for the underlying system to be smart about how it treats certain types of overlapping windows, thus optimize away the need for actually duplicating the value. Spark, for example, does this for sliding windows.
+[^11]：请注意，这种关于批处理管道中工作方式的高级概念视图掩盖了一次有效触发整个数据表的复杂性，尤其是当该表大到需要多台机器来处理时。 最近添加到 Beam 的 [SplittableDoFn API](https://s.apache.org/splittable-do-fn) 提供了对相关机制的一些深入了解。
 
-[^11]: Note that this high-level conceptual view of how things work in batch pipelines belies the complexity of efficiently triggering an entire table of data at once, particularly when that table is sizeable enough to require a plurality of machines to process. The [SplittableDoFn API](https://s.apache.org/splittable-do-fn) recently added to Beam provides some insight into the mechanics involved.
+[^12]：是的，如果将批处理和流式处理混合在一起，就会得到 Beam，这就是该名称最初的来源。 真的。
 
-[^12]: And yes, if you blend batch and streaming together you get Beam, which is where that name came from originally. For reals.
+[^13]：这就是为什么您应该始终使用牛津逗号的原因。
 
-[^13]: This is why you should always use an Oxford comma.
-
-[^14]: Note that in the case of merging windows, in addition to merging the current values for the two windows to yield a merged current value, the previous values for those two windows would need to be merged, as well, to allow for the later calculation of a merged delta come triggering time.
+[^14]：请注意，在合并窗口的情况下，除了合并两个窗口的当前值以产生合并的当前值之外，还需要合并这两个窗口的先前值，以允许 为以后计算合并的增量来触发时间。

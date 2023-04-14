@@ -68,12 +68,11 @@ PCollection<KV<Team, Integer>> totals = input
                .discardingFiredPanes())
   .apply(Sum.integersPerKey());
 ```
-```
 
 当在流式运行器上针对我们两种不同的输入数据顺序执行时，结果如图 4-3 所示。以下是有关此图的一些有趣注释：
 
 - 因为我们通过事件时间窗格模拟处理时间窗口，所以“窗口”在处理时间轴上被描绘，这意味着它们的有效宽度是在 y 轴而不是 x 轴上测量的。
-- 由于处理时间窗口化对遇到输入数据的顺序很敏感，因此对于两个观察顺序中的每一个，每个“窗口”的结果都不同，即使事件本身在技术上在每个版本中发生在同一时间。在左边我们得到 12、18、18，而在右边我们得到 7、36、5。
+ 由于处理时间窗口化对遇到输入数据的顺序很敏感，因此对于两个观察顺序中的每一个，每个“窗口”的结果都不同，即使事件本身在技术上在每个版本中发生在同一时间。在左边我们得到 12、18、18，而在右边我们得到 7、36、5。
 
 ![](./media/stsy_0403.mp4)
 <center><i>图 4-3。通过触发器的处理时间“窗口化”，相同输入的两个不同处理时间排序</i></center>
@@ -433,7 +432,7 @@ public class BoundedSessions extends WindowFn<Object, IntervalWindow> {
       current = next;
     }
     merges.add(current);
-    “    for (MergeCandidate merge : merges) {
+    for (MergeCandidate merge : merges) {
       merge.apply(c);
     }
   }
@@ -492,17 +491,18 @@ PCollection<KV<Team, Integer>> totals = input
 
 - 未对齐的固定窗口，当结合固定窗口使用水印触发器时，随着时间的推移提供更均匀的输出分布。
 - 每个元素的固定窗口，它提供了动态选择每个元素的固定窗口大小的灵活性（例如，提供可定制的每个用户或每个广告活动的窗口大小），以更好地定制管道语义以供使用手头的案子。
-- “有界会话窗口，它限制给定会话可能增长的大小；例如，为了抵制垃圾邮件尝试或限制管道实现的已完成会话的延迟。
+- 有界会话窗口，它限制给定会话可能增长的大小；例如，为了抵制垃圾邮件尝试或限制管道实现的已完成会话的延迟。
 
 在第 3 章中与 Slava 一起深入研究水印并在这里对高级窗口进行了广泛调查之后，我们现在已经远远超出了多维鲁棒流处理的基础知识。至此，我们结束了对 Beam 模型以及本书第一部分的关注。
 
 接下来是 Reuven 关于一致性保证、一次性处理和副作用的第 5 章，之后我们开始进入第 6 章的第二部分，流和表。
 
 
-[^1]: As far as I know, Apache Flink is the only other system to support custom windowing to the extent that Beam does. And to be fair, its support extends even beyond that of Beam's, thanks to the ability to provide a custom window evictor. Head asplode.
 
-[^2]: And I'm not actually aware of any such systems at this time.
+[^1]：据我所知，Apache Flink 是唯一一个像 Beam 一样支持自定义窗口的系统。 公平地说，由于能够提供自定义窗口驱逐器，它的支持甚至超出了 Beam 的支持。 爆头。
 
-[^3]: This naturally implies the use of keyed data, but because windowing is intrinsically tied to grouping by key anyway, that restriction isn't particularly burdensome.
+[^2]：目前我实际上并不知道有任何此类系统。
 
-[^4]: And it's not critical that the element itself know the window size; you could just as easily look up and cache the appropriate window size for whatever the desired dimension is; for example, per-user.
+[^3]：这自然意味着使用键控数据，但由于窗口本质上与键分组相关，因此该限制并不是特别麻烦。
+
+[^4]：元素本身知道窗口大小并不重要； 无论所需的尺寸是多少，您都可以轻松地查找和缓存适当的窗口大小； 例如，每个用户。

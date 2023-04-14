@@ -339,40 +339,41 @@ Flink 的分布式快照是处理流管道一致性的一种优雅方式；但�
 尽管本章重点介绍了特定于 Dataflow 的技术，但其他流系统也提供了完全一次的保证。 Apache Spark Streaming 将流式管道作为一系列小批量作业运行，依赖于 Spark 批处理运行器中的一次性保证。 Apache Flink 使用 Chandy Lamport 分布式快照的变体来获得运行一致的状态，并且可以使用这些快照来确保一次性处理。 我们也鼓励您了解这些其他系统，以广泛了解不同流处理系统的工作原理！
 
 
-[^1]: In fact, no system we are aware of that provides at-least once (or better) is able to guarantee this, including all other Beam runners.
 
-[^2]: Dataflow also provides an accurate batch runner; however, in this context we are focused on the streaming runner.
+[^1]：事实上，我们所知道的提供至少一次（或更好）的系统都无法保证这一点，包括所有其他 Beam 运行程序。
 
-[^3]: The Dataflow optimizer groups many steps together and adds shuffles only where they are needed.
+[^2]: Dataflow 还提供了一个准确的批处理程序； 然而，在这种情况下，我们专注于流式运行器。
 
-[^4]: Batch pipelines also need to guard against duplicates in shuffle. However the problem is much easier to solve in batch, which is why historical batch systems did do this and streaming systems did not. Streaming runtimes that use a microbatch architecture, such as Spark Streaming, delegate duplicate detection to a batch shuffler.
+[^3]：数据流优化器将许多步骤组合在一起，并仅在需要的地方添加随机播放。
 
-[^5]: A lot of care is taken to make sure this checkpointing is efficient; for example, schema and access pattern optimizations that are intimately tied to the characteristics of the underlying key/value store.
+[^4]: Batch pipelines 也需要在 shuffle 中防止重复。 然而，批处理问题更容易解决，这就是为什么历史批处理系统确实这样做而流式系统没有这样做的原因。 使用微批次架构的流式运行时，例如 Spark Streaming，将重复检测委托给批处理洗牌器。
 
-[^6]: This is not the custom user-supplied timestamp used for windowing. Rather this is a deterministic processing-time timestamp that is assigned by the sending worker.
+[^5]：非常小心以确保此检查点有效； 例如，与底层键/值存储的特性密切相关的模式和访问模式优化。
 
-[^7]: Some care needs to be taken to ensure that this algorithm works. Each sender must guarantee that the system timestamps it generates are strictly increasing, and this guarantee must be maintained across worker restarts.
+[^6]：这不是用于窗口的自定义用户提供的时间戳。 相反，这是由发送工作人员分配的确定性处理时间时间戳。
 
-[^8]: In theory, we could dispense with startup scans entirely by lazily building the Bloom filter for a bucket only when a threshold number of records show up with timestamps in that bucket.
+[^7]：需要注意确保此算法有效。 每个发送者必须保证它生成的系统时间戳是严格递增的，并且必须在 worker 重新启动时保持这种保证。
 
-[^9]: At the time of this writing, a new, more-flexible API called [SplittableDoFn](http://bit.ly/2JQa7GJ) is available for Apache Beam.
+[^8]：理论上，我们可以完全免除启动扫描，方法是仅当桶中出现阈值数量的记录并带有时间戳时才为桶懒惰地构建布隆过滤器。
 
-[^10]: We assume that nobody is maliciously modifying the bytes in the file while we are reading it.
+[^9]：在撰写本文时，名为 [SplittableDoFn](http://bit.ly/2JQa7GJ) 的新的更灵活的 API 可用于 Apache Beam。
 
-[^11]: Again note that the [SplittableDoFn API](http://bit.ly/2JQa7GJ) has different methods for this.
+[^10]：我们假设在我们读取文件时没有人恶意修改文件中的字节。
 
-[^12]: Using the `requiresDedupping` override.
+[^11]：再次注意 [SplittableDoFn API](http://bit.ly/2JQa7GJ) 对此有不同的方法。
 
-[^13]: Note that these determinism boundaries might become more explicit in the Beam Model at some point. Other Beam runners vary in their ability to handle nondeterministic user code.
+[^12]：使用 `requiresDedupping` 覆盖。
 
-[^14]: As long as you properly handle the failure when the source file no longer exists.
+[^13]：请注意，这些确定性边界在某些时候可能会在 Beam 模型中变得更加明确。 其他 Beam 运行器处理不确定用户代码的能力各不相同。
 
-[^15]: Due to the global nature of the service, BigQuery does not guarantee that all duplicates are removed. Users can periodically run a query over their tables to remove any duplicates that were not caught by the streaming insert API. See the BigQuery documentation for more information.
+[^14]: 只要你妥善处理源文件不存在时的故障。
 
-[^16]: Resilient Distributed Datasets; Spark's abstraction of a distributed dataset, similar to PCollection in Beam.
+[^15]：由于服务的全球性，BigQuery 不保证删除所有重复项。 用户可以定期对他们的表运行查询，以删除流式插入 API 未捕获的任何重复项。 有关详细信息，请参阅 BigQuery 文档。
 
-[^17]: These sequence numbers are per connection and are unrelated to the snapshot epoch number.
+[^16]：弹性分布式数据集； Spark对分布式数据集的抽象，类似于Beam中的PCollection。
 
-[^18]: Only for nonidempotent sinks. Completely idempotent sinks do not need to wait for the snapshot to complete.
+[^17]：这些序列号是每个连接的，与快照纪元号无关。
 
-[^19]: Specifically, Flink assumes that the mean time to worker failure is less than the time to snapshot; otherwise, the pipeline would be unable to make progress.
+[^18]：仅适用于非幂等接收器。 完全幂等的接收器不需要等待快照完成。
+
+[^19]：具体来说，Flink 假设 worker 失败的平均时间小于快照时间； 否则，管道将无法取得进展。

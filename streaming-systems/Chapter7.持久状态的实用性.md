@@ -2,7 +2,7 @@
 
 人们为什么要写书？当你考虑到创造力的乐趣、对语法和标点符号的某种喜爱，以及偶尔的自恋感时，你基本上就会渴望捕捉一个原本短暂的想法，以便将来重新审视它。在非常高的层次上，我刚刚激发并解释了数据处理管道中的持久状态。
 
-持久状态，顾名思义，就是我们刚刚在 [Chapter 6](ch06.html#streams_and_tables) 中讨论过的表格，另外还要求表格稳健地存储在相对不会丢失的媒体中。只要您不询问站点可靠性工程师，就存储在本地磁盘计数中。存储在一组复制的磁盘上会更好。存储在不同物理位置的一组复制磁盘上更好。存储在内存中一次绝对不算数。存储在跨多台机器的复制内存中，并带有 UPS 电源备份和现场发电机。你得到图片。
+持久状态，顾名思义，就是我们刚刚在 [Chapter 6](Chapter6.流和表.md#Chapter6.流和表) 中讨论过的表格，另外还要求表格稳健地存储在相对不会丢失的媒体中。只要您不询问站点可靠性工程师，就存储在本地磁盘计数中。存储在一组复制的磁盘上会更好。存储在不同物理位置的一组复制磁盘上更好。存储在内存中一次绝对不算数。存储在跨多台机器的复制内存中，并带有 UPS 电源备份和现场发电机。你得到图片。
 
 在本章中，我们的目标是执行以下操作：
 
@@ -15,7 +15,7 @@
 
 ### 动机
 
-首先，让我们更准确地激发持久状态。我们从 [Chapter 6](ch06.html#streams_and_tables) 中知道分组是为我们提供表格的原因。我在本章开头所假设的核心是正确的：持久化这些表的目的是捕获其中包含的其他短暂数据。但为什么这是必要的？
+首先，让我们更准确地激发持久状态。我们从 [Chapter 6](Chapter6.流和表.md#Chapter6.流和表) 中知道分组是为我们提供表格的原因。我在本章开头所假设的核心是正确的：持久化这些表的目的是捕获其中包含的其他短暂数据。但为什么这是必要的？
 
 
 
@@ -23,7 +23,7 @@
 
 这个问题的答案在处理无界输入数据的情况下最为清楚，所以我们将从那里开始。主要问题是处理无限数据的管道实际上打算永远运行。但是，永远运行是一个比这些管道通常执行的环境要高得多的服务级别目标。由于机器故障、计划维护、代码更改以及偶尔导致整个生产管道集群中断的错误配置命令，长时间运行的管道将不可避免地出现中断。为了确保在发生此类事情时能够从中断的地方恢复，长时间运行的管道需要对中断前的位置进行某种持久的记忆。这就是持久状态的用武之地。
 
-让我们将这个想法扩展到无限数据之外。这仅在无限情况下相关吗？批处理管道是否使用持久状态，为什么或为什么不使用？与我们遇到的几乎所有其他批处理与流处理问题一样，答案与批处理和流处理系统本身的性质关系不大（考虑到我们在 [第 6 章]（ch06.html#streams_and_tables ))，更多地与它们历史上用于处理的数据集类型有关。
+让我们将这个想法扩展到无限数据之外。这仅在无限情况下相关吗？批处理管道是否使用持久状态，为什么或为什么不使用？与我们遇到的几乎所有其他批处理与流处理问题一样，答案与批处理和流处理系统本身的性质关系不大（考虑到我们在 [第 6 章](Chapter6.流和表.md#Chapter6.流和表)），更多地与它们历史上用于处理的数据集类型有关。
 
 有界数据集本质上是有限的。因此，处理有界数据的系统（历史上的批处理系统）已针对该用例进行了定制。他们经常假设输入可以在失败时全部重新处理。换句话说，如果处理管道的某个部分发生故障并且输入数据仍然可用，我们可以简单地重新启动处理管道的相应部分并让它再次读取相同的输入。这称为*重新处理输入*。
 
@@ -75,7 +75,7 @@ class GroupByKey<K, V> extends PTransform<
 
 每次触发器触发该表中的键+窗口时，它都会为该键+窗口发出一个新窗格，其值是我们在前面的签名中看到的“Iterable”。
 
-让我们看一下 [示例 7-1](#early_on_time_and_late_chap_seven) 中的一个实际示例。我们将从 [Example 6-5](ch06.html#early_on_time_and_late_firings_via_the_early_on_time_late_api_chap_six) （具有固定窗口和早期/准时/延迟触发器）中获取求和管道，并将其转换为使用原始分组而不是增量组合（其中我们将在本章稍后讨论）。为此，我们首先对解析的用户/分数键/值对应用“GroupByKey”转换。 `GroupByKey` 操作执行原始分组，产生一个 `PCollection` 与用户的键/值对和 `Iterable` 组的分数。然后，我们使用一个简单的 `MapElements` lambda 将每个 iterable 中的所有 `Integer` 相加，该 lambda 将 `Iterable` 转换为 `IntStream` 并在其上调用 `sum`。
+让我们看一下 [示例 7-1](#early_on_time_and_late_chap_seven) 中的一个实际示例。我们将从 [Example 6-5](Chapter6.流和表.md#early_on_time_and_late_firings_via_the_early_on_time_late_api_chap_six) （具有固定窗口和早期/准时/延迟触发器）中获取求和管道，并将其转换为使用原始分组而不是增量组合（其中我们将在本章稍后讨论）。为此，我们首先对解析的用户/分数键/值对应用“GroupByKey”转换。 `GroupByKey` 操作执行原始分组，产生一个 `PCollection` 与用户的键/值对和 `Iterable` 组的分数。然后，我们使用一个简单的 `MapElements` lambda 将每个 iterable 中的所有 `Integer` 相加，该 lambda 将 `Iterable` 转换为 `IntStream` 并在其上调用 `sum`。
 
 *示例 7-1。通过 early/on-time/late API 提前、准时和延迟触发*
 
@@ -105,7 +105,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 <center><i>图 7-1。 通过具有窗口和早期/准时/延迟触发的原始输入分组求和。 原始输入通过 GroupByKey 转换组合在一起并存储在表中。 触发后，MapElements lambda 将单个窗格中的原始输入汇总在一起，以得出每个团队的分数。</i></center>
 
-将其与 [图 6-10](ch06.html#streams_and_tables_view_of_windowed_summation) （使用增量合并，稍后讨论）进行比较，很明显这要糟糕得多。首先，我们要存储更多数据：我们现在存储该窗口的所有输入，而不是每个窗口一个整数。其次，如果我们有多个触发器触发，我们通过重新汇总我们已经为之前的触发器触发添加在一起的输入来重复工作。最后，如果分组操作是我们将状态检查点到持久存储的点，那么在机器故障时，我们必须再次重新计算表的任何重新触发的总和。这是很多重复的数据和计算。更好的是增量计算和检查实际总和，这是*增量组合*的一个示例。
+将其与 [图 6-10](Chapter6.流和表.md#streams_and_tables_view_of_windowed_summation) （使用增量合并，稍后讨论）进行比较，很明显这要糟糕得多。首先，我们要存储更多数据：我们现在存储该窗口的所有输入，而不是每个窗口一个整数。其次，如果我们有多个触发器触发，我们通过重新汇总我们已经为之前的触发器触发添加在一起的输入来重复工作。最后，如果分组操作是我们将状态检查点到持久存储的点，那么在机器故障时，我们必须再次重新计算表的任何重新触发的总和。这是很多重复的数据和计算。更好的是增量计算和检查实际总和，这是*增量组合*的一个示例。
 
 
 
@@ -163,9 +163,9 @@ CombineFn接受类型为 `InputT` 的输入，这些输入可以组合成称为 
     
     
 
-为了完整起见，再次考虑[示例 6-5](ch06.html#early_on_time_and_late_firings_via_the_early_on_time_late_api_chap_six)，如 [示例 7-3](#grouping_and_summation_chap_seven) 所示，它使用增量组合实现了求和管道。
+为了完整起见，再次考虑[示例 6-5](Chapter6.流和表.md#early_on_time_and_late_firings_via_the_early_on_time_late_api_chap_six)，如 [示例 7-3](#grouping_and_summation_chap_seven) 所示，它使用增量组合实现了求和管道。
 
-*示例 7-3。 通过增量组合进行分组和求和，如 [示例 6-5](ch06.html#early_on_time_and_late_firings_via_the_early_on_time_late_api_chap_six)*
+*示例 7-3。 通过增量组合进行分组和求和，如 [示例 6-5](Chapter6.流和表.md#early_on_time_and_late_firings_via_the_early_on_time_late_api_chap_six)*
 
 ```java
 PCollection<String> raw = IO.read(...);
@@ -179,7 +179,7 @@ PCollection<KV<Team, Integer>> totals = input
   .apply(Sum.integersPerKey());
 ```
 
-执行后，我们得到了我们所看到的 [图 6-10](ch06.html#streams_and_tables_view_of_windowed_summation)（此处显示在 [图 7-2](#grouping_and_summation_via_incremental_combination)）。与 [图 7-1](#summation_via_raw_grouping_of_input_with_windowing) 相比，这显然是一个很大的改进，在存储的数据量和执行的计算量方面效率更高。
+执行后，我们得到了我们所看到的 [图 6-10](Chapter6.流和表.md#streams_and_tables_view_of_windowed_summation)（此处显示在 [图 7-2](#grouping_and_summation_via_incremental_combination)）。与 [图 7-1](#summation_via_raw_grouping_of_input_with_windowing) 相比，这显然是一个很大的改进，在存储的数据量和执行的计算量方面效率更高。
 
 ![](./media/stsy_0702.mp4)
 
@@ -697,12 +697,13 @@ private static TestStream<KV<String, VisitOrImpression>> createStream() {
 
 
 
-[^1]: For some definition of "forever," typically at least "until we successfully complete execution of our batch pipeline and no longer require the inputs."
 
-[^2]: Recall that Beam doesn't currently expose these state tables directly; you must trigger them back into a stream to observe their contents as a new PCollection.
+[^1]：对于“永远”的某些定义，通常至少“直到我们成功完成批处理管道的执行并且不再需要输入”。
 
-[^3]: Or, as my colleague Kenn Knowles points out, if you take the definition as being commutativity across sets, the three-parameter version of commutativity is actually sufficient to also imply associativity: `COMBINE(a, b, c) == COMBINE(a, c, b) == COMBINE(b, a, c) == COMBINE(b, c, a) == COMBINE(c, a, b) == COMBINE(c, b, a)`. Math is fun.
+[^2]：回想一下，Beam 目前不直接公开这些状态表； 您必须将它们触发回流中才能将它们的内容作为新的 PCollection 观察。
 
-[^4]: And indeed, timers are the underlying feature used to implement most of the completeness and repeated updated triggers we discussed in [Chapter 2](#ch02.html#the_what_where_when_and_how){data-type="xref"} as well as garbage collection based on allowed lateness.
+[^3]：或者，正如我的同事 Kenn Knowles 指出的那样，如果您将定义定义为跨集合的交换性，则交换性的三参数版本实际上也足以暗示结合性：`COMBINE(a, b, c) == COMBINE(a, c, b) == COMBINE(b, a, c) == COMBINE(b, c, a) == COMBINE(c, a, b) == COMBINE(c, b, a)`。 数学很有趣。
 
-[^5]: Thanks to the nature of web browsing, the visit trails we'll be analyzing are trees of URLs linked by HTTP referrer fields. In reality, they would end up being directed graphs, but for the sake of simplicity, we'll assume each page on our website has incoming links from exactly one other referring page on the site, thus yielding a simpler tree structure. Generalizing to graphs is a natural extension of the tree-based implementation, and only further drives home the points being made.
+[^4]：事实上，计时器是用于实现我们在[第2章](Chapter2.数据处理的内容、地点、时间和方式.md#the_what_where_when_and_how){data-type="xref"}中讨论的大部分完整性和重复更新触发器的底层功能以及基于允许的迟到的垃圾收集。
+
+[^5]：由于网络浏览的性质，我们将要分析的访问轨迹是由 HTTP 引用字段链接的 URL 树。 实际上，它们最终会成为有向图，但为了简单起见，我们假设我们网站上的每个页面都有来自网站上另一个引用页面的传入链接，从而产生一个更简单的树结构。 推广到图形是基于树的实现的自然扩展，只会进一步推动提出的观点。

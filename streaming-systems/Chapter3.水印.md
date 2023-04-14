@@ -22,7 +22,7 @@
 
 这个分布上有一个关键点，位于“in-flight”分布的最左边，对应于我们管道中任何未处理消息的最旧事件时间戳。我们使用这个值来定义水印：
 
-*水印是尚未完成的最古老[^1]作品的单调递增时间戳。*
+水印是尚未完成的最古老[^1]作品的单调递增时间戳。
 
 此定义提供了两个使其有用的基本属性：
 
@@ -465,14 +465,15 @@ Pub/Sub 面临哪些挑战？因为 Pub/Sub 不保证排序，所以我们必须
 现在我们已经对水印如何在幕后工作有了坚实的基础，我们可以深入了解它们可以为我们做什么，因为我们在第 4 章中使用窗口和触发来回答更复杂的查询。
 
 
-[^1]: Note the additional mention of monotonicity; we have not yet discussed how to achieve this. Indeed the discussion thus far makes no mention of monotonicity. If we considered exclusively the oldest in-flight event time, the watermark would not always be monotonic, as we have made no assumptions about our input. We return to this discussion later on.
 
-[^2]: To be precise, it's not so much that the number of logs need be static as it is that the number of logs at any given time be known a priori by the system. A more sophisticated input source composed of a dynamically chosen number of inputs logs, such as [Pravega](http://pravega.io), could just as well be used for constructing a perfect watermark. It's only when the number of logs that exist in the dynamic set at any given time is unknown (as in the example in the next section) that one must fall back on a heuristic watermark.
+[^1]：注意额外提到的单调性； 我们尚未讨论如何实现这一点。 事实上，到目前为止的讨论没有提到单调性。 如果我们只考虑最早的飞行事件时间，水印将不会总是单调的，因为我们没有对我们的输入做出任何假设。 我们稍后会回到这个讨论。
 
-[^3]: Note that by saying "flow through the system," I don't necessarily imply they flow along the same path as normal data. They might (as in Apache Flink), but they might also be transmitted out-of-band (as in MillWheel/Cloud Dataflow).
+[^2]：准确地说，与其说日志数量需要是静态的，不如说系统先验地知道任何给定时间的日志数量。 由动态选择的输入日志数量组成的更复杂的输入源，例如 [Pravega](http://pravega.io)，也可以用于构建完美的水印。 只有在任何给定时间动态集中存在的日志数量未知时（如下一节中的示例所示），才必须求助于启发式水印。
 
-[^4]: The *start* of the window is not a safe choice from a watermark correctness perspective because the first element in the window often comes *after* the beginning of the window itself, which means that the watermark is not guaranteed to have been held back as far as the start of the window.
+[^3]：请注意，我所说的“流经系统”并不一定意味着它们沿着与正常数据相同的路径流动。 它们可能（如在 Apache Flink 中），但它们也可能在带外传输（如在 MillWheel/Cloud Dataflow 中）。
 
-[^5]: The percentile watermark triggering scheme described here is not currently implemented by Beam; however, other systems such as MillWheel implement this.
+[^4]：从水印正确性的角度来看，窗口的 *start* 不是一个安全的选择，因为窗口中的第一个元素通常出现在 *之后* 窗口本身，这意味着水印不能保证 一直被推迟到窗口的开始。
 
-[^6]: For more information on Flink watermarks, see the [Flink documentation on the subject.](https://ci.apache.org/projects/flink/flink-docs-release-1.3/dev/event_time.html)
+[^5]: 这里描述的百分位数水印触发方案目前还没有被 Beam 实现； 但是，其他系统（例如 MillWheel）实现了这一点。
+
+[^6]：有关 Flink 水印的更多信息，请参阅 [Flink documentation on the subject.](https://ci.apache.org/projects/flink/flink-docs-release-1.3/dev/event_time.html )

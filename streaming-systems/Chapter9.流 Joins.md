@@ -5,7 +5,7 @@
 
 ### 你所有的加入都属于流
 
-连接两个数据集是什么意思？ 我们直观地理解连接只是一种特定类型的分组操作：通过将共享某些属性（即键）的数据连接在一起，我们将一些以前不相关的单个数据元素收集在一起，形成一组相关元素。 正如我们在 [第 6 章](Chapter6.流和表.md#streams_and_tables) 中了解到的那样，分组操作总是消耗一个流并生成一个表。 知道了这两件事，就可以得出构成整章基础的结论：*在他们心中，所有连接都是流式连接*。
+连接两个数据集是什么意思？ 我们直观地理解连接只是一种特定类型的分组操作：通过将共享某些属性（即键）的数据连接在一起，我们将一些以前不相关的单个数据元素收集在一起，形成一组相关元素。 正如我们在 [第 6 章](Chapter6.流和表.md#Chapter6.流和表) 中了解到的那样，分组操作总是消耗一个流并生成一个表。 知道了这两件事，就可以得出构成整章基础的结论：*在他们心中，所有连接都是流式连接*。
 
 这个事实的伟大之处在于它实际上使流式连接的主题变得更容易处理。 我们在流式分组操作（窗口化、水印、触发器等）的上下文中学习的用于时间推理的所有工具继续适用于流式连接的情况。 也许令人生畏的是，将流媒体添加到组合中似乎只会使事情复杂化。 但是正如您将在后面的示例中看到的那样，将所有连接建模为流式连接具有一定的简洁性和一致性。 很明显，几乎所有类型的连接实际上都归结为同一模式的微小变化，而不是感觉存在大量不同的连接方法。 最后，这种清晰的洞察力有助于使连接（流式或其他方式）变得不那么令人生畏。
 
@@ -44,7 +44,7 @@
 
 ### 无窗口连接
 
-流式连接无限数据总是需要开窗，这是一个流行的神话。 但是通过应用我们在 [第 6 章](Chapter6.流和表.md#流和表) 中学到的概念，我们可以看出这根本不是真的。 连接（窗口化和非窗口化）只是另一种类型的分组操作，分组操作产生表。 因此，如果我们想将由非窗口连接（或等效地，覆盖所有时间的单个全局窗口内的连接）创建的表作为流使用，我们只需要应用一个非分组（或触发器）操作 “等到我们看到所有输入”的变化。 将连接窗口化为非全局窗口并使用水印触发器（即“等到我们看到流的有限时间块中的所有输入”触发器）确实是一种选择，但在每条记录上触发也是如此（ 即，物化视图语义）或随着处理时间的推进而周期性地进行，而不管连接是否是窗口化的。 因为它使示例易于理解，所以我们假设在以下所有非窗口连接示例中使用隐式默认的每条记录触发器，这些示例将连接结果观察为流。
+流式连接无限数据总是需要开窗，这是一个流行的神话。 但是通过应用我们在 [第 6 章](Chapter6.流和表.md#Chapter6.流和表) 中学到的概念，我们可以看出这根本不是真的。 连接（窗口化和非窗口化）只是另一种类型的分组操作，分组操作产生表。 因此，如果我们想将由非窗口连接（或等效地，覆盖所有时间的单个全局窗口内的连接）创建的表作为流使用，我们只需要应用一个非分组（或触发器）操作 “等到我们看到所有输入”的变化。 将连接窗口化为非全局窗口并使用水印触发器（即“等到我们看到流的有限时间块中的所有输入”触发器）确实是一种选择，但在每条记录上触发也是如此（ 即，物化视图语义）或随着处理时间的推进而周期性地进行，而不管连接是否是窗口化的。 因为它使示例易于理解，所以我们假设在以下所有非窗口连接示例中使用隐式默认的每条记录触发器，这些示例将连接结果观察为流。
 
 现在，加入他们自己。 ANSI SQL 定义了五种类型的连接：`FULL OUTER`、`LEFT OUTER`、`RIGHT OUTER`、`INNER` 和 `CROSS`。 我们深入研究前四个，并在下一段中简要讨论最后一个。 我们还谈到了另外两个有趣但不太常见（并且不太支持，至少使用标准语法）的变体：`ANTI` 和 `SEMI` 连接。
 
@@ -76,7 +76,7 @@
 
 我们可以看到，`FULL OUTER` 连接包括满足连接谓词的两行（例如，“L2，R2”和“L3，R3”），但它也包括不符合谓词的部分行（例如 ，“`L1，null`”和“`null，R4`”，其中 null 表示数据的未连接部分）。
 
-当然，这只是这个`FULL OUTER`-join 关系的一个时间点快照，是在所有数据都到达系统之后拍摄的。 我们来这里是为了了解流式连接，根据定义，流式连接涉及到额外的时间维度。 正如我们从 [第 8 章](ch08.html#streaming_sql) 中了解到的，如果我们想要了解给定的数据集/关系如何随时间变化，我们想用时变关系 (TVR) 来说话。 因此，为了最好地了解联接如何随时间演变，现在让我们看一下此联接的完整 TVR（每个快照关系之间的变化以黄色突出显示）：
+当然，这只是这个`FULL OUTER`-join 关系的一个时间点快照，是在所有数据都到达系统之后拍摄的。 我们来这里是为了了解流式连接，根据定义，流式连接涉及到额外的时间维度。 正如我们从 [第 8 章](Chapter8.流 SQL.md#streaming_sql) 中了解到的，如果我们想要了解给定的数据集/关系如何随时间变化，我们想用时变关系 (TVR) 来说话。 因此，为了最好地了解联接如何随时间演变，现在让我们看一下此联接的完整 TVR（每个快照关系之间的变化以黄色突出显示）：
 
 ``` SQL
 12:10> SELECT TVR
@@ -539,7 +539,7 @@ Right ON L.Num = R.Num;        Right ON L.Num = R.Num;
 
 - 为连接超时提供有意义的参考点
 
-   这对于许多无界连接情况很有用，但它可能最明显地适用于外部连接等用例，因为连接的一侧是否会出现是先验未知的。 对于经典的批处理（包括标准的交互式 SQL 查询），仅当有界输入数据集已被完全处理时，外连接才会超时。 但是在处理无界数据时，我们不能等到所有数据都处理完。 正如我们在第 [2](ch02.html#the_what_where_when_and_how)和 [3](ch03.html#watermarks_chapter)章节中讨论的那样，水印提供了一个进度指标，用于衡量输入源在事件时间内的完整性。 但是要使用该指标来使连接超时，我们需要一些参考点来进行比较。 通过将连接的范围限制在窗口的末尾，对连接进行窗口化提供了该引用。 在水印通过窗口的末端之后，系统可以认为窗口的输入完成。 在那一点上，就像在有界连接的情况下一样，让任何未连接的行超时并具体化它们的部分结果是安全的。
+   这对于许多无界连接情况很有用，但它可能最明显地适用于外部连接等用例，因为连接的一侧是否会出现是先验未知的。 对于经典的批处理（包括标准的交互式 SQL 查询），仅当有界输入数据集已被完全处理时，外连接才会超时。 但是在处理无界数据时，我们不能等到所有数据都处理完。 正如我们在[第2章](Chapter2.数据处理的内容、地点、时间和方式.md#the_what_where_when_and_how)和 [第3章](Chapter3.水印.md#watermarks_chapter)节中讨论的那样，水印提供了一个进度指标，用于衡量输入源在事件时间内的完整性。 但是要使用该指标来使连接超时，我们需要一些参考点来进行比较。 通过将连接的范围限制在窗口的末尾，对连接进行窗口化提供了该引用。 在水印通过窗口的末端之后，系统可以认为窗口的输入完成。 在那一点上，就像在有界连接的情况下一样，让任何未连接的行超时并具体化它们的部分结果是安全的。
 
 
 也就是说，正如我们之前看到的，开窗绝对不是流连接的必要条件。 在很多情况下这很有意义，但绝不是必需的。
@@ -1160,12 +1160,13 @@ PCollection<Decimal> validYenRates = yenRates
 连接通常是数据处理、流式传输或其他方面中比较令人生畏的方面之一。 然而，通过了解连接的理论基础以及我们如何直接从该基础推导出所有不同类型的连接，连接就变得不那么可怕了，即使流式处理增加了额外的时间维度。
 
 
-[^1]: From a conceptual perspective, at least. There are many different ways to implement each of these types of joins, some of which are likely much more efficient than performing an actual `FULL OUTER` join and then filtering down its results, especially when the rest of the query and the distribution of the data are taken into consideration.
 
-[^2]: Again, ignoring what happens when there are duplicate join keys; more on this when we get to `SEMI` joins.
+[^1]：至少从概念的角度来看。 有许多不同的方法来实现这些类型的连接中的每一种，其中一些可能比执行实际的`FULL OUTER`连接然后过滤其结果更有效，特别是当查询的其余部分和分布 数据被考虑在内。
 
-[^3]: From a conceptual perspective, at least. There are, of course, many different ways to implement each of these types of joins, some of which might be much more efficient than performing an actual `FULL OUTER` join and then filtering down its results, depending on the rest of the query and the distribution of the data.
+[^2]：再次忽略存在重复连接键时发生的情况； 当我们谈到 `SEMI` 连接时，会详细介绍这一点。
 
-[^4]: Note that the example data and the temporal join use case motivating it are lifted almost wholesale from Julian Hyde's excellent ["Streams, joins, and temporal tables"](http://bit.ly/2MoNqaS) document.
+[^3]：至少从概念的角度来看。 当然，有许多不同的方法可以实现这些类型的连接中的每一种，其中一些方法可能比执行实际的`FULL OUTER`连接然后过滤其结果更有效，具体取决于查询的其余部分和 数据的分布。
 
-[^5]: It's a partial implementation because it only works if the windows exist in isolation, as in [Figure 9-1](#ch09.html#temporal_validity_windowing_over_time_chap_nine){data-type="xref"}. As soon as you mix the windows with other data, such as the joining examples below, you would need some mechanism for splitting the data from the shrunken window into two separate windows, which Beam does not currently provide.
+[^4]：请注意，示例数据和激发它的时态连接用例几乎是从 Julian Hyde 的优秀["Streams, joins, and temporal tables"](http://bit.ly/2MoNqaS) 文档中提取的。
+
+[^5]：这是一个部分实现，因为它仅在窗口独立存在时才有效，如 [图 9-1](#temporal_validity_windowing_over_time_chap_nine) 所示。 一旦将窗口与其他数据混合，例如下面的连接示例，您将需要某种机制将数据从缩小的窗口拆分为两个单独的窗口，而 Beam 目前不提供这种机制。

@@ -16,7 +16,7 @@
 
 关系代数的一个更重要的方面是它的闭包属性：将关系代数中的任何运算符应用于任何有效关系 [^1] 总是会产生另一个关系。换句话说，关系是关系代数的通用货币，所有运算符都将它们作为输入消费并作为输出产生。
 
-从历史上看，许多在 SQL 中支持流式处理的尝试都未能满足闭包属性。它们将流与经典关系分开处理，提供新的运算符以在两者之间进行转换，并限制可以应用于其中之一的操作。这显着提高了任何此类流式 SQL 系统的采用门槛：潜在用户必须学习新的运算符并了解它们适用的地方和不适用的地方，并且同样地重新学习这个新世界中的适用性规则对于任何老运营商。更糟糕的是，这些系统中的大多数仍然无法提供我们想要的全套流语义，例如支持强大的无序处理和强大的时间连接支持（我们将在第 9 章中介绍后者） ]（ch09.html#streaming_joins））。因此，我认为基本上不可能命名任何已经真正广泛采用的现有流式 SQL 实现。此类流式 SQL 系统的额外认知开销和受限功能确保了它们仍然是一个利基企业。
+从历史上看，许多在 SQL 中支持流式处理的尝试都未能满足闭包属性。它们将流与经典关系分开处理，提供新的运算符以在两者之间进行转换，并限制可以应用于其中之一的操作。这显着提高了任何此类流式 SQL 系统的采用门槛：潜在用户必须学习新的运算符并了解它们适用的地方和不适用的地方，并且同样地重新学习这个新世界中的适用性规则对于任何老运营商。更糟糕的是，这些系统中的大多数仍然无法提供我们想要的全套流语义，例如支持强大的无序处理和强大的时间连接支持（我们将在第 9 章中介绍后者） ]（Chapter9.流 Joins.md#streaming_joins））。因此，我认为基本上不可能命名任何已经真正广泛采用的现有流式 SQL 实现。此类流式 SQL 系统的额外认知开销和受限功能确保了它们仍然是一个利基企业。
 
 为了改变这种状况，真正将流式 SQL 推向前沿，我们需要一种方法让流式成为关系代数本身的一等公民，这样整个标准关系代数就可以自然地应用于流式和非流式使用个案。这并不是说流和表应该被视为完全相同的东西；它们绝对是不一样的，并且认识到这一事实有助于清晰理解并有助于导航流/表关系，正如我们很快就会看到的那样。但是核心代数应该干净自然地适用于这两个世界，只有在绝对必要的情况下，才对标准关系代数进行最少的扩展。
 
@@ -188,7 +188,7 @@
 ---------------------------------------------------------
 ```
 
-我们知道这个序列捕捉了关系随时间变化的完整历史。鉴于我们对 [第 6 章](ch06.html#streams_and_tables) 中的表和流的理解，不难理解时变关系与流和表理论的关系。
+我们知道这个序列捕捉了关系随时间变化的完整历史。鉴于我们对 [第 6 章](Chapter6.流和表.md#streams_and_tables) 中的表和流的理解，不难理解时变关系与流和表理论的关系。
 
 表非常简单：因为时变关系本质上是一系列经典关系（每个关系在特定时间点捕获关系的快照），而经典关系类似于表，将时变关系观察为表只是产生观察时间的时间点关系快照。
 
@@ -234,7 +234,7 @@
 
 因此，在 SQL 中已经有一些时变关系的先例。但我离题了。这里的要点是表捕获了特定时间点随时间变化的关系的快照。大多数现实世界的表实现只是简单地跟踪我们观察到的实时情况；其他人维护一些额外的历史信息，这在极限上相当于一个完全保真度的时变关系，它捕获了一个关系随时间的整个历史。
 
-流是略有不同的野兽。我们在 [第 6 章](ch06.html#streams_and_tables) 中了解到，它们也可以捕获表随时间的演变。但它们的做法与我们目前看到的随时间变化的关系有些不同。他们不是在每次关系发生变化时整体捕获整个关系的快照，而是捕获导致这些快照处于时变关系中的*变化序列*。这里的细微差别通过一个例子变得更加明显。
+流是略有不同的野兽。我们在 [第 6 章](Chapter6.流和表.md#streams_and_tables) 中了解到，它们也可以捕获表随时间的演变。但它们的做法与我们目前看到的随时间变化的关系有些不同。他们不是在每次关系发生变化时整体捕获整个关系的快照，而是捕获导致这些快照处于时变关系中的*变化序列*。这里的细微差别通过一个例子变得更加明显。
 
 作为复习，再次回顾我们的基线示例`TVR`查询
 
@@ -372,7 +372,7 @@
 
 事实上，可以肯定地说，`STREAM`查询只是提供了对存在于相应的基于表的`TVR`查询中的整个数据历史记录的替代呈现。 STREAM 渲染的价值在于它的简洁性：它仅捕获 TVR 中每个时间点关系快照之间的变化增量。 表序列`TVR`呈现的价值在于它提供的清晰度：它以突出其与经典关系的自然关系的格式捕获关系随时间的演变，并在这样做时提供简单明了的 流上下文中关系语义的定义以及流带来的额外时间维度。
 
-`STREAM` 和基于表格的 `TVR` 渲染之间的相似之处的另一个重要方面是，它们在编码的整体数据方面本质上是等效的。 这触及了其支持者长期以来鼓吹的流/表二元性的核心：流和表[^6] 实际上只是同一枚硬币的两个不同面。 或者重新使用[第 6 章](ch06.html#streams_and_tables) 中的糟糕物理类比，流和表是随时间变化的关系，就像波和粒子是光：[^7] 一个完整的时间 - 可变关系同时是表和流； 表和流只是同一概念的不同物理表现，具体取决于上下文。
+`STREAM` 和基于表格的 `TVR` 渲染之间的相似之处的另一个重要方面是，它们在编码的整体数据方面本质上是等效的。 这触及了其支持者长期以来鼓吹的流/表二元性的核心：流和表[^6] 实际上只是同一枚硬币的两个不同面。 或者重新使用[第 6 章](Chapter6.流和表.md#Chapter6.流和表) 中的糟糕物理类比，流和表是随时间变化的关系，就像波和粒子是光：[^7] 一个完整的时间 - 可变关系同时是表和流； 表和流只是同一概念的不同物理表现，具体取决于上下文。
 
 现在，重要的是要记住，只有当两个版本都编码相同的信息时，这种流/表的二元性才是正确的； 也就是说，当您拥有完全保真表或流时。 然而，在许多情况下，完全保真是不切实际的。 正如我之前提到的，对时变关系的完整历史进行编码，无论是流形式还是表格形式，对于大型数据源来说都是相当昂贵的。 TVR 的流和表表现以某种方式有损是很常见的。 表格通常只编码最新版本的 TVR； 那些支持临时或版本访问的通常将编码历史压缩到特定的时间点快照，和/或垃圾收集版本早于某个阈值。 类似地，流通常只对 TVR 演变的有限持续时间进行编码，通常是该历史的相对较新的部分。 像 Kafka 这样的持久流提供了对整个 TVR 进行编码的能力，但这同样是相对不常见的，超过某个阈值的数据通常会通过垃圾收集过程被丢弃。
 
@@ -380,19 +380,19 @@
 
 ## 回顾过去：流和表偏差
 
-在许多方面，向 SQL 添加强大的流支持的行为主要是尝试将 Beam 模型的 *where*、*when* 和 *how* 语义与经典 SQL 模型的 *what* 语义合并 . 但要干净利落地做到这一点，并以一种忠实于经典 SQL 外观和感觉的方式，需要了解这两个模型之间的关系。 因此，正如我们在 [第 6 章](ch06.html#streams_and_tables) 中探索了 Beam 模型与流和表理论的关系一样，我们现在将探索 Beam 模型与经典 SQL 模型的关系，使用流和 表理论作为我们比较的基础框架。 在此过程中，我们将发现每个模型中存在的固有偏见，这将为我们提供一些见解，让我们了解如何以一种干净、自然的方式最好地将两者结合起来。
+在许多方面，向 SQL 添加强大的流支持的行为主要是尝试将 Beam 模型的 *where*、*when* 和 *how* 语义与经典 SQL 模型的 *what* 语义合并 . 但要干净利落地做到这一点，并以一种忠实于经典 SQL 外观和感觉的方式，需要了解这两个模型之间的关系。 因此，正如我们在 [第 6 章](Chapter6.流和表.md#Chapter6.流和表) 中探索了 Beam 模型与流和表理论的关系一样，我们现在将探索 Beam 模型与经典 SQL 模型的关系，使用流和 表理论作为我们比较的基础框架。 在此过程中，我们将发现每个模型中存在的固有偏见，这将为我们提供一些见解，让我们了解如何以一种干净、自然的方式最好地将两者结合起来。
 
 ### Beam 模型：一种偏流的方法
 
-让我们从 Beam 模型开始，建立在 [第 6 章](ch06.html#streams_and_tables) 中的讨论之上。 首先，我想讨论 Beam 模型中固有的流偏差，因为它目前存在于流和表中。
+让我们从 Beam 模型开始，建立在 [第6章](Chapter6.流和表.md#Chapter6.流和表) 中的讨论之上。 首先，我想讨论 Beam 模型中固有的流偏差，因为它目前存在于流和表中。
 
-如果您回想一下图 [6-11](ch06.html#even_time_processing_time_view_of_windowed_summation) 和 [6-12](ch06.html#streams_and_tables_view_of_windowed_summation_on_a_streaming)，它们显示了我们用作相同分数求和管道的两个不同视图 本书中的一个示例：在[图 6-11](ch06.html#even_time_processing_time_view_of_windowed_summation) 中是一个逻辑的 Beam-Model 视图，在 [图 6-12](ch06.html#streams_and_tables_view_of_windowed_summation_on_a_streaming) 中是一个物理的流和表—— 导向的观点。 比较两者有助于突出 Beam 模型与流和表的关系。 但是通过将一个叠加在另一个之上，正如我在 [图 8-1](#stream_bias_in_the_beam_model_approach) 中所做的那样，我们可以看到这种关系的另一个有趣的方面：Beam 模型的固有流偏差。
+如果您回想一下图 [6-11](Chapter6.流和表.md#even_time_processing_time_view_of_windowed_summation) 和 [6-12](Chapter6.流和表.md#streams_and_tables_view_of_windowed_summation_on_a_streaming)，它们显示了我们用作相同分数求和管道的两个不同视图 本书中的一个示例：在[图 6-11](Chapter6.流和表.md#even_time_processing_time_view_of_windowed_summation) 中是一个逻辑的 Beam-Model 视图，在 [图 6-12](Chapter6.流和表.md#streams_and_tables_view_of_windowed_summation_on_a_streaming) 中是一个物理的流和表—— 导向的观点。 比较两者有助于突出 Beam 模型与流和表的关系。 但是通过将一个叠加在另一个之上，正如我在 [图 8-1](#stream_bias_in_the_beam_model_approach) 中所做的那样，我们可以看到这种关系的另一个有趣的方面：Beam 模型的固有流偏差。
 
 ![img](./media/stsy_0801.png)
 
 ###### Figure 8-1. Stream bias in the Beam Model approach
 
-在此图中，我绘制了红色虚线，将逻辑视图中的转换连接到物理视图中的相应组件。 当以这种方式观察时，突出的一点是所有逻辑转换都由 *streams* 连接，即使是涉及分组的操作（我们从 [Chapter 6](ch06.html#streams_and_tables) 中了解到，结果是一个表 创建*某处*）。 用 Beam 的说法，这些转换是“PTransforms”，它们总是应用于`PCollections`以产生新的`PCollections`。 这里重要的一点是 Beam 中的`PCollections`*总是*流。 因此，Beam 模型本质上是一种偏向于流的数据处理方法：流是 Beam 管道（甚至是批处理管道）中的通用货币，而表总是被特殊对待，要么在源后面抽象，要么在边缘处抽象 管道或隐藏在管道中某处的分组和触发操作之下。
+在此图中，我绘制了红色虚线，将逻辑视图中的转换连接到物理视图中的相应组件。 当以这种方式观察时，突出的一点是所有逻辑转换都由 *streams* 连接，即使是涉及分组的操作（我们从 [第6章](Chapter6.流和表.md#Chapter6.流和表) 中了解到，结果是一个表 创建*某处*）。 用 Beam 的说法，这些转换是“PTransforms”，它们总是应用于`PCollections`以产生新的`PCollections`。 这里重要的一点是 Beam 中的`PCollections`*总是*流。 因此，Beam 模型本质上是一种偏向于流的数据处理方法：流是 Beam 管道（甚至是批处理管道）中的通用货币，而表总是被特殊对待，要么在源后面抽象，要么在边缘处抽象 管道或隐藏在管道中某处的分组和触发操作之下。
 
 由于 Beam 根据流进行操作，因此在涉及表的任何地方（源、汇和任何中间分组/取消分组），都需要进行某种转换以隐藏底层表。 Beam 中的那些转换看起来像这样：
 
@@ -423,7 +423,7 @@
 
 ### SQL 模型：偏向表的方法
 
-与 Beam 模型的流偏向方法相反，SQL 历来采用表偏向方法：查询应用于表，并且总是产生新表。 这类似于我们在[第 6 章](ch06.html#streams_and_tables) 中使用 MapReduce 看到的批处理模型，[^9] 但是考虑一个像我们这样的具体示例会很有用 刚刚查看了梁模型。
+与 Beam 模型的流偏向方法相反，SQL 历来采用表偏向方法：查询应用于表，并且总是产生新表。 这类似于我们在[第 6 章](Chapter6.流和表.md#streams_and_tables) 中使用 MapReduce 看到的批处理模型，[^9] 但是考虑一个像我们这样的具体示例会很有用 刚刚查看了梁模型。
 
 考虑以下非规范化 SQL 表：
 
@@ -488,7 +488,7 @@ UserScores (user, team, score, timestamp)
 
 输入表（即源，在梁模型术语中）
 
-- 这些总是在特定时间点[^10]（通常是查询执行时间）隐式触发，以生成包含当时表快照的有界流。 这也与经典批处理所获得的相同； 例如，我们在 [第 6 章](ch06.html#streams_and_tables) 中看到的 MapReduce 案例。
+- 这些总是在特定时间点[^10]（通常是查询执行时间）隐式触发，以生成包含当时表快照的有界流。 这也与经典批处理所获得的相同； 例如，我们在 [第 6 章](Chapter6.流和表.md#streams_and_tables) 中看到的 MapReduce 案例。
 
 输出表（即汇，梁模型术语）
 
@@ -611,7 +611,7 @@ If we were to imagine these data as a classic SQL table, they might look somethi
 ------------------------------------------------
 ```
 
-如果您还记得的话，我们在 [第 2 章](ch02.html#the_what_where_when_and_how) 中第一次介绍这个数据集时就看到了这个表。 此渲染提供了比我们通常显示的更多的数据细节，明确强调了九个分数本身属于七个不同用户的事实，每个用户都是同一团队的成员。 在我们开始深入研究示例之前，SQL 提供了一种简洁明了的方式来查看完整的数据布局。
+如果您还记得的话，我们在 [第 2 章](Chapter2.数据处理的内容、地点、时间和方式.md#the_what_where_when_and_how) 中第一次介绍这个数据集时就看到了这个表。 此渲染提供了比我们通常显示的更多的数据细节，明确强调了九个分数本身属于七个不同用户的事实，每个用户都是同一团队的成员。 在我们开始深入研究示例之前，SQL 提供了一种简洁明了的方式来查看完整的数据布局。
 
 这种数据视图的另一个好处是它完全捕获了每条记录的事件时间和处理时间。 您可以将事件时间列想象成只是原始数据的另一部分，而处理时间列是系统提供的东西（在这种情况下，使用一个假设的`Sys.MTime`列来记录处理- 给定行的时间修改时间戳；即该行到达源表的时间），捕获记录本身进入系统的进入时间。
 
@@ -766,7 +766,7 @@ PCollection<KV<Team, Integer>> totals =
 
 ### *Where*: windowing
 
-正如我们在[第 6 章](ch06.html#streams_and_tables) 中了解到的，开窗是按键分组的一种修改，其中窗口成为分层键的次要部分。 与经典的程序化批处理一样，您可以在 SQL 中很容易地将数据窗口化到更简单的窗口中，就像现在存在的那样，只需将时间作为“GROUP BY”参数的一部分。 或者，如果相关系统提供了它，您可以使用内置的窗口操作。 我们稍后会查看两者的 SQL 示例，但首先，让我们回顾一下 [第 3 章](ch03.html#watermarks_chapter) 中的编程版本。 回想一下 [Example 6-2](ch06.html#summation_pipeline_chap_six_second)，带窗口的 Beam 管道看起来像 [Example 8-2](#example_eight_two) 中所示的那样。
+正如我们在[第 6 章](Chapter6.流和表.md#streams_and_tables) 中了解到的，开窗是按键分组的一种修改，其中窗口成为分层键的次要部分。 与经典的程序化批处理一样，您可以在 SQL 中很容易地将数据窗口化到更简单的窗口中，就像现在存在的那样，只需将时间作为“GROUP BY”参数的一部分。 或者，如果相关系统提供了它，您可以使用内置的窗口操作。 我们稍后会查看两者的 SQL 示例，但首先，让我们回顾一下 [第 3 章](Chapter3.水印.md#watermarks_chapter) 中的编程版本。 回想一下 [Example 6-2](Chapter6.流和表.md#summation_pipeline_chap_six_second)，带窗口的 Beam 管道看起来像 [Example 8-2](#example_eight_two) 中所示的那样。
 
 *Example 8-2. Summation pipeline*
 
@@ -778,7 +778,7 @@ PCollection<KV<Team, Integer>> totals = input
   .apply(Sum.integersPerKey());
 ```
 
-该管道的执行（在 [图 6-5](ch06.html#event_time_process_time_view_of_windowed_summation_on_a_batch_engine) 中呈现的流和表中）看起来像 [图 8-8]（#streams_and_tables_view_of_windowed_summation_on_a_batch_engine_chap_eight）中的图表。
+该管道的执行（在 [图 6-5](Chapter6.流和表.md#event_time_process_time_view_of_windowed_summation_on_a_batch_engine) 中呈现的流和表中）看起来像 [图 8-8]（#streams_and_tables_view_of_windowed_summation_on_a_batch_engine_chap_eight）中的图表。
 
 
 
@@ -844,7 +844,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 ### *When*: triggers
 
-和以前一样，这个问题的答案是触发器和水印。 然而，在 SQL 的上下文中，有一个强有力的论据是有一组不同的默认值，而不是我们在 [第 3 章](ch03.html#watermarks_chapter) 中引入的 Beam 模型：而不是默认使用单个 水印触发器，一个更像 SQL 的默认设置是从物化视图中获取提示并在每个元素上触发。 换句话说，每当有新输入到达时，我们都会产生相应的新输出。
+和以前一样，这个问题的答案是触发器和水印。 然而，在 SQL 的上下文中，有一个强有力的论据是有一组不同的默认值，而不是我们在 [第 3 章](Chapter3.水印.md#watermarks_chapter) 中引入的 Beam 模型：而不是默认使用单个 水印触发器，一个更像 SQL 的默认设置是从物化视图中获取提示并在每个元素上触发。 换句话说，每当有新输入到达时，我们都会产生相应的新输出。
 
 #### 类似 SQL 的默认值：每记录触发器
 
@@ -1063,7 +1063,7 @@ PCollection<KV<Team, Integer>> totals = input
 
 到目前为止，在本节中，我们一直忽略了我在本章开头介绍的`Sys.Undo`列。 因此，我们默认使用*累积模式*来回答窗口/行的*如何*优化相互关联的问题。 换句话说，任何时候我们观察到聚合行的多个修订，后来的修订建立在以前的修订之上，将新输入与旧输入一起累积。 我选择这种方法是因为它与前面一章中使用的方法相匹配，而且它是对表世界中事物工作方式的相对直接的转换。
 
-也就是说，累积模式有一些主要缺点。 事实上，正如我们在 [第 2 章](ch02.html#the_what_where_when_and_how) 中所讨论的那样，由于过度计数，对于具有两个或多个分组操作序列的任何查询/管道来说，它都是完全错误的。 允许在允许包含多个串行分组操作的查询的系统中使用一行的多个修订的唯一明智的方法是它是否在默认情况下以 *accumulating 和 retracting* 模式运行。 否则，由于盲目合并单个行的多个修订，您会遇到给定输入记录多次包含在单个聚合中的问题。
+也就是说，累积模式有一些主要缺点。 事实上，正如我们在 [第 2 章](Chapter2.数据处理的内容、地点、时间和方式.md#the_what_where_when_and_how) 中所讨论的那样，由于过度计数，对于具有两个或多个分组操作序列的任何查询/管道来说，它都是完全错误的。 允许在允许包含多个串行分组操作的查询的系统中使用一行的多个修订的唯一明智的方法是它是否在默认情况下以 *accumulating 和 retracting* 模式运行。 否则，由于盲目合并单个行的多个修订，您会遇到给定输入记录多次包含在单个聚合中的问题。
 
 因此，当我们谈到将累积模式语义合并到 SQL 世界中的问题时，最符合我们提供直观和自然体验的目标的选项是系统是否在幕后默认使用撤回。[^15]正如我之前介绍“Sys.Undo”专栏时所指出的那样，如果您不关心撤回（如本节之前的示例所示），则无需请求撤回 . 但如果你真的要他们，他们应该在那里。
 
@@ -1265,40 +1265,41 @@ PCollection<KV<Team, Integer>> totals = input
 
 
 
-^[1](#ch08.html#idm139957175341792-marker)^ What I mean by "valid relation" here is simply a relation for which the application of a given operator is well formed. For example, for the SQL query `SELECT x FROM y`​, a valid relation y would be any relation containing an attribute/column named x. Any relation not containing a such-named attribute would be invalid and, in the case of a real database system, would yield a query execution error.
 
-^[2](#ch08.html#idm139957175328912-marker)^ Much credit to Julian Hyde for this name and succinct rendering of the concept.
+[^1]：我在这里所说的“有效关系”的意思只是给定运算符的应用程序格式正确的关系。 例如，对于 SQL 查询`SELECT x FROM y`，有效关系 y 是包含名为 x 的属性/列的任何关系。 任何不包含此类命名属性的关系都是无效的，并且在真实数据库系统的情况下，会产生查询执行错误。
 
-^[3](#ch08.html#idm139957175228928-marker)^ Note that the `Sys.Undo` name used here is riffing off the concise [undo/redo nomenclature from Apache Flink](https://flink.apache.org/news/2017/04/04/dynamic-tables.html), which I think is a very clean way to capture the ideas of retraction and nonretraction rows.
+[^2]：朱利安·海德 (Julian Hyde) 为这个名称和对概念的简洁呈现表示了极大的敬意。
 
-^[4](#ch08.html#idm139957175195248-marker)^ Now, in this example, it's not too difficult to figure out that the new value of 8 should replace the old value of 7, given that the mapping is 1:1. But we'll see a more complicated example later on when we talk about sessions that is much more difficult to handle without having retractions as a guide.
+[^3]：请注意，此处使用的“Sys.Undo”名称借鉴了简洁的[undo/redo nomenclature from Apache Flink](https://flink.apache.org/news/2017/04/04/dynamic -tables.html)，我认为这是一种非常简洁的方式来捕捉撤回行和非撤回行的想法。
 
-^[5](#ch08.html#idm139957175168000-marker)^ And indeed, this is a key point to remember. There are some systems that advocate treating streams and tables as identical, claiming that we can simply treat streams like never-ending tables. That statement is accurate inasmuch as the true underlying primitive is the time-varying relation, and all relational operations may be applied equally to any time-varying relation, regardless of whether the actual physical manifestation is a stream or a table. But that sort of approach conflates the two very different types of views that tables and streams provide for a given time-varying relation. Pretending that two very different things are the same might seem simple on the surface, but it's not a road toward understanding, clarity, and correctness.
+[^4]：现在，在此示例中，假设映射为 1:1，则不难发现新值 8 应替换旧值 7。 但是我们稍后会看到一个更复杂的例子，当我们谈论在没有撤回作为指导的情况下更难以处理的会议时。
 
-^[6](#ch08.html#idm139957175150208-marker)^ Here referring to tables in the sense of tables that can vary over time; that is, the table-based TVRs we've been looking at.
+[^5]：确实，这是要记住的关键点。 有一些系统主张将流和表视为相同的，声称我们可以简单地将流视为永无止境的表。 该陈述是准确的，因为真正的底层原语是时变关系，并且所有关系操作都可以同等地应用于任何时变关系，而不管实际的物理表现是流还是表。 但是这种方法将表和流为给定的时变关系提供的两种截然不同的视图混为一谈。 假装两个截然不同的事物是相同的，表面上看起来很简单，但这并不是通向理解、清晰和正确的道路。
 
-^[7](#ch08.html#idm139957175148368-marker)^ This one courtesy Julian Hyde.
+[^6]：这里指的是可以随时间变化的表格意义上的表格； 也就是说，我们一直在研究的基于表格的 TVR。
 
-^[8](#ch08.html#idm139957175101104-marker)^ Though there are a number of efforts in flight across various projects that are trying to simplify the specification of triggering/ungrouping semantics. The most compelling proposal, made independently within both the Flink and Beam communities, is that triggers should simply be specified at the outputs of a pipeline and automatically propagated up throughout the pipeline. In this way, one would describe only the desired shape of the streams that actually create materialized output; the shape of all other streams in the pipeline would be implicitly derived from there.
+[^7]：本文由 Julian Hyde 友情提供。
 
-^[9](#ch08.html#idm139957174835696-marker)^ Though, of course, a single SQL query has vastly more expressive power than a single MapReduce, given the far less-confining set of operations and composition options available.
+[^8]：尽管各种项目都在努力简化触发/取消分组语义的规范。 在 Flink 和 Beam 社区中独立提出的最引人注目的提议是，触发器应该简单地在管道的输出中指定，并自动向上传播到整个管道。 这样，人们将只描述实际创建物化输出的流的所需形状； 管道中所有其他流的形状将从那里隐式导出。
 
-^[10](#ch08.html#idm139957174793216-marker)^ Note that we're speaking conceptually here; there are of course a multitude of optimizations that can be applied in actual execution; for example, looking up specific rows via an index rather than scanning the entire table.
+[^9]：当然，单个 SQL 查询比单个 MapReduce 具有更强大的表达能力，因为可用的操作和组合选项的限制要少得多。
 
-^[11](#ch08.html#idm139957174770912-marker)^ It's been brought to my attention multiple times that the "`MATERIALIZED`" aspect of these queries is just an optimization: semantically speaking, these queries could just as easily be replaced with generic `CREATE VIEW` statements, in which case the database might instead simply rematerialize the entire view each time it is referenced. This is true. The reason I use the `MATERIALIZED` variant here is that the semantics of a materialized view are to incrementally update the view table in response to a stream of changes, which is indicative of the streaming nature behind them. That said, the fact that you can instead provide a similar experience by re-executing a bounded query each time a view is accessed provides a nice link between streams and tables as well as a link between streaming systems and the way batch systems have been historically used for processing data that evolves over time. You can either incrementally process changes as they occur or you can reprocess the entire input dataset from time to time. Both are valid ways of processing an evolving table of data.
+[^10]：请注意，我们在这里是从概念上讲的； 当然，在实际执行中可以应用大量优化； 例如，通过索引查找特定行而不是扫描整个表。
 
-^[12](#ch08.html#idm139957174741168-marker)^ Though it's probably fair to say that SQL's table bias is likely an artifact of SQL's *roots* in batch processing.
+[^11]：我多次注意到这些查询的“`MATERIALIZED`”方面只是一种优化：从语义上讲，这些查询可以很容易地替换为通用的`CREATE VIEW`语句，其中 在这种情况下，数据库可能会在每次引用时简单地重新实现整个视图。 这是真实的。 我在这里使用 `MATERIALIZED` 变体的原因是物化视图的语义是增量更新视图表以响应变化流，这表明它们背后的流特性。 也就是说，您可以通过每次访问视图时重新执行有界查询来提供类似的体验，这一事实提供了流和表之间的良好链接，以及流系统和批处理系统历史上的方式之间的链接 用于处理随时间变化的数据。 您可以在发生变化时以增量方式处理变化，也可以不时地重新处理整个输入数据集。 两者都是处理不断变化的数据表的有效方法。
 
-^[13](#ch08.html#idm139957174688160-marker)^ For some use cases, capturing and using the current processing time for a given record as its event time going forward can be useful (for example, when logging events directly into a TVR, where the time of ingress is the natural event time for that record).
+[^12]：尽管可以公平地说，SQL 的表偏差很可能是批处理中 SQL *roots* 的产物。
 
-^[14](#ch08.html#idm139957174580832-marker)^ Maths are easy to get wrong.
+[^13]：对于某些用例，捕获给定记录的当前处理时间并将其用作其未来的事件时间可能很有用（例如，当将事件直接记录到 TVR 时，进入时间很自然 该记录的事件时间）。
 
-^[15](#ch08.html#idm139957174420112-marker)^ It's sufficient for retractions to be used by default and not simply always because the system only needs the *option* to use retractions. There are specific use cases; for example, queries with a single grouping operation whose results are being written into an external storage system that supports per-key updates, where the system can detect retractions are not needed and disable them as an optimization.
+[^14]：数学很容易出错。
 
-^[16](#ch08.html#idm139957174363856-marker)^ Note that it's a little odd for the simple addition of a new column in the `SELECT` statement to result in a new rows appearing in a query. A fine alternative approach would be to require `Sys.Undo` rows to be filtered out via a `WHERE` clause when not needed.
+[^15]：默认情况下使用撤回就足够了，而不是总是因为系统只需要*选项*来使用撤回。 有特定的用例； 例如，具有单个分组操作的查询，其结果被写入支持每个键更新的外部存储系统，其中系统可以检测不需要撤回并将它们作为优化禁用。
 
-^[17](#ch08.html#idm139957174352128-marker)^ Not that this triviality applies only in cases for which eventual consistency is sufficient. If you need to always have a globally coherent view of all sessions at any given time, you must 1) be sure to write/delete (via tombstones) each session at its emit time, and 2) only ever read from the HBase table at a timestamp that is less than the output watermark from your pipeline (to synchronize reads against the multiple, independent writes/deletes that happen when sessions merge). Or better yet, cut out the middle person and serve the sessions from your state tables directly.
+[^16]：请注意，在 `SELECT` 语句中简单添加一个新列会导致查询中出现新行，这有点奇怪。 一个很好的替代方法是要求在不需要时通过`WHERE`子句过滤掉`Sys.Undo`行。
 
-^[18](#ch08.html#idm139957174325392-marker)^ To be clear, they're not all hypothetical. Calcite has support for the windowing constructs described in this chapter.
+[^17]：并不是说这种微不足道的事情只适用于最终一致性足够的情况。 如果您需要在任何给定时间始终拥有所有会话的全局一致视图，则必须 1) 确保在每个会话发出时写入/删除（通过逻辑删除），以及 2) 仅在以下时间从 HBase 表中读取 一个小于管道输出水印的时间戳（同步读取与会话合并时发生的多个独立写入/删除）。 或者更好的是，去掉中间人并直接从状态表为会话提供服务。
 
-^[19](#ch08.html#idm139957174288112-marker)^ Note that the definition of "index" becomes complicated in the case of merging windows like sessions. A reasonable approach is to take the maximum of all of the previous sessions being merged together and increment by one.
+[^18]：需要明确的是，它们并不都是假设的。 Calcite 支持本章中描述的窗口结构。
+
+[^19]: 请注意，在像会话一样合并窗口的情况下，“索引”的定义变得复杂。 一种合理的方法是将所有先前会话中的最大值合并在一起并递增 1。
