@@ -1,0 +1,43 @@
+
+
+**xxii** 
+
+Introduction 
+
+ergonomic API design. I aim to explain and demystify these more advanced and powerful features of Rust and to enable you to build faster, more ergo- nomic, and more robust applications going forward. 
+
+**What’s in the Book** 
+
+This book is written both as a guide and as a reference. The chapters are more or less independent, so you can skip directly to topics that particularly interest you (or are currently causing you headaches), or you can read the book start to finish for a more holistic experience. That said, I do recom- mend that you start by reading Chapters 1 and 2, as they lay the foundation for the later chapters and for many topics that will come up in your day-to- day Rust development. Here’s a quick breakdown of what you’ll find in each chapter: 
+
+Chapter 1, *Foundations*, gives deeper, more thorough descriptions of fundamental Rust concepts like variables, memory, ownership, bor- rowing, and lifetimes that you’ll need to be familiar with to follow the remainder of the book. 
+
+Chapter 2, *Types*, similarly provides a more exhaustive explanation of types and traits in Rust, including how the compiler reasons about them, their features and restrictions, and a number of advanced applications. 
+
+Chapter 3, *Designing Interfaces*, covers how to design APIs that are intui- tive, flexible, and misuse-resistant, including advice on how to name things, how to use the type system to enforce API contracts, and when to use generics versus trait objects. 
+
+Chapter 4, *Error Handling*, explores the two primary kinds of errors (enumerated and opaque), when the use of each is appropriate, and how each of these are defined, constructed, propagated, and handled. 
+
+Chapter 5, *Project Structure*, focuses on the non-code parts of a Rust project, such as Cargo metadata and configuration, crate features, and versioning. 
+
+Chapter 6, *Testing*, details how the standard Rust testing harness works and presents some testing tools and techniques that go beyond standard unit and integration tests, such as fuzzing and performance testing. 
+
+Chapter 7, *Macros*, covers both declarative and procedural macros, including how they’re written, what they’re useful for, and some of their pitfalls. 
+
+Chapter 8, *Asynchronous Programming*, gives an introduction to the dif- ference between synchronous and asynchronous interfaces and then delves into how asynchrony is represented in Rust both at the low level of Future and Pin and at the high level of async and await. The chapter also explains the role of an asynchronous executor and how it makes the whole async machinery come together. 
+
+Chapter 9, *Unsafe Code*, explains the great powers that the unsafe key- word unlocks and the great responsibilities that come with those pow- ers. You’ll learn about common gotchas in unsafe code as well as tools and techniques you can use to reduce the risk of incorrect unsafe code. 
+
+Chapter 10, *Concurrency (and Parallelism)*, looks at how concurrency is represented in Rust and why it can be so difficult to get right in terms of both correctness and performance. It covers how concurrency and asynchrony are related (but not the same), how concurrency works when you get closer to the hardware, and how to stay sane while trying to write correct concurrent programs. 
+
+Chapter 11, *Foreign Function Interfaces*, teaches you how to make Rust cooperate nicely with other languages and what FFI primitives like the extern keyword actually do. 
+
+Chapter 12, *Rust Without the Standard Library*, is all about using Rust in situations where the full standard library isn’t available, such as on embedded devices or other constrained platforms, where you’re restricted to what the core and alloc modules provide. 
+
+Chapter 13, *The Rust Ecosystem*, doesn’t cover a particular Rust subject but instead aims to give broader guidance about working in the Rust ecosystem. It contains descriptions of common design patterns, advice on staying up to date on additions to the language and best practices, tips on useful tools and other useful trivia I’ve accumulated over the years that isn’t otherwise described in any single place. 
+
+The book has a website at *https://rust-for-rustaceans.com* with links to resources from the book, future errata, and the like. You’ll also find that information at the book’s page on the No Starch Press website at *https:// nostarch.com/rust-rustaceans/*. 
+
+And now, with all that out of the way, there’s only one thing left to do: 
+
+fn main() { 
