@@ -24,8 +24,6 @@
 
 那么，让我们看看编译器如何使用 repr(C) 布局特定类型：清单 2-1 中的 Foo 类型。 您认为编译器会如何将其放置在内存中？
 
----
-
 ```
 #[repr(C)]
 struct Foo {
@@ -36,8 +34,6 @@ struct Foo {
   short: u16,
 }
 ```
-
----
 
 *Listing 2-1: Alignment affects layout.*
 
@@ -79,131 +75,7 @@ struct Foo {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-2** 
-
-**TYPES** 
-
-Now that the fundamentals are out of the way, we’ll look at Rust’s type system. We’ll 
-
-skip past the basics covered in *The Rust Programming Language* and instead dive head- 
-
-first into how different types are laid out in memory, the ins and outs of traits and trait bounds, existen- tial types, and the rules for using types across crate boundaries. 
-
-**Types in Memory** 
-
-Every Rust value has a type. Types serve many purposes in Rust, as we’ll see in this chapter, but one of their most fundamental roles is to tell you how to interpret bits of memory. For example, the sequence of bits 0b10111101 (writ- ten in hexadecimal notation as 0xBD) does not mean anything in and of itself until you assign it a type. When interpreted under the type u8, that sequence 
-
-**20** Chapter 2 
-
-of bits is the number 189. When interpreted under the type i8, it is –67. When you define your own types, it’s the compiler’s job to determine where each part of the defined type goes in the in-memory representation for that type. Where does each field of your struct appear in the sequence of bits? Where is the discriminant for your enum stored? It’s important to understand how this process works as you begin to write more advanced Rust code, because these details affect both the correctness and the performance of your code. 
-
-**Alignment** 
-
-Before we talk about how a type’s in-memory representation is determined, we first need to discuss the notion of *alignment*, which dictates where the bytes for a type can be stored. Once a type’s representation has been deter- mined, you might think you can take any arbitrary memory location and interpret the bytes stored there as that type. While that is true in a theoreti- cal sense, in practice the hardware also constrains where a given type can be placed. The most obvious example of this is that pointers point to *bytes*, not *bits*. If you placed a value of type T starting at bit 4 of your computer’s memory, you would have no way to refer to its location; you can create a pointer pointing only to byte 0 or byte 1 (bit 8). For this reason, all values, no matter their type, must start at a byte boundary. We say that all values must be at least *byte-aligned*—they must be placed at an address that is a multiple of 8 bits. 
-
-Some values have more stringent alignment rules than just being byte- aligned. In the CPU and the memory system, memory is often accessed in blocks larger than a single byte. For example, on a 64-bit CPU, most values are accessed in chunks of 8 bytes (64 bits), with each operation starting at an 8-byte-aligned address. This is referred to as the CPU’s *word size*. The CPU then uses some cleverness to handle reading and writing smaller val- ues, or values that span the boundaries of these chunks. 
-
-Where possible, you want to ensure that the hardware can operate in its “native” alignment. To see why, consider what happens if you try to read an i64 that starts in the middle of an 8-byte block (that is, the pointer to it is not 8-byte-aligned). The hardware will have to do two reads—one from the sec- ond half of the first block to get to the start of the i64, and one from the first half of the second block to read the rest of the i64—and then splice the results together. This is not very efficient. Since the operation is spread across multiple accesses to the underlying memory, you may also end up with strange results if the memory you’re reading from is concurrently written to by a different thread. You might read the first 4 bytes before the other thread’s write has happened and the second 4 bytes after, resulting in a corrupted value. 
-
-Operations on data that is not aligned are referred to as *misaligned accesses* and can lead to poor performance and bad concurrency prob- lems. For this reason, many CPU operations require, or strongly prefer, that their arguments are *naturally aligned*. A naturally aligned value is one whose alignment matches its size. So, for example, for an 8-byte load, the provided address would need to be 8-byte-aligned. 
-
-Since aligned accesses are generally faster and provide stronger con- sistency semantics, the compiler tries to take advantage of them where 
-
-**N O T E** 
-
-possible. It does this by giving every type an alignment that’s computed based on the types that it contains. Built-in values are usually aligned to their size, so a u8 is byte-aligned, a u16 is 2-byte-aligned, a u32 is 4-byte- aligned, and a u64 is 8-byte-aligned. Complex types—types that contain other types—are typically assigned the largest alignment of any type they contain. For example, a type that contains a u8, a u16, and a u32 will be 4-byte-aligned because of the u32. 
-
-**Layout** 
-
-Now that you know about alignment, we can explore how the compiler decides on the in-memory representation, known as the *layout*, of a type.
- By default, as you’ll see shortly, the Rust compiler gives very few guarantees about how it lays out types, which makes for a poor starting point for under- standing the underlying principles. Luckily, Rust provides a repr attribute you can add to your type definitions to request a particular in-memory rep- resentation for that type. The most common one you will see, if you see one at all, is repr(C). As the name suggests, it lays out the type in a way that is compatible with how a C or C++ compiler would lay out the same type. This is helpful when writing Rust code that interfaces with other languages using the foreign-function interface, which we’ll talk about in Chapter 11, as Rust will generate a layout that matches the expectations of the other language’s compiler. Since the C layout is predictable and not subject to change, repr(C) is also useful in unsafe contexts if you’re working with raw pointers into the type, or if you need to cast between two different types that you know have the same fields. And, of course, it is perfect for taking our first steps into layout algorithms. 
-
-*Another useful representation is* *repr(transparent)**, which can be used only on types with a single field and which guarantees that the layout of the outer type is exactly the same as that of the inner type. This comes in handy in combination with the “newtype” pattern, where you may want to operate on the in-memory representations of some* *struct A* *and* *struct NewA(A)* *as if they were the same. Without* *repr(transparent)**, the Rust compiler does not guarantee that they will have the same layout.* 
-
-So, let’s look how the compiler would lay out a particular type with repr(C): the Foo type in Listing 2-1. How do you think the compiler would lay this out in memory? 
-
-```
-#[repr(C)]
-struct Foo {
-  tiny: bool,
-  normal: u32,
-  small: u8,
-  long: u64,
-  short: u16,
-```
-
-} 
-
-Listing 2-1: Alignment affects layout. 
-
-Types **21** 
-
-**22** Chapter 2 
-
-First the compiler sees the field tiny, whose logical size is 1 bit (true or false). But since the CPU and memory operate in terms of bytes, tiny is given 1 byte in the in-memory representation. Next, normal is a 4-byte type, so we want it to be 4-byte-aligned. But even if Foo is aligned, the 1 byte we allocated to tiny is going to make normal miss its alignment. To rectify this, the compiler inserts 3 bytes of *padding*—bytes with an indeterminate value that are ignored in user code—into the in-memory representation between tiny and normal. No values go into the padding, but it does take up space. 
-
-For the next field, small, alignment is simple: it’s a 1-byte value, and
- the current byte offset into the struct is 1 + 3 + 4 = 8. This is already byte- aligned, so small can go immediately after normal. With long we have a problem again, though. We are now 1 + 3 + 4 + 1 = 9 bytes into Foo. If Foo is aligned, then long is not 8-byte-aligned the way we want it to be, so we must insert another 7 bytes of padding to make long aligned again. This also conveniently ensures the 2-byte alignment we need for the last field, short, bringing the total to 26 bytes. Now that we’ve gone through all the fields, we also need to determine the alignment of Foo itself. The rule here is to use the largest alignment of any of Foo’s fields, which will be 8 bytes because of long. So, to ensure that Foo remains aligned if placed in, say, an array, the compiler then adds a final 6 bytes of padding to make Foo’s size a multiple of its alignment at 32 bytes. 
-
-Now we are ready to shed the C legacy and consider what would hap- pen to the layout if we did not use repr(C) in Listing 2-1. One of the primary limitations of the C representation is that it requires that we place all fields in the same order that they appear in the original struct definition. The default Rust representation repr(Rust) removes that limitation, along with a couple of other lesser restrictions, such as deterministic field ordering for types that happen to have the same fields. That is, even two different types that share all the same fields, of the same type, in the same order, are not guaranteed to be laid out the same when using the default Rust layout! 
-
-Since we’re now allowed to reorder the fields, we can place them
- in decreasing order of size. This means we no longer need the padding between Foo’s fields; the fields themselves are used to achieve the necessary alignment! Foo is now just the size of its fields: only 16 bytes. This is one of the reasons why Rust by default does not give many guarantees about how a type is laid out in memory: by giving the compiler more leeway to rearrange things, we can produce more efficient code. 
-
-It turns out there’s also a third way to lay out a type, and that is to tell the compiler that we do not want any padding between our fields. In doing so, we’re saying that we are willing to take the performance hit of using misaligned accesses. The most common use case for this is when the impact of every additional byte of memory can be felt, such as if you have a lot of instances of the type, if you have very limited memory, or if you’re sending the in-memory representation over a lower-bandwidth medium like a network connection. To opt in to this behavior, you can annotate your type with #[repr(packed)]. Keep in mind that this may lead to much slower code, and in extreme cases, this can cause your program to crash if you try to perform operations that the CPU supports only on aligned arguments. 
-
-Sometimes, you want to give a particular field or type a larger align- ment than it technically requires. You can do that using the attribute #[repr(align(n))]. A common use case for this is to ensure that different values stored contiguously in memory (like in an array) end up in differ- ent cache lines on the CPU. That way, you avoid *false sharing*, which can cause huge performance degradations in concurrent programs. False shar- ing occurs when two different CPUs access different values that happen 
-
-to share a cache line; while they can theoretically operate in parallel, they both end up contending to update the same single entry in the cache. We’ll talk about concurrency in much greater detail in Chapter 10. 
-
-**Complex Types** 
-
-You might be curious about how the compiler represents other Rust types in memory. Here’s a quick reference: 
-
-**Tuple** Represented like a struct with fields of the same type as the tuple values in the same order. 
-
-**Array** Represented as a contiguous sequence of the contained type with no padding between the elements. 
-
-**Union** Layout is chosen independently for each variant. Alignment is the maximum across all the variants. 
-
-**Enumeration** Same as union, but with one additional hidden shared field that stores the enum variant discriminant. The discriminant is the value the code uses to determine which of the enum variants a given value holds. The size of the discriminant field depends on the number of variants. 
-
-**Dynamically Sized Types and Wide Pointers** 
-
-You may have come across the marker trait Sized in various odd corners
- of the Rust documentation and in error messages. Usually, it comes up because the compiler wants you to provide a type that is Sized, but you (apparently) did not. Most types in Rust implement Sized automatically— that is, they have a size that’s known at compile time—but two common types do not: trait objects and slices. If you have, for example, a dyn Iterator or a [u8], those do not have a well-defined size. Their size depends on some information that is known only when the program runs and not at com- pile time, which is why they are called *dynamically sized types (DSTs)*. Nobody knows ahead of time whether the dyn Iterator your function received is this 200-byte struct or that 8-byte struct. This presents a problem: often the compiler must know the size of something in order to produce valid code, such as how much space to allocate to a tuple of type (i32, dyn Iterator, [u8], i32) or what offset to use if your code tries to access the fourth field. But if the type isn’t Sized, that information isn’t available. 
-
-The compiler requires types to be Sized nearly everywhere. Struct fields, function arguments, return values, variable types, and array types must all be Sized. This restriction is so common that every single type bound you 
-
-Types **23** 
-
-**N O T E** 
-
-write includes T: Sized unless you explicitly opt out of it with T: ?Sized (the ? means “may not be”). But this is pretty unhelpful if you have a DST and want to do something with it, like if you really want your function to accept a trait object or a slice as an argument. 
-
-The way to bridge this gap between unsized and sized types is to place unsized types behind a *wide pointer* (also known as a *fat pointer*). A wide pointer is just like a normal pointer, but it includes an extra word-sized field that gives the additional information about that pointer that the compiler needs to generate reasonable code for working with the pointer. When you take a reference to a DST, the compiler automatically constructs a wide pointer for you. For a slice, the extra information is simply the length of the slice. For a trait object—well, we’ll get to that later. And crucially, that wide pointer *is* Sized. Specifically, it is twice the size of a usize (the size of a word on the target platform): one usize for holding the pointer, and one usize for holding the extra information needed to “complete” the type. 
-
-*Box* *and* *Arc* *also support storing wide pointers, which is why they both support* *T: ?Sized**.* 
-
-**Traits and Trait Bounds** 
-
-**24** 
-
-Chapter 2 
-
-**N O T E** 
+### Traits and Trait Bounds
 
 Traits are a key piece of Rust’s type system—they are the glue that allows types to interoperate even though they don’t know about each other at the time they are defined. *The Rust Programming Language* does a great job of covering how to define and use traits, so I won’t go over that here. Instead, we’re going to take a look at some of the more technical aspects of traits: how they’re implemented, restrictions you have to adhere to, and some more esoteric uses of traits. 
 
@@ -211,12 +83,11 @@ Traits are a key piece of Rust’s type system—they are the glue that allows t
 
 By now, you’ve probably written a decent amount of generic code in Rust. You’ve used generic type parameters on types and methods, and maybe even a few trait bounds here and there. But have you ever wondered what actually happens to generic code when you compile it, or what happens when you call a trait method on a dyn Trait? 
 
-When you write a type or function that is generic over T, you’re really telling the compiler to make a copy of that type or function for each type
- T. When you construct a Vec<i32> or a HashMap<String, bool>, the compiler essentially copy-pastes the generic type and all its implementation blocks and replaces all instances of each generic parameter with the concrete type you provided. It makes a full copy of the Vec type with every T replaced with i32, and a full copy of the HashMap type with every K replaced with String and every V with bool. 
+When you write a type or function that is generic over T, you’re really telling the compiler to make a copy of that type or function for each type T. When you construct a Vec<i32> or a HashMap<String, bool>, the compiler essentially copy-pastes the generic type and all its implementation blocks and replaces all instances of each generic parameter with the concrete type you provided. It makes a full copy of the Vec type with every T replaced with i32, and a full copy of the HashMap type with every K replaced with String and every V with bool. 
 
 *In reality, the compiler does not actually do a full copy-paste. It copies only parts of the code that you use, so if you never call* *find* *on a* *Vec**, the code for* *find* *won’t be copied and compiled.* 
 
-**N O T E** 
+
 
 The same thing applies to generic functions. Consider the code in Listing 2-2, which shows a generic method. 
 
@@ -229,7 +100,7 @@ impl String {
 
 } 
 
-Listing 2-2: A generic method using static dispatch 
+*Listing 2-2: A generic method using static dispatch*
 
 A copy of this method is made for every distinct pattern type (recall that impl Trait is shorthand for <T: Trait>). We need a different copy of the function body for each impl Pattern type because we need to know the address of the is_contained_in function to call it. The CPU needs to be told where to jump to and continue execution. For any *given* pattern, the com- piler knows that that address is the address of the place where that pattern type implements that trait method. But there is no one address we could use for *any* type, so we need to have one copy for each type, each with its own address to jump to. This is referred to as *static dispatch*, since for any given copy of the method, the address we are “dispatching to” is known statically. 
 
@@ -241,11 +112,7 @@ This process of going from a generic type to many non-generic types
 
 Monomorphization also comes at a cost: all those instantiations of your type need to be compiled separately, which can increase compile time if the compiler cannot optimize them away. Each monomorphized function also results in its own chunk of machine code, which can make your program larger. And because instructions aren’t shared between different instantia- tions of a generic type’s methods, the CPU’s instruction cache is also less effective as it now needs to hold multiple copies of effectively the same instructions. 
 
-Types **25** 
 
-**26** Chapter 2 
-
-**N O T E** 
 
 **NON-GENERIC INNER FUNCTIONS** 
 
@@ -255,18 +122,11 @@ One pattern you can use for cases like this is to declare a non-generic helper f
 
 Making the function an inner function comes with the added benefit that you do not pollute your module with a single-purpose function . You can instead declare such a helper function outside the method instead; just be careful that you don’t make it a method under a generic impl block, as then it will still be monomorphized . 
 
-The alternative to static dispatch is *dynamic dispatch*, which enables
- code to call a trait method on a generic type without knowing what that type is. I said earlier that the reason we needed multiple instances of the method in Listing 2-2 was that otherwise your program wouldn’t know what address to jump to in order to call the trait method is_contained_in on the given pattern. Well, with dynamic dispatch, the caller simply tells you. If you replace impl Pattern with &dyn Pattern, you tell the caller that they must give *two* pieces of information for this argument: the address of the pattern *and* the address of the is_contained_in method. In practice, the caller gives us a pointer to a chunk of memory called a virtual method table, or *vtable*, that holds the address of the implementation of *all* the trait’s methods for the type in question, one of which is is_contained_in. When the code inside the method wants to call a trait method on the provided pattern, it looks up
- the address of that pattern’s implementation of is_contained_in in the vtable and then calls the function at that address. This allows us to use the same function body regardless of what type the caller wants to use. 
+The alternative to static dispatch is *dynamic dispatch*, which enables code to call a trait method on a generic type without knowing what that type is. I said earlier that the reason we needed multiple instances of the method in Listing 2-2 was that otherwise your program wouldn’t know what address to jump to in order to call the trait method is_contained_in on the given pattern. Well, with dynamic dispatch, the caller simply tells you. If you replace impl Pattern with &dyn Pattern, you tell the caller that they must give *two* pieces of information for this argument: the address of the pattern *and* the address of the is_contained_in method. In practice, the caller gives us a pointer to a chunk of memory called a virtual method table, or *vtable*, that holds the address of the implementation of *all* the trait’s methods for the type in question, one of which is is_contained_in. When the code inside the method wants to call a trait method on the provided pattern, it looks up the address of that pattern’s implementation of is_contained_in in the vtable and then calls the function at that address. This allows us to use the same function body regardless of what type the caller wants to use. 
 
 *Every vtable also contains information about the concrete type’s layout and alignment since that information is always needed to work with a type. If you want an example of what an explicit vtable looks like, take a look at the* *std::task::RawWakerVTable* *type.* 
 
-You’ll notice that when we opted in to dynamic dispatch using the dyn keyword, we had to place an & in front of it. The reason is that we no longer know at compile time the size of the pattern type that the caller passes in, so we don’t know how much space to set aside for it. In other words, dyn Trait
- is !Sized, where the ! means not. To make it Sized so we can take it as an 
-
-argument, we place it behind a pointer (which we know the size of). Since we also need to pass along the table of method addresses, this pointer becomes a wide pointer, where the extra word holds the pointer to the vtable. You can use any type that is able to hold a wide pointer for dynamic dispatch, such 
-
-as &mut, Box, and Arc. Listing 2-3 shows the dynamic dispatch equivalent of Listing 2-2. 
+You’ll notice that when we opted in to dynamic dispatch using the dyn keyword, we had to place an & in front of it. The reason is that we no longer know at compile time the size of the pattern type that the caller passes in, so we don’t know how much space to set aside for it. In other words, dyn Trait is !Sized, where the ! means not. To make it Sized so we can take it as an argument, we place it behind a pointer (which we know the size of). Since we also need to pass along the table of method addresses, this pointer becomes a wide pointer, where the extra word holds the pointer to the vtable. You can use any type that is able to hold a wide pointer for dynamic dispatch, such as &mut, Box, and Arc. Listing 2-3 shows the dynamic dispatch equivalent of Listing 2-2. 
 
 ```
 impl String {
@@ -279,19 +139,11 @@ impl String {
 
 Listing 2-3: A generic method using dynamic dispatch 
 
-The combination of a type that implements a trait and its vtable is known as a *trait object*. Most traits can be turned into trait objects, but not all. For example, the Clone trait, whose clone method returns Self, cannot be turned into a trait object. If we accept a dyn Clone trait object and then call clone on it, the compiler won’t know what type to return. Or, consider the Extend trait from the standard library, which has a method extend that
- is generic over the type of the provided iterator (so there may be many instances of it). If you were to call a method that took a dyn Extend, there would be no single address for extend to place in the trait object’s vtable; there would have to be one entry for every type extend might ever be called with. These are examples of traits that are not *object-safe* and therefore may not be turned into trait objects. To be object-safe, none of a trait’s methods can be generic or use the Self type. Furthermore, the trait cannot have any static methods (that is, methods whose first argument does not dereference to Self), since it would be impossible to know which instance of the method to call. It is not clear, for example, what code FromIterator::from_iter(&[0]) should execute. 
+The combination of a type that implements a trait and its vtable is known as a *trait object*. Most traits can be turned into trait objects, but not all. For example, the Clone trait, whose clone method returns Self, cannot be turned into a trait object. If we accept a dyn Clone trait object and then call clone on it, the compiler won’t know what type to return. Or, consider the Extend trait from the standard library, which has a method extend that is generic over the type of the provided iterator (so there may be many instances of it). If you were to call a method that took a dyn Extend, there would be no single address for extend to place in the trait object’s vtable; there would have to be one entry for every type extend might ever be called with. These are examples of traits that are not *object-safe* and therefore may not be turned into trait objects. To be object-safe, none of a trait’s methods can be generic or use the Self type. Furthermore, the trait cannot have any static methods (that is, methods whose first argument does not dereference to Self), since it would be impossible to know which instance of the method to call. It is not clear, for example, what code FromIterator::from_iter(&[0]) should execute. 
 
-When reading about trait objects, you may see mentions of the trait bound Self: Sized. Such a bound implies that Self is not being used through a trait object (since it would then be !Sized). You can place that bound on a trait to require that the trait never use dynamic dispatch, or you can place
- it on a specific method to make that method unavailable when the trait is accessed through a trait object. Methods with a where Self: Sized bound are exempted when checking if a trait is object-safe. 
+When reading about trait objects, you may see mentions of the trait bound Self: Sized. Such a bound implies that Self is not being used through a trait object (since it would then be !Sized). You can place that bound on a trait to require that the trait never use dynamic dispatch, or you can place it on a specific method to make that method unavailable when the trait is accessed through a trait object. Methods with a where Self: Sized bound are exempted when checking if a trait is object-safe. 
 
-Dynamic dispatch cuts compile times, since it’s no longer necessary
- to compile multiple copies of types and methods, and it can improve the efficiency of your CPU instruction cache. However, it also prevents the com- piler from optimizing for the specific types that are used. With dynamic dispatch, all the compiler can do for find in Listing 2-2 is insert a call to
- the function through the vtable—it can no longer perform any additional optimizations as it does not know what code will sit on the other side of that function call. Furthermore, every method call on a trait object requires a lookup in the vtable, which adds a small amount of overhead over calling the method directly. 
-
-Types **27** 
-
-**28** Chapter 2 
+Dynamic dispatch cuts compile times, since it’s no longer necessary to compile multiple copies of types and methods, and it can improve the efficiency of your CPU instruction cache. However, it also prevents the com- piler from optimizing for the specific types that are used. With dynamic dispatch, all the compiler can do for find in Listing 2-2 is insert a call to the function through the vtable—it can no longer perform any additional optimizations as it does not know what code will sit on the other side of that function call. Furthermore, every method call on a trait object requires a lookup in the vtable, which adds a small amount of overhead over calling the method directly. 
 
 When you’re given the choice between static and dynamic dispatch, there is rarely a clear-cut right answer. Broadly speaking, though, you’ll want to use static dispatch in your libraries and dynamic dispatch in your binaries. In a library, you want to allow your users to decide what kind of dispatch is best for them, since you don’t know what their needs are. If you use dynamic dispatch, they’re forced to do the same, whereas if you use static dispatch, they can choose whether to use dynamic dispatch or not. In a binary, on the other hand, you’re writing the final code, so there are no needs to consider except those of the code you are writing. Dynamic dis- patch often allows you to write cleaner code that leaves out generic param- eters and will compile more quickly, all at a (usually) marginal performance cost, so it’s usually the better choice for binaries. 
 
@@ -301,35 +153,27 @@ Rust traits can be generic in one of two ways: with generic type parameters like
 
 The rationale for this is that associated types are often significantly easier to work with, but will not allow multiple implementations. So, more simply put, the advice is really just to use associated types whenever you can. 
 
-With a generic trait, users must always specify all the generic parame- ters and repeat any bounds on those parameters. This can quickly get messy and hard to maintain. If you add a generic parameter to a trait, all users of that trait must also be updated to reflect the change. And since multiple implementations of a trait may exist for a given type, the compiler may have a hard time deciding which instance of the trait you meant to use, leading to awful disambiguating function calls like FromIterator::<u32>::from_iter. But the upside is that you can implement the trait multiple times for
- the same type—for example, you can implement PartialEq against mul- tiple right-hand side types for your type, or you can implement both FromIterator<T> *and* FromIterator<&T> where T: Clone, precisely because of
- the flexibility that generic traits provide. 
+With a generic trait, users must always specify all the generic parame- ters and repeat any bounds on those parameters. This can quickly get messy and hard to maintain. If you add a generic parameter to a trait, all users of that trait must also be updated to reflect the change. And since multiple implementations of a trait may exist for a given type, the compiler may have a hard time deciding which instance of the trait you meant to use, leading to awful disambiguating function calls like FromIterator::<u32>::from_iter. But the upside is that you can implement the trait multiple times for the same type—for example, you can implement PartialEq against mul- tiple right-hand side types for your type, or you can implement both FromIterator<T> *and* FromIterator<&T> where T: Clone, precisely because of the flexibility that generic traits provide. 
 
 With associated types, on the other hand, the compiler needs to know only the type that implements the trait, and all the associated types follow (since there is only one implementation). This means the bounds can all live in the trait itself and do not need to be repeated on use. In turn, this allows the trait to add further associated types without affecting its users. And because the type dictates all the associated types of the trait, you never have to disambiguate with the unified function calling syntax shown in the previ- ous paragraph. However, you cannot implement Deref against multiple Target types, nor can you implement Iterator with multiple different Item types. 
 
 **Coherence and the Orphan Rule** 
 
-Rust has some fairly strict rules about where you can implement traits and what types you can implement them on. These rules exist to preserve the 
-
-**N O T E** 
-
-*coherence* property: for any given type and method, there is only ever one correct choice for which implementation of the method to use for that type. To see why this is important, consider what would happen if I could write my own implementation of the Display trait for the bool type from the standard library. Now, for any code that tries to print a bool value and includes my crate, the compiler won’t know whether to pick the implemen- tation I wrote or the one from the standard library. Neither choice is cor- rect or better than the other, and the compiler obviously cannot choose randomly. The same issue occurs if the standard library is not involved at all, but we instead have two crates that depend on each other, and they both implement a trait for some shared type. The coherence property ensures that the compiler never ends up in these situations and never has to make these choices: there will always be exactly one obvious choice. 
+Rust has some fairly strict rules about where you can implement traits and what types you can implement them on. These rules exist to preserve the *coherence* property: for any given type and method, there is only ever one correct choice for which implementation of the method to use for that type. To see why this is important, consider what would happen if I could write my own implementation of the Display trait for the bool type from the standard library. Now, for any code that tries to print a bool value and includes my crate, the compiler won’t know whether to pick the implemen- tation I wrote or the one from the standard library. Neither choice is cor- rect or better than the other, and the compiler obviously cannot choose randomly. The same issue occurs if the standard library is not involved at all, but we instead have two crates that depend on each other, and they both implement a trait for some shared type. The coherence property ensures that the compiler never ends up in these situations and never has to make these choices: there will always be exactly one obvious choice. 
 
 A facile way to uphold coherence would be to ensure only the crate that defines a trait can write implementations for that trait; if no one else can implement the trait, then there can be no conflicting implementa- tions elsewhere. However, this is too restrictive in practice and would essentially make traits useless, as there would be no way to implement traits like std::fmt::Debug and serde::Serialize for your own types, unless you got your own type included into the defining crate. The opposite extreme, saying that you can implement traits for only your own types, solves that problem but introduces another: a crate that defines a trait now cannot provide implementations of that trait for types in the stan- dard library or in other popular crates! Ideally, we would like to find some set of rules that balances the desire for downstream crates to implement upstream traits for their own types against the desire for upstream crates to be able to add implementations of their own traits without breaking downstream code. 
 
-*Upstream refers to something your code depends on, and downstream refers to some- thing that depends on your code. Often, these terms are used in the direct sense
- of crate dependencies, but they can also be used to refer to authoritative forks of a codebase—if you do a fork of the Rust compiler, the official Rust compiler is your “upstream.”* 
+*Upstream refers to something your code depends on, and downstream refers to some- thing that depends on your code. Often, these terms are used in the direct sense of crate dependencies, but they can also be used to refer to authoritative forks of a codebase—if you do a fork of the Rust compiler, the official Rust compiler is your “upstream.”* 
 
 In Rust, the rule that establishes that balance is the *orphan rule*. Simply stated, the orphan rule says that you can implement a trait for a type only if the trait *or* the type is local to your crate. So, you can implement Debug for your own type, and you can implement MyNeatTrait for bool, but you cannot implement Debug for bool. If you try, your code will not compile, and the compiler will tell you that there are conflicting implementations. 
 
 This gets you pretty far; it allows you to implement your own traits for third-party types and to implement third-party traits for your own types. However, the orphan rule is not the end of the story. There are a number of additional implications, caveats, and exceptions to it that you should be aware of. 
 
-Types **29** 
+
 
 **Blanket Implementations** 
 
-The orphan rule allows you to implement traits over a range of types with code like impl<T> MyTrait for T where T: and so on. This is a *blanket implementation*—it is not limited to just one particular type but instead applies to a wide range
- of types. Only the crate that defines a trait is allowed to write a blanket imple- mentation, and adding a blanket implementation to an existing trait is consid- ered a breaking change. If it were not, a downstream crate that contained impl MyTrait for Foo could suddenly stop compiling just because you update the crate that defines MyTrait with an error about a conflicting implementation. 
+The orphan rule allows you to implement traits over a range of types with code like impl<T> MyTrait for T where T: and so on. This is a *blanket implementation*—it is not limited to just one particular type but instead applies to a wide range of types. Only the crate that defines a trait is allowed to write a blanket imple- mentation, and adding a blanket implementation to an existing trait is consid- ered a breaking change. If it were not, a downstream crate that contained impl MyTrait for Foo could suddenly stop compiling just because you update the crate that defines MyTrait with an error about a conflicting implementation. 
 
 **Fundamental Types** 
 
@@ -340,10 +184,7 @@ Some types are so essential that it’s necessary to allow anyone to implement t
 There are some limited cases where we want to allow implementing a for- eign trait for a foreign type, which the orphan rule does not normally allow. The simplest example of this is when you want to write something like impl From<MyType> for Vec<i32>. Here, the From trait is foreign, as is the Vec type,
  yet there is no danger of violating coherence. This is because a conflicting implementation could be added only through a blanket implementation in the standard library (the standard library cannot otherwise name MyType), which is a breaking change anyway. 
 
-To allow these kinds of implementations, the orphan rule includes
- a narrow exemption that permits implementing foreign traits for for-
- eign types under a very specific set of circumstances. Specifically, a given impl<P1..=Pn> ForeignTrait<T1..=Tn> for T0 is allowed only if at least one Ti
- is a local type and no T before the first such Ti is one of the generic types P1..=Pn. Generic type parameters (Ps) *are* allowed to appear in T0..Ti as long as they are *covered* by some intermediate type. A T is covered if it appears as a type parameter to some other type (like Vec<T>), but not if it stands on its own (just T) or just appears behind a fundamental type like &T. So, all the implementations in Listing 2-4 are valid. 
+To allow these kinds of implementations, the orphan rule includes a narrow exemption that permits implementing foreign traits for foreign types under a very specific set of circumstances. Specifically, a given impl<P1..=Pn> ForeignTrait<T1..=Tn> for T0 is allowed only if at least one Ti is a local type and no T before the first such Ti is one of the generic types P1..=Pn. Generic type parameters (Ps) *are* allowed to appear in T0..Ti as long as they are *covered* by some intermediate type. A T is covered if it appears as a type parameter to some other type (like Vec<T>), but not if it stands on its own (just T) or just appears behind a fundamental type like &T. So, all the implementations in Listing 2-4 are valid. 
 
 ```
 impl<T> From<T> for MyType
@@ -352,11 +193,9 @@ impl<T> From<MyType> for Vec<T>
 impl<T> ForeignTrait<MyType, T> for Vec<T>
 ```
 
-Listing 2-4: Valid implementations of foreign traits for foreign types 
+*Listing 2-4: Valid implementations of foreign traits for foreign types*
 
-**30** Chapter 2 
 
-**N O T E** 
 
 However, the implementations in Listing 2-5 are invalid. 
 
@@ -369,14 +208,11 @@ impl<T> From<T> for Vec<T>
 impl<T> ForeignTrait<T, MyType> for Vec<T>
 ```
 
-Listing 2-5: Invalid implementations of foreign traits for foreign types 
+*Listing 2-5: Invalid implementations of foreign traits for foreign types*
 
-This relaxation of the orphan rule complicates the rules for what con- stitutes a breaking change when you add a new implementation for an exist- ing trait. In particular, adding a new implementation to an existing trait
- is non-breaking only if it contains at least one *new* local type, and that new local type satisfies the rules for the exemption described earlier. Adding any other new implementation is a breaking change. 
+This relaxation of the orphan rule complicates the rules for what con- stitutes a breaking change when you add a new implementation for an exist- ing trait. In particular, adding a new implementation to an existing trait is non-breaking only if it contains at least one *new* local type, and that new local type satisfies the rules for the exemption described earlier. Adding any other new implementation is a breaking change. 
 
-*Note that* *impl ForeignTrait for ForeignType* *is valid, but* *impl ForeignTrait for ForeignType* *is not! This may seem arbi- trary, but without this rule, you could write* *impl ForeignTrait
- for ForeignType**, and another crate could write* *impl ForeignTrait for ForeignType**, and a conflict would arise only when the two crates were brought together. Instead of disallowing this pattern altogether, the orphan rule requires that your local type come before the type parameter, which breaks the tie and ensures that
- if both crates uphold coherence in isolation, they also uphold it when combined.* 
+*Note that* *impl ForeignTrait for ForeignType* *is valid, but* *impl ForeignTrait for ForeignType* *is not! This may seem arbi- trary, but without this rule, you could write* *impl ForeignTrait  for ForeignType**, and another crate could write* *impl ForeignTrait for ForeignType**, and a conflict would arise only when the two crates were brought together. Instead of disallowing this pattern altogether, the orphan rule requires that your local type come before the type parameter, which breaks the tie and ensures that if both crates uphold coherence in isolation, they also uphold it when combined.* 
 
 **Trait Bounds** 
 
@@ -384,26 +220,17 @@ The standard library is flush with trait bounds, whether it’s that the keys in
 
 First and foremost, trait bounds do not have to be of the form T: Trait where T is some type your implementation or type is generic over. The bounds can be arbitrary type restrictions and do not even need to include generic parameters, types of arguments, or local types. You can write a trait bound like where String: Clone, even though String: Clone is always true and contains no local types. You can also write where io::Error: From<MyError<T>>; your generic type parameters do not need to appear only on the left-hand side. This not only allows you to express more intricate bounds but also can save you from needlessly repeating bounds. For example, if your method wants to construct a HashMap<K, V, S> whose keys are some generic type T and whose value is a usize, instead of writing the bounds out like where T: Hash 
 
-\+ Eq, S: BuildHasher + Default, you could write where HashMap<T, usize, S>: FromIterator. This saves you from looking up the exact bounds requirements 
-
-Types **31** 
-
-for the methods you end up using and more clearly communicates the “true” requirement of your code. As you can see, it can also significantly reduce the complexity of your bounds if the bounds on the underlying trait methods you want to call are complex. 
+\+ Eq, S: BuildHasher + Default, you could write where HashMap<T, usize, S>: FromIterator. This saves you from looking up the exact bounds requirements for the methods you end up using and more clearly communicates the “true” requirement of your code. As you can see, it can also significantly reduce the complexity of your bounds if the bounds on the underlying trait methods you want to call are complex. 
 
 **DERIVE TRAIT** 
 
-While #[derive(Trait)] is extremely convenient, in the context of trait bounds, you should be aware of one subtlety around how it is often implemented . Many #[derive(Trait)] expansions desugar into impl Trait for Foo<T> where
- T: Trait . This is often what you want, but not always . For example, consider what happens if we try to derive Clone this way for Foo<T> and Foo contains an Arc<T> . Arc implements Clone regardless of whether T implements Clone, but due to the derived bounds, Foo will implement Clone only if T does! This isn’t usually too big of an issue, but it does add a bound where one isn’t needed . 
+While #[derive(Trait)] is extremely convenient, in the context of trait bounds, you should be aware of one subtlety around how it is often implemented . Many #[derive(Trait)] expansions desugar into impl Trait for Foo<T> where T: Trait . This is often what you want, but not always . For example, consider what happens if we try to derive Clone this way for Foo<T> and Foo contains an Arc<T> . Arc implements Clone regardless of whether T implements Clone, but due to the derived bounds, Foo will implement Clone only if T does! This isn’t usually too big of an issue, but it does add a bound where one isn’t needed . 
 
 If we rename the type to Shared, the problem may become a little clearer . Imagine how confused a user that has a Shared<NotClone> will be when the compiler tells them that they cannot clone it! At the time of writing, this is how #[derive(Clone)] as provided by the standard library works, though this may change in the future . 
 
 Sometimes, you want bounds on associated types of types you’re generic over. As an example, consider the iterator method flatten, which takes an iterator that produces items that in turn implement Iterator and produces an iterator of the items of those inner iterators. The type it pro- duces, Flatten, is generic over I, which is the type of the outer iterator. Flatten implements Iterator if I implements Iterator *and* the items yielded by I themselves implement IntoIterator. To enable you to write bounds like this, Rust lets you refer to associated types of a type using the syntax Type::AssocType. For example, we can refer to I’s Item type using I::Item. If a type has multiple associated types by the same name, such as if the trait that provides the associated type is itself generic (and therefore there are many implementations), you can disambiguate with the syntax <Type as Trait>::AssocType. Using this, you can write bounds not only for the outer iterator type but also for the item type of that outer iterator. 
 
-In code that uses generics extensively, you may find that you need to write a bound that talks about references to a type. This is normally fine, as you’ll tend to also have a generic lifetime parameter that you can use as the lifetime for these references. In some cases, however, you want the bound to say “this reference implements this trait for any lifetime.” This type of bound is known as a *higher-ranked trait bound*, and it’s particularly useful in association with the Fn traits. For example, say you want to be generic over a function that takes a reference to a T and returns a reference to *inside* that T. If you write F: Fn(&T) -> &U, you need to provide a lifetime for those refer- ences, but you really want to say “any lifetime as long as the output is the 
-
-**32** Chapter 2 
-
-same as the input.” Using a higher-ranked lifetime, you can write F: for<'a> Fn(&'a T) -> &'a U to say that for *any* lifetime 'a, the bound must hold. The Rust compiler is smart enough that it automatically adds the for when you write Fn bounds with references like this, which covers the majority of use cases for this feature. The explicit form is needed so exceedingly rarely that, at the time of writing, the standard library uses it in just three places—but it does happen and so is worth knowing about. 
+In code that uses generics extensively, you may find that you need to write a bound that talks about references to a type. This is normally fine, as you’ll tend to also have a generic lifetime parameter that you can use as the lifetime for these references. In some cases, however, you want the bound to say “this reference implements this trait for any lifetime.” This type of bound is known as a *higher-ranked trait bound*, and it’s particularly useful in association with the Fn traits. For example, say you want to be generic over a function that takes a reference to a T and returns a reference to *inside* that T. If you write F: Fn(&T) -> &U, you need to provide a lifetime for those refer- ences, but you really want to say “any lifetime as long as the output is the same as the input.” Using a higher-ranked lifetime, you can write F: for<'a> Fn(&'a T) -> &'a U to say that for *any* lifetime 'a, the bound must hold. The Rust compiler is smart enough that it automatically adds the for when you write Fn bounds with references like this, which covers the majority of use cases for this feature. The explicit form is needed so exceedingly rarely that, at the time of writing, the standard library uses it in just three places—but it does happen and so is worth knowing about. 
 
 To bring all of this together, consider the code in Listing 2-6, which can be used to implement Debug for any type that can be iterated over and whose elements are Debug. 
 
@@ -416,7 +243,7 @@ impl Debug for AnyIterable
 }}
 ```
 
-Listing 2-6: An excessively generic implementation of *Debug* for any iterable collection 
+*Listing 2-6: An excessively generic implementation of *Debug* for any iterable collection*
 
 You could copy-paste this implementation for pretty much any collec- tion type and it would “just work.” Of course, you may want a smarter debug implementation, but this illustrates the power of trait bounds quite well. 
 
@@ -424,23 +251,11 @@ You could copy-paste this implementation for pretty much any collec- tion type a
 
 Usually, we use traits to denote functionality that multiple types can sup- port; a Hash type can be hashed by calling hash, a Clone type can be cloned by calling clone, and a Debug type can be formatted for debugging by calling fmt. But not all traits are functional in this way. Some traits, called *marker traits*, instead indicate a property of the implementing type. Marker traits have no methods or associated types and serve just to tell you that a par- ticular type can or cannot be used in a certain way. For example, if a type implements the Send marker trait, it is safe to send across thread boundar- ies. If it does not implement this marker trait, it isn’t safe to send. There are no methods associated with this behavior; it’s just a fact about the type. The standard library has a number of these in the std::marker module, including Send, Sync, Copy, Sized, and Unpin. Most of these (all except Copy) are also *auto- traits*; the compiler automatically implements them for types unless the type contains something that does not implement the marker trait. 
 
-Marker traits serve an important purpose in Rust: they allow you to write bounds that capture semantic requirements not directly expressed
- in the code. There is no call to send in code that requires that a type is Send. Instead, the code *assumes* that the given type is fine to use in a sepa- rate thread, and without marker traits the compiler would have no way of checking that assumption. It would be up to the programmer to remember the assumption and read the code very carefully, which we all know is not something we’d like to rely on. That path is riddled with data races, seg- faults, and other runtime issues. 
+Marker traits serve an important purpose in Rust: they allow you to write bounds that capture semantic requirements not directly expressed in the code. There is no call to send in code that requires that a type is Send. Instead, the code *assumes* that the given type is fine to use in a sepa- rate thread, and without marker traits the compiler would have no way of checking that assumption. It would be up to the programmer to remember the assumption and read the code very carefully, which we all know is not something we’d like to rely on. That path is riddled with data races, seg- faults, and other runtime issues. 
 
-Types **33** 
+Similar to marker traits are *marker types*. These are unit types (like struct MyMarker;) that hold no data and have no methods. Marker types are useful for, well, marking a type as being in a particular state. They come in handy when you want to make it impossible for a user to misuse an API. For example, consider a type like SshConnection, which may or may not have been authenticated yet. You could add a generic type argument to SshConnection and then create two marker types: Unauthenticated and Authenticated. When the user first connects, they get SshConnection<Unauthe nticated>. In its impl block, you provide only a single method: connect. The connect method returns a SshConnection<Authenticated>, and it’s only in that impl block that you provide the remaining methods for running commands and such. We will look at this pattern further in Chapter 3. 
 
-Similar to marker traits are *marker types*. These are unit types (like struct MyMarker;) that hold no data and have no methods. Marker types
- are useful for, well, marking a type as being in a particular state. They come in handy when you want to make it impossible for a user to misuse
- an API. For example, consider a type like SshConnection, which may or may not have been authenticated yet. You could add a generic type argument
- to SshConnection and then create two marker types: Unauthenticated and Authenticated. When the user first connects, they get SshConnection<Unauthe nticated>. In its impl block, you provide only a single method: connect. The connect method returns a SshConnection<Authenticated>, and it’s only in that impl block that you provide the remaining methods for running commands and such. We will look at this pattern further in Chapter 3. 
-
-**Existential Types** 
-
-**34** 
-
-Chapter 2 
-
-**N O T E** 
+### Existential Types
 
 In Rust you very rarely have to specify the types of variables you declare in the body of a function or the types of generic arguments to methods that you call. This is because of *type inference*, where the compiler decides what type to use based on what type the code the type appears in evaluates to. The compiler will usually infer types only for variables and for the argu- ments (and return types) of closures; top-level definitions like functions, types, traits, and trait implementation blocks all require that you explicitly name all types. There are a couple of reasons for this, but the primary one is that type inference is much easier when you have at least some known points to start the inference from. However, it’s not always easy, or even pos- sible, to fully name a type! For example, if you return a closure from a func- tion, or an async block from a trait method, its type does not have a name that you can type into your code. 
 
@@ -452,56 +267,37 @@ This behavior is what gives existential types their name: we are assert- ing tha
 
 Not all instances of impl Trait use existential types. If you use impl Trait in argument position for a function, it’s really just shorthand for an unnamed generic parameter to that function. For example, fn foo(s: impl ToString) is mostly just syntax sugar for fn foo<S: ToString>(s: S). 
 
-Existential types come in handy particularly when you implement traits that have associated types. For example, imagine you’re implementing the IntoIterator trait. It has an associated type IntoIter that holds the type of
- the iterator that the type in question can be turned into. With existential types, you do not need to define a separate iterator type to use for IntoIter. Instead, you can give the associated type as impl Iterator<Item = Self::Item> and just write an expression inside the fn into_iter(self) that evaluates to an Iterator, such as by using maps and filters over some existing iterator type. 
+Existential types come in handy particularly when you implement traits that have associated types. For example, imagine you’re implementing the IntoIterator trait. It has an associated type IntoIter that holds the type of the iterator that the type in question can be turned into. With existential types, you do not need to define a separate iterator type to use for IntoIter. Instead, you can give the associated type as impl Iterator<Item = Self::Item> and just write an expression inside the fn into_iter(self) that evaluates to an Iterator, such as by using maps and filters over some existing iterator type. 
 
 Existential types also provide a feature beyond mere convenience: they allow you to perform zero-cost type erasure. Instead of exporting helper types just because they appear in a public signature somewhere—iterators and futures are common examples of this—you can use existential types to hide the underlying concrete type. Users of your interface are shown only the traits that the relevant type implements, while the concrete type is left as an implementation detail. Not only does this simplify the interface, but it also enables you to change that implementation as you wish without break- ing downstream code in the future. 
 
-**Summary** 
+### Summary
 
 This chapter has provided a thorough review of the Rust type system. We’ve looked both at how the compiler manifests types in memory and how it rea- sons about the types themselves. This is important background material for writing unsafe code, complex application interfaces, and asynchronous code in later chapters. You’ll also find that much of the type reasoning from this chapter plays into how you design Rust code interfaces, which we’ll cover in the next chapter. 
 
-Types **35** 
 
-**3** 
 
-**DESIGNING INTERFACES** 
+## 3 DESIGNING INTERFACES
 
-Every project, no matter how large or small, has an API. In fact, it usually has several. 
-
-Some of these are user-facing, like an HTTP endpoint or a command line interface, and 
-
-some are developer-facing, like a library’s public inter- 
-
-face. On top of these, Rust crates also have a number 
-
-of internal interfaces: every type, trait, and module 
-
-boundary has its own miniature API that the rest of your code interfaces with. As your codebase grows in size and complexity, you’ll find it worth- while to invest some thought and care into how you design even the inter- nal APIs to make the experience of using and maintaining the code over time as pleasant as possible. 
+Every project, no matter how large or small, has an API. In fact, it usually has several. Some of these are user-facing, like an HTTP endpoint or a command line interface, and some are developer-facing, like a library’s public interface. On top of these, Rust crates also have a number of internal interfaces: every type, trait, and module boundary has its own miniature API that the rest of your code interfaces with. As your codebase grows in size and complexity, you’ll find it worth- while to invest some thought and care into how you design even the inter- nal APIs to make the experience of using and maintaining the code over time as pleasant as possible. 
 
 In this chapter we’ll look at some of the most important considerations for writing idiomatic interfaces in Rust, whether the users of those inter- faces are your own code or other developers using your library. These essen- tially boil down to four principles: your interfaces should be *unsurprising*, *flexible*, *obvious*, and *constrained*. I’ll discuss each of these principles in turn, to provide some guidance for writing reliable and usable interfaces. 
 
-**38** 
+I highly recommend taking a look at the Rust API Guidelines (*https:// rust-lang.github.io/api-guidelines/*) after you’ve read this chapter. There’s an excellent checklist you can follow, with a detailed run-through of each recommendation. Many of the recommendations in this chapter are also checked by the cargo clippy tool, which you should start running on your code if you aren’t already. I also encourage you to read through Rust RFC 1105 (*https://rust-lang.github.io/rfcs/1105-api-evolution.html*) and the chapter of *The Cargo Book* on SemVer compatibility (*https://doc.rust-lang.org/cargo/ reference/semver.html*), which cover what is and is not a breaking change in Rust. 
 
-Chapter 3 
-
-I highly recommend taking a look at the Rust API Guidelines (*https:// rust-lang.github.io/api-guidelines/*) after you’ve read this chapter. There’s
- an excellent checklist you can follow, with a detailed run-through of each recommendation. Many of the recommendations in this chapter are also checked by the cargo clippy tool, which you should start running on your code if you aren’t already. I also encourage you to read through Rust RFC 1105 (*https://rust-lang.github.io/rfcs/1105-api-evolution.html*) and the chapter of *The Cargo Book* on SemVer compatibility (*https://doc.rust-lang.org/cargo/ reference/semver.html*), which cover what is and is not a breaking change
- in Rust. 
-
-**Unsurprising** 
+### Unsurprising
 
 The Principle of Least Surprise, otherwise known as the Law of Least Astonishment, comes up a lot in software engineering, and it holds true for Rust interfaces as well. Where possible, your interfaces should be intuitive enough that if the user has to guess, they usually guess correctly. Of course, not everything about your application is going to be immediately intuitive in this way, but anything that *can* be unsurprising should be. The core idea here is to stick close to things the user is likely to already know so that they don’t have to relearn concepts in a different way than they’re used to. That way you can save their brain power for figuring out the things that are actu- ally specific to your interface. 
 
 There are a variety of ways you can make your interfaces predictable. Here, we’ll look at how you can use naming, common traits, and ergonomic trait tricks to help the user out. 
 
-**Naming Practices** 
+***Naming Practices***
 
 A user of your interface will encounter it first through its names; they will immediately start to infer things from the names of types, methods, vari- ables, fields, and libraries they come across. If your interface reuses names for things—say, methods and types—from other (perhaps common) inter- faces, the user will know they can make certain assumptions about your methods and types. A method called iter probably takes &self, and prob- ably gives you an iterator. A method called into_inner probably takes self and likely returns some kind of wrapped type. A type called SomethingError probably implements std::error::Error and appears in various Results. By reusing common names for the same purpose, you make it easier for the user to guess what things do and allow them to more easily understand the things that are different about your interface. 
 
 A corollary to this is that things that share a name *should* in fact work the same way. Otherwise—for example, if your iter method takes self, or if your SomethingError type does not implement Error—the user will likely write incorrect code based on how they expect the interface to work. They will be surprised and frustrated and will have to spend time digging into how your interface differs from their expectations. When we can save the user this kind of friction, we should. 
 
-**Common Traits for Types** 
+***Common Traits for Types***
 
 Users in Rust will also make the major assumption that everything in the interface “just works.” They expect to be able to print any type with {:?} and send anything and everything to another thread, and they expect that every type is Clone. Where possible, we should again avoid surprising the user and eagerly implement most of the standard traits even if we do not need them immediately. 
 
@@ -509,26 +305,19 @@ Because of the coherence rules discussed in Chapter 2, the compiler will not all
 
 First among these standard traits is the Debug trait. Nearly every type can, and should, implement Debug, even if it only prints the type’s name. Using #[derive(Debug)] is often the best way to implement the Debug trait in your interface, but keep in mind that all derived traits automatically add the same bound for any generic parameters. You could also simply write your own implementation by leveraging the various debug_ helpers on fmt::Formatter. 
 
-Tied in close second are the Rust auto-traits Send and Sync (and, to a lesser extent, Unpin). If a type does not implement one of these traits, it should be for a very good reason. A type that is not Send can’t be placed in
- a Mutex and can’t be used even transitively in an application that contains a thread pool. A type that is not Sync can’t be shared through an Arc or placed in a static variable. Users have come to expect that types *just work* in these contexts, especially in the asynchronous world where nearly everything runs on a thread pool, and will become frustrated if you don’t ensure that your types implement these traits. If your types cannot implement them, make sure that fact, and the reason why, is well documented! 
+Tied in close second are the Rust auto-traits Send and Sync (and, to a lesser extent, Unpin). If a type does not implement one of these traits, it should be for a very good reason. A type that is not Send can’t be placed in a Mutex and can’t be used even transitively in an application that contains a thread pool. A type that is not Sync can’t be shared through an Arc or placed in a static variable. Users have come to expect that types *just work* in these contexts, especially in the asynchronous world where nearly everything runs on a thread pool, and will become frustrated if you don’t ensure that your types implement these traits. If your types cannot implement them, make sure that fact, and the reason why, is well documented! 
 
 The next set of nearly universal traits you should implement is Clone and Default. These traits can be derived or implemented easily and make sense to implement for most types. If your type cannot implement these traits, make sure to call it out in your documentation, as users will usually expect to be able to easily create more (and new) instances of types as they see fit. If they cannot, they will be surprised. 
 
 One step further down in the hierarchy of expected traits is the com- parison traits: PartialEq, PartialOrd, Hash, Eq, and Ord. The PartialEq trait is particularly desirable, because users will at some point inevitably have two instances of your type that they wish to compare with == or assert_eq!. Even if your type would compare equal for only the same instance of the type, it’s worth implementing PartialEq to enable your users to use assert_eq!. 
 
-PartialOrd and Hash are more specialized, and may not apply quite as broadly, but where possible you will want to implement them too. This is especially true for types a user might use as the key in a map, or a type they may deduplicate using any of the std::collection set types, since they tend to require these bounds. Eq and Ord come with additional semantic require- ments on the implementing type’s comparison operations beyond those of PartialEq and PartialOrd. These are well documented in the documentation 
-
-Designing Interfaces **39** 
-
-**40** Chapter 3 
-
-for those traits, and you should implement them *only* if you’re sure those semantics actually apply to your type. 
+PartialOrd and Hash are more specialized, and may not apply quite as broadly, but where possible you will want to implement them too. This is especially true for types a user might use as the key in a map, or a type they may deduplicate using any of the std::collection set types, since they tend to require these bounds. Eq and Ord come with additional semantic require- ments on the implementing type’s comparison operations beyond those of PartialEq and PartialOrd. These are well documented in the documentation for those traits, and you should implement them *only* if you’re sure those semantics actually apply to your type. 
 
 Finally, for most types, it makes sense to implement the serde crate’s Serialize and Deserialize traits. These can be easily derived, and the serde _derive crate even comes with mechanisms for overwriting the serialization for just one field or enum variant. Since serde is a third-party crate, you may not wish to add a required dependency on it. Most libraries therefore choose to provide a serde feature that adds support for serde only when the user opts into it. 
 
 You might be wondering why I haven’t included the derivable trait Copy in this section. There are two things that set Copy apart from the other traits mentioned. The first is that users do not generally expect types to be Copy; quite to the contrary, they tend to expect that if they want two copies of something, they have to call clone. Copy changes the semantics of moving a value of the given type, which might surprise the user. This ties in to the second observation: it is very easy for a type to *stop* being Copy, because Copy types are highly restricted. A type that starts out simple can easily end up having to hold a String, or some other non-Copy type. Should that happen, and you have to remove the Copy implementation, that’s a backward incom- patible change. In contrast, you rarely have to remove a Clone implementa- tion, so that’s a less onerous commitment. 
 
-**Ergonomic Trait Implementations** 
+***Ergonomic Trait Implementations***
 
 Rust does not automatically implement traits for references to types that implement traits. To phrase this a different way, you cannot generally call fn foo<T: Trait>(t: T) with a &Bar, even if Bar: Trait. This is because Trait may contain methods that take &mut self or self, which obviously cannot be called on &Bar. Nonetheless, this behavior might be very surprising to a user who sees that Trait has only &self methods! 
 
@@ -536,28 +325,23 @@ For this reason, when you define a new trait, you’ll usually want to pro- vide
 
 Iterators are another case where you’ll often want to specifically add trait implementations on references to a type. For any type that can be iterated over, consider implementing IntoIterator for both &MyType and &mut MyType where applicable. This makes for loops work with borrowed instances of your type as well out of the box, just like users would expect. 
 
-**Wrapper Types** 
+***Wrapper Types***
 
 Rust does not have object inheritance in the classical sense. However, the Deref trait and its cousin AsRef both provide something a little like inheritance. These traits allow you to have a value of type T and call methods on some type U by calling them directly on the T-typed value if T: Deref<Target = U>. This feels like magic to the user, and is generally great. 
 
-**Flexible** 
-
 If you provide a relatively transparent wrapper type (like Arc), there’s a good chance you’ll want to implement Deref so that users can call methods on the inner type by just using the . operator. If accessing the inner type does not require any complex or potentially slow logic, you should also consider implementing AsRef, which allows users to easily use a &WrapperType as an &InnerType. For most wrapper types, you will also want to implement From<InnerType> and Into<InnerType> where possible so that your users can easily add or remove your wrapping. 
 
-You may also have come across the Borrow trait, which feels very similar to Deref and AsRef but is really a bit of a different beast. Specifically, Borrow
- is tailored for a much narrower use case: allowing the caller to supply any one of multiple essentially identical variants of the same type. It could, per- haps, have been called Equivalent instead. For example, for a HashSet<String>, Borrow allows the caller to supply either a &str *or* a &String. While the same could have been achieved with AsRef, that would not be safe without Borrow’s additional requirement that the target type implements Hash, Eq, and Ord exactly the same as the implementing type. Borrow also has a blanket imple- mentation of Borrow<T> for T, &T, and &mut T, which makes it convenient to use in trait bounds to accept either owned *or* referenced values of a given type. In general, Borrow is intended only for when your type is essentially equiva- lent to another type, whereas Deref and AsRef are intended to be imple- mented more widely for anything your type can “act as.” 
+You may also have come across the Borrow trait, which feels very similar to Deref and AsRef but is really a bit of a different beast. Specifically, Borrow is tailored for a much narrower use case: allowing the caller to supply any one of multiple essentially identical variants of the same type. It could, per- haps, have been called Equivalent instead. For example, for a HashSet<String>, Borrow allows the caller to supply either a &str *or* a &String. While the same could have been achieved with AsRef, that would not be safe without Borrow’s additional requirement that the target type implements Hash, Eq, and Ord exactly the same as the implementing type. Borrow also has a blanket imple- mentation of Borrow<T> for T, &T, and &mut T, which makes it convenient to use in trait bounds to accept either owned *or* referenced values of a given type. In general, Borrow is intended only for when your type is essentially equiva- lent to another type, whereas Deref and AsRef are intended to be imple- mented more widely for anything your type can “act as.” 
 
-**DEREF AND INHERENT METHODS** 
+> **DEREF AND INHERENT METHODS** 
 
-The magic around the dot operator and Deref can get confusing and surprising when there are methods on T that take self . For example, given a value t: T, it is not clear whether t.frobnicate() frobnicates the T or the underlying U! 
+> The magic around the dot operator and Deref can get confusing and surprising when there are methods on T that take self . For example, given a value t: T, it is not clear whether t.frobnicate() frobnicates the T or the underlying U! 
 
-For this reason, types that allow you to transparently call methods on some inner type that isn’t known in advance should avoid inherent methods . It’s fine for Vec to have a push method even though it dereferences to a slice, since you know that slices won’t get a push method any time soon . But if your type dereferences to a user-controlled type, any inherent method you add may also exist on that user-controlled type, and thus cause issues . In these cases, favor static methods of the form fn frobnicate(t: T) . That way, t.frobnicate() always calls U::frobnicate, and T::frobnicate(t) can be used to frobnicate the T itself . 
+> For this reason, types that allow you to transparently call methods on some inner type that isn’t known in advance should avoid inherent methods . It’s fine for Vec to have a push method even though it dereferences to a slice, since you know that slices won’t get a push method any time soon . But if your type dereferences to a user-controlled type, any inherent method you add may also exist on that user-controlled type, and thus cause issues . In these cases, favor static methods of the form fn frobnicate(t: T) . That way, t.frobnicate() always calls U::frobnicate, and T::frobnicate(t) can be used to frobnicate the T itself . 
 
-Every piece of code you write includes, implicitly or explicitly, a contract. The contract consists of a set of requirements and a set of promises. The requirements are restrictions on how the code can be used, while the 
+### Flexible
 
-Designing Interfaces **41** 
-
-promises are guarantees about how the code can be used. When designing a new interface, you want to think carefully about this contract. A good rule of thumb is to avoid imposing unnecessary restrictions and to only make promises you can keep. Adding restrictions or removing promises usually requires a major semantic version change and is likely to break code else- where. Relaxing restrictions or giving additional promises, on the other hand, is usually backward compatible. 
+Every piece of code you write includes, implicitly or explicitly, a contract. The contract consists of a set of requirements and a set of promises. The requirements are restrictions on how the code can be used, while the promises are guarantees about how the code can be used. When designing a new interface, you want to think carefully about this contract. A good rule of thumb is to avoid imposing unnecessary restrictions and to only make promises you can keep. Adding restrictions or removing promises usually requires a major semantic version change and is likely to break code else- where. Relaxing restrictions or giving additional promises, on the other hand, is usually backward compatible. 
 
 In Rust, restrictions usually come in the form of trait bounds and argument types, and promises come in the form of trait implementations and return types. For example, compare the three function signatures in Listing 3-1. 
 
@@ -567,7 +351,7 @@ fn frobnicate2(s: &str) -> Cow<'_, str>
 fn frobnicate3(s: impl AsRef<str>) -> impl AsRef<str>
 ```
 
-Listing 3-1: Similar function signatures with different contracts 
+*Listing 3-1: Similar function signatures with different contracts*
 
 These three function signatures all take a string and return a string, but they do so under very different contracts. 
 
@@ -581,9 +365,7 @@ None of these function signatures is *better* than the others. If you need owner
 
 In the remainder of this section I give examples of interface design decisions that often come up, and their implications for your interface contract. 
 
-**42** Chapter 3 
-
-**Generic Arguments** 
+***Generic Arguments***
 
 One obvious requirement your interface must place on users is what types they must provide to your code. If your function explicitly takes a Foo, the user must own and give you a Foo. There is no way around it. In most cases it pays off to use generics rather than concrete types, to allow the caller to pass any type that conforms to what your function actually needs, rather than only a particular type. Changing &str in Listing 3-1 to impl AsRef<str> is an example of this kind of relaxing. One way to go about relaxing requirements this way is to start with the argument fully generic with no bounds, and then just follow the compiler errors to discover what bounds you need to add. 
 
@@ -594,34 +376,24 @@ You may remember from Chapter 2 that generic code is duplicated for every combin
 Before you go running to do that, though, there are a few things you should consider. First, you are making this choice on behalf of your users, who cannot opt out of dynamic dispatch. If you know that the code you’re applying dynamic dispatch to will never be performance-sensitive, that
  may be fine. But if a user comes along who wants to use your library in their high-performance application, dynamic dispatch in a function that is called in a hot loop may be a deal breaker. Second, at the time of writing, using dynamic dispatch will work only when you have a simple trait bound like T: AsRef<str> or impl AsRef<str>. For more complex bounds, Rust does not know how to construct a dynamic dispatch vtable, so you cannot take, say, &dyn Hash + Eq. And finally, remember that with generics, the caller can always choose dynamic dispatch themselves by passing in a trait object. The reverse is not true: if you take a trait object, that is what the caller must provide. 
 
-It may be tempting to start your interfaces off with concrete types and then turn them generic over time. This can work, but keep in mind that such changes are not necessarily backward compatible. To see why, imagine that you change a function from fn foo(v: &Vec<usize>) to fn foo(v: impl AsRef<[usize]>). While every &Vec<usize> implements AsRef<[usize]>, type 
-
-Designing Interfaces **43** 
-
-inference can still cause issues for users. Consider what happens if the caller invokes foo with foo(&iter.collect()). In the original version, the com- piler could determine that it should collect into a Vec, but now it just knows that it needs to collect into some type that implements AsRef<[usize]>. And there could be multiple such types, so with this change, the caller’s code will no longer compile! 
+It may be tempting to start your interfaces off with concrete types and then turn them generic over time. This can work, but keep in mind that such changes are not necessarily backward compatible. To see why, imagine that you change a function from fn foo(v: &Vec<usize>) to fn foo(v: impl AsRef<[usize]>). While every &Vec<usize> implements AsRef<[usize]>, type inference can still cause issues for users. Consider what happens if the caller invokes foo with foo(&iter.collect()). In the original version, the com- piler could determine that it should collect into a Vec, but now it just knows that it needs to collect into some type that implements AsRef<[usize]>. And there could be multiple such types, so with this change, the caller’s code will no longer compile! 
 
 **Object Safety** 
 
-When you define a new trait, whether or not that trait is object-safe (see the end of “Compilation and Dispatch” in Chapter 2) is an unwritten part of the trait’s contract. If the trait is object-safe, users can treat different types that implement your trait as a single common type using dyn Trait. If it isn’t, the compiler will disallow dyn Trait for that trait. You should prefer your traits to be object-safe even if that comes at a slight cost to the ergonom- 
-
-ics of using them (such as taking impl AsRef<str> over &str), since object safety enables new ways to use your traits. If your trait must have a generic method, consider whether its generic parameters can be on the trait itself or if its generic arguments can also use dynamic dispatch to preserve the object safety of the trait. Alternatively, you can add a where Self: Sized trait bound to that method, which makes it possible to call the method only with a concrete instance of the trait (and not through dyn Trait). You can see examples of this pattern in the Iterator and Read traits, which are object-safe but provide some additional convenience methods on concrete instances. 
+When you define a new trait, whether or not that trait is object-safe (see the end of “Compilation and Dispatch” in Chapter 2) is an unwritten part of the trait’s contract. If the trait is object-safe, users can treat different types that implement your trait as a single common type using dyn Trait. If it isn’t, the compiler will disallow dyn Trait for that trait. You should prefer your traits to be object-safe even if that comes at a slight cost to the ergonomics of using them (such as taking impl AsRef<str> over &str), since object safety enables new ways to use your traits. If your trait must have a generic method, consider whether its generic parameters can be on the trait itself or if its generic arguments can also use dynamic dispatch to preserve the object safety of the trait. Alternatively, you can add a where Self: Sized trait bound to that method, which makes it possible to call the method only with a concrete instance of the trait (and not through dyn Trait). You can see examples of this pattern in the Iterator and Read traits, which are object-safe but provide some additional convenience methods on concrete instances. 
 
 There is no single answer to the question of how many sacrifices you should be willing to make to preserve object safety. My recommendation is that you consider how your trait will be used, and whether it makes sense for users to want to use it as a trait object. If you think it’s likely that users will want to use many different instances of your trait together, you should work harder to provide object safety than if you don’t think that use case makes much sense. For example, dynamic dispatch would not be useful
  for the FromIterator trait because its one method does not take self, so
  you wouldn’t be able to construct a trait object in the first place. Similarly, std::io::Seek is fairly useless as a trait object on its own, because the only thing you would be able to do with such a trait object is seek, without being able to read or write. 
 
-**DROP TRAIT OBJECTS** 
+> **DROP TRAIT OBJECTS** 
 
-You might think that the Drop trait is also useless as a trait object, since all
- you can do with Drop as a trait object is to drop it . But it turns out there are some libraries that specifically just want to be able to drop arbitrary types . For example, a library that offers deferred dropping of values, such as for concur- rent garbage collection or just deferred cleanup, cares only that the values can 
-
-**44** Chapter 3 
-
-be dropped, and nothing else . Interestingly enough, the story of Drop doesn’t end there; since Rust needs to be able to drop trait objects too, every vtable contains the drop method . Effectively, every dyn Trait is also a dyn Drop . 
+>  You might think that the Drop trait is also useless as a trait object, since all
+>  you can do with Drop as a trait object is to drop it . But it turns out there are some libraries that specifically just want to be able to drop arbitrary types . For example, a library that offers deferred dropping of values, such as for concur- rent garbage collection or just deferred cleanup, cares only that the values can be dropped, and nothing else . Interestingly enough, the story of Drop doesn’t end there; since Rust needs to be able to drop trait objects too, every vtable contains the drop method . Effectively, every dyn Trait is also a dyn Drop . 
 
 Remember that object safety is a part of your public interface! If you modify a trait in an otherwise backward compatible way, such as by adding a method with a default implementation, but it makes the trait not object-safe, you need to bump your major semantic ver- sion number. 
 
-**Borrowed vs. Owned** 
+***Borrowed vs. Owned***
 
 For nearly every function, trait, and type you define in Rust, you must decide whether it should own, or just hold a reference to, its data. Whatever decision you make will have far-reaching impli- cations for the ergonomics and performance of your interface. Luckily, these decisions very often make themselves. 
 
@@ -633,17 +405,9 @@ On the other hand, if your code doesn’t need to own the data, it should operat
 
 Of course, in the real world, things are often less clear-cut. Sometimes, you don’t know in advance whether your code will need to own the data or not. For example, String::from_utf8_lossy needs to take ownership of the byte sequence that is passed to it only if it contains invalid UTF-8 sequences. In this case, the Cow type is your friend: it lets you operate on references if the data allows, and it lets you produce an owned value if necessary. 
 
-Other times, reference lifetimes complicate the interface so much that it becomes a pain to use. If your users are struggling to get code to compile on top of your interface, that’s a sign that you may want to (even unnecessarily) take ownership of certain pieces of data. If you do this, start with data that is cheap to clone or is not 
+Other times, reference lifetimes complicate the interface so much that it becomes a pain to use. If your users are struggling to get code to compile on top of your interface, that’s a sign that you may want to (even unnecessarily) take ownership of certain pieces of data. If you do this, start with data that is cheap to clone or is not part of anything performance-sensitive before you decide to heap-allocate what might be a huge chunk of bytes. 
 
-Designing Interfaces **45** 
-
-**46** Chapter 3 
-
-**N O T E** 
-
-part of anything performance-sensitive before you decide to heap-allocate what might be a huge chunk of bytes. 
-
-**Fallible and Blocking Destructors** 
+***Fallible and Blocking Destructors***
 
 Types centered on I/O often need to perform cleanup when they’re dropped. This may include flushing writes to disk, closing files, or gracefully terminat- ing connections to remote hosts. The natural place to perform this cleanup is in the type’s Drop implementation. Unfortunately, once a value is dropped, we no longer have a way to communicate errors to the user except by panick- ing. A similar problem arises in asynchronous code, where we wish to finish up when there is work pending. By the time drop is called, the executor may be shutting down, and we have no way to do more work. We could try to 
 
@@ -666,53 +430,40 @@ The third option is to hold the data inside the ManuallyDrop type, which derefer
 
 Ultimately, you should choose whichever of these approaches fits your application best. I would err on the side of going with the second option, and switching to the others only if you find yourself in a sea of Options. The ManuallyDrop solution is excellent if the code is simple enough that you can eas- ily check the safety of your code, and you are confident in your ability to do so. 
 
-**Obvious** 
-
-**N O T E** 
+###Obvious
 
 While some users may be familiar with aspects of the implementation that underpins your interface, they are unlikely to understand all of its rules and limitations. They won’t know that it’s never okay to call foo after calling bar, or that it’s only safe to call the unsafe method baz when the moon is at a 47-degree angle and no one has sneezed in the past 18 seconds. Only if the interface makes it clear that something strange is going on will they reach for the documentation or carefully read type signatures. It’s therefore criti- cal for you to make it as easy as possible for users to understand your inter- face and as hard as possible for them to use it incorrectly. The two primary techniques at your disposal for this are your documentation and the type system, so let’s look at each of those in turn. 
 
 *You can also take advantage of naming to suggest to the user when there’s more to
  an interface than meets the eye. If a user sees a method named* *dangerous**, chances are they will read its documentation.* 
 
-**Documentation** 
+***Documentation***
 
 The first step to making your interfaces transparent is to write good docu- mentation. I could write an entire book dedicated to how to write documen- tation, but let’s focus on Rust-specific advice here. 
 
-First, clearly document any cases where your code may do something unexpected, or where it relies on the user doing something beyond what’s dictated by the type signature. Panics are a good example of both of 
-
-Designing Interfaces **47** 
-
-**48** Chapter 3 
-
-**N O T E** 
-
-these circumstances: if your code can panic, document that fact, along with the circumstances it might panic under. Similarly, if your code might return an error, document the cases in which it does. For unsafe functions, document what the caller must guarantee in order for the call to be safe. 
+First, clearly document any cases where your code may do something unexpected, or where it relies on the user doing something beyond what’s dictated by the type signature. Panics are a good example of both of these circumstances: if your code can panic, document that fact, along with the circumstances it might panic under. Similarly, if your code might return an error, document the cases in which it does. For unsafe functions, document what the caller must guarantee in order for the call to be safe. 
 
 Second, include end-to-end usage examples for your code on a crate and module level. These are more important than examples for specific types or methods, since they give the user a feel for how everything fits together. With a decent high-level understanding of the interface’s struc- ture, the developer may soon realize what particular methods and types do and where they should be used. End-to-end examples also give the user a starting point for customizing their usage, and they can, and often will, copy-paste the example and then modify it to suit their needs. This kind of “learning by doing” tends to work better than having them try to piece something together from the components. 
 
 *Very method-specific examples that show that, yes, the* *len* *method indeed returns the length are unlikely to tell the user anything new about your code.* 
 
-Third, organize your documentation. Having all your types, traits, and functions in a single top-level module makes it difficult for the user to get
- a sense of where to start. Take advantage of modules to group together semantically related items. Then, use intra-documentation links to interlink items. If the documentation on type A talks about trait B, then it should link to that trait right there. If you make it easy for the user to explore your interface, they are less likely to miss important connections or dependen- cies. Also consider marking parts of your interface that are not intended to be public but are needed for legacy reasons with #[doc(hidden)], so that they do not clutter up your documentation. 
+Third, organize your documentation. Having all your types, traits, and functions in a single top-level module makes it difficult for the user to get a sense of where to start. Take advantage of modules to group together semantically related items. Then, use intra-documentation links to interlink items. If the documentation on type A talks about trait B, then it should link to that trait right there. If you make it easy for the user to explore your interface, they are less likely to miss important connections or dependen- cies. Also consider marking parts of your interface that are not intended to be public but are needed for legacy reasons with #[doc(hidden)], so that they do not clutter up your documentation. 
 
 And finally, enrich your documentation wherever possible. Link to external resources that explain concepts, data structures, algorithms, or other aspects of your interface that may have good explanations elsewhere. RFCs, blog posts, and whitepapers are great for this, if any are relevant. Use #[doc(cfg(..))] to highlight items that are available only under certain con- figurations so the user quickly realizes why some method that’s listed in the documentation isn’t available. Use #[doc(alias = "...")] to make types and methods discoverable under other names that users may search for them by. In the top-level documentation, point the user to commonly used modules, features, types, traits, and methods. 
 
-**Type System Guidance** 
+***Type System Guidance***
 
 The type system is an excellent tool to ensure that your interfaces are obvi- ous, self-documenting, and misuse-resistant. You have several techniques at your disposal that can make your interfaces very hard to misuse, and thus, make it more likely that they will be used correctly. 
 
-The first of these is *semantic typing*, in which you add types to repre- sent the *meaning* of a value, not just its primitive type. The classic example here is for Booleans: if your function takes three bool arguments, chances 
+The first of these is *semantic typing*, in which you add types to repre- sent the *meaning* of a value, not just its primitive type. The classic example here is for Booleans: if your function takes three bool arguments, chances are some user will mess up the order of the values and realize it only after something has gone terribly wrong. If, on the other hand, it takes three arguments of distinct two-variant enum types, the user cannot get the order wrong without the compiler yelling at them: if they attempt to pass DryRun::Yes to the overwrite argument, that will simply not work, nor will passing Overwrite::No as the dry_run argument. You can apply semantic typ- ing beyond Booleans as well. For example, a newtype around a numeric type may provide a unit for the contained value, or it could constrain raw pointer arguments to only those that have been returned by another method. 
 
-are some user will mess up the order of the values and realize it only after something has gone terribly wrong. If, on the other hand, it takes three arguments of distinct two-variant enum types, the user cannot get the order wrong without the compiler yelling at them: if they attempt to pass DryRun::Yes to the overwrite argument, that will simply not work, nor will passing Overwrite::No as the dry_run argument. You can apply semantic typ- ing beyond Booleans as well. For example, a newtype around a numeric type may provide a unit for the contained value, or it could constrain 
-
-raw pointer arguments to only those that have been returned by another method. 
-
-A closely related technique is to use zero-sized types to indicate that a particular fact is true about an instance of a type. Consider, for instance, a type called Rocket that represents the state of a real rocket. Some operations (methods) on Rocket should be available no matter what state the rocket
- is in, but some make sense only in particular situations. It is, for example, impossible to launch a rocket if it has already been launched. Similarly, it should probably not be possible to separate the fuel tank if the rocket has not yet launched. We could model these as enum variants, but then all the methods would be available at every stage, and we’d need to introduce pos- sible panics. 
+A closely related technique is to use zero-sized types to indicate that a particular fact is true about an instance of a type. Consider, for instance, a type called Rocket that represents the state of a real rocket. Some operations (methods) on Rocket should be available no matter what state the rocket is in, but some make sense only in particular situations. It is, for example, impossible to launch a rocket if it has already been launched. Similarly, it should probably not be possible to separate the fuel tank if the rocket has not yet launched. We could model these as enum variants, but then all the methods would be available at every stage, and we’d need to introduce pos- sible panics. 
 
 Instead, as shown in Listing 3-2, we can introduce a generic parameter on Rocket, Stage, and use it to restrict what methods are available when. 
 
+
+
+```  rust
 1 struct Grounded;
  struct Launched;
  // and so on
@@ -721,10 +472,7 @@ Instead, as shown in Listing 3-2, we can introduce a generic parameter on Rocket
 
 3 impl Default for Rocket<Grounded> {} impl Rocket<Grounded> { 
 
-```
-    pub fn launch(self) -> Rocket<Launched> { }
-  }
-```
+​		pub fn launch(self) -> Rocket<Launched> { }
 
 4 impl Rocket<Launched> {
  pub fn accelerate(&mut self) { } pub fn decelerate(&mut self) { } 
@@ -734,21 +482,13 @@ Instead, as shown in Listing 3-2, we can introduce a generic parameter on Rocket
 5 impl<Stage> Rocket<Stage> {
  pub fn color(&self) -> Color { }
  pub fn weight(&self) -> Kilograms { } 
-
 } 
+```
 
-Listing 3-2: Using marker types to restrict implementations 
+*Listing 3-2: Using marker types to restrict implementations*
 
 We introduce unit types to represent each stage of the rocket 1. We don’t actually need to store the stage—only the meta-information it provides— so we store it behind a PhantomData 2 to guarantee that it is eliminated at compile time. Then, we write implementation blocks for Rocket only when
- it holds a particular type parameter. You can construct a rocket only on the 
-
-Designing Interfaces **49** 
-
-**50** 
-
-Chapter 3 
-
-ground (for now), and you can launch it only from the ground 3.
+ it holds a particular type parameter. You can construct a rocket only on the ground (for now), and you can launch it only from the ground 3.
  Only when the rocket has been launched can you control its velocity 4. There are some things you can always do with the rocket, no matter what state it is in, and those we place in a generic implementation block 5. You’ll notice that with the interface designed this way, it’s simply not possible for the user to call a method at the wrong time—we have encoded the usage rules in the types themselves, and made illegal states *unrepresentable*. 
 
 This notion extends to many other domains as well; if your function ignores a pointer argument unless a given Boolean argument is true, it’s better to combine the two arguments instead. With an enum type with
@@ -826,7 +566,7 @@ fn main() {
 }
 ```
 
-Listing 3-5: Implementing a trait for an existing type may cause problems. 
+*Listing 3-5: Implementing a trait for an existing type may cause problems.*
 
 If you add impl Foo1 for Unit to crate1 without marking it a breaking change, the downstream code will suddenly stop compiling since the call to foo is now ambiguous. This can even apply to implementations of *new* public traits, if the downstream crate uses wildcard imports (use crate1::*). You will particularly want to keep this in mind if you provide a prelude module that you instruct users to use wildcard imports for. 
 
@@ -836,13 +576,7 @@ Most changes to existing traits are also breaking changes, such as changing a me
 I say “generally” and “most” here, because as interface authors, we have a tool available to us that lets us skirt some of these rules: *sealed traits*. A sealed trait is one that can be used only, and not implemented, by other crates. This immediately makes a number of breaking changes non-breaking. For example, you can add a new method to a sealed trait, since you know there are no implementations outside of the current crate to consider. Similarly, you can implement a sealed trait for new foreign types, since you know
  the foreign crate that defined that type cannot have added a conflicting implementation. 
 
-Sealed traits are most commonly used for *derived* traits—traits that provide blanket implementations for types that implement particular other traits. You should seal a trait only if it does not make sense for a foreign crate to implement your trait; it severely restricts the usefulness of the trait, since downstream crates will no longer be able to implement it for 
-
-**52** Chapter 3 
-
-**N O T E** 
-
-their own types. You can also use sealed traits to restrict which types can be used as type arguments, such as restricting the Stage type in the Rocket example from Listing 3-2 to only the Grounded and Launched types. 
+Sealed traits are most commonly used for *derived* traits—traits that provide blanket implementations for types that implement particular other traits. You should seal a trait only if it does not make sense for a foreign crate to implement your trait; it severely restricts the usefulness of the trait, since downstream crates will no longer be able to implement it for their own types. You can also use sealed traits to restrict which types can be used as type arguments, such as restricting the Stage type in the Rocket example from Listing 3-2 to only the Grounded and Launched types. 
 
 Listing 3-6 shows how to seal a trait and how to then still add implemen- tations for it in the defining crate. 
 
