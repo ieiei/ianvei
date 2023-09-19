@@ -1,0 +1,130 @@
+
+For all but the simplest programs, you will have methods that can fail. In this chapter, we’ll look at different ways to represent, handle, and propagate those failures and the advantages and drawbacks of each. We’ll start by exploring different ways to represent errors, including enumeration and erasure, and then examine some special error cases that require a different representation technique. Next, we’ll look at various ways of handling errors and the future of error handling. 
+
+It’s worth noting that best practices for error handling in Rust are still an active topic of conversation, and at the time of writing, the ecosystem has not yet settled on a single, unified approach. This chapter will therefore focus on the underlying principles and techniques rather than recommend- ing specific crates or patterns. 
+
+**Representing Errors** 
+
+When you write code that can fail, the most important question to ask your- self is how your users will interact with any errors returned. Will users need to know exactly which error happened and the minutiae about what went wrong, or will they simply log that an error occurred and move on as best they can? To understand this, we have to look at whether the nature of the error is likely to affect what the caller does upon receiving it. This in turn will dictate how we represent different errors. 
+
+You have two main options for representing errors: enumeration and era- sure. That is, you can either have your error type *enumerate* the possible error conditions so that the caller can distinguish them, or you can just provide the caller with a single, *opaque* error. Let’s discuss these two options in turn. 
+
+**Enumeration** 
+
+For our example, we’ll use a library function that copies bytes from some input stream into some output stream, much like std::io::copy. The user provides you with two streams, one to read from and one to write to, and you copy the bytes from one to the other. During this process, it’s entirely possible for either stream to fail, at which point the copy has to stop and return an error to the user. Here, the user will likely want to know whether it was the input stream or the output stream that failed. For example, in a web server, if an error occurs on the input stream while streaming a file to a client, it might be because a disk was ejected, whereas if the output stream errors, maybe the client just disconnected. The latter may be an error the server should ignore, since copies to new connections can still complete, whereas the former may require that the whole server be shut down! 
+
+This is a case where we want to enumerate the errors. The user needs to be able to distinguish between the different error cases so that they can respond appropriately, so we use an enum named CopyError, with each variant representing a separate underlying cause for the error, like in Listing 4-1. 
+
+```
+ pub enum CopyError {
+   In(std::io::Error),
+   Out(std::io::Error),
+ }
+```
+
+*Listing 4-1: An enumerated error type*
+
+Each variant also includes the error that was encountered to provide the caller with as much information about went wrong as possible. 
+
+When making your own error type, you need to take a number of steps to make the error type play nicely with the rest of the Rust ecosystem. First, your error type should implement the std::error::Error trait, which provides callers with common methods for introspecting error types. The main method of interest is Error::source, which provides a mechanism to find the underlying cause of an error. This is most commonly used to print a backtrace that dis- plays a trace all the way back to the error’s root cause. For our CopyError type,  the implementation of source is straightforward: we match on self and extract and return the inner std::io::Error. 
+
+Second, your type should implement both Display and Debug so that callers can meaningfully print your error. This is required if you implement the Error trait. In general, your implementation of Display should give a one-line description of what went wrong that can easily be folded into other error mes- sages. The display format should be lowercase and without trailing punctua- tion so that it fits nicely into other, larger error reports. Debug should provide a more descriptive error including auxiliary information that may be useful in tracking down the cause of the error, such as port numbers, request identi- fiers, filepaths, and the like, which #[derive(Debug)] is usually sufficient for. 
+
+** In older Rust code, you may see references to the* *Error::description* *method, but this has been deprecated in favor of* *Display**.* 
+
+Third, your type should, if possible, implement both Send and Sync so that users are able to share the error across thread boundaries. If your error type is not thread-safe, you will find that it’s almost impossible to use your crate in a multithreaded context. Error types that implement Send and Sync are also much easier to use with the very common std::io::Error type, which is able to wrap errors that implement Error, Send, and Sync. Of course, not all error types can reasonably be Send and Sync, such as if they’re tied to particular thread-local resources, and that’s okay. You’re probably not sending those errors across thread boundaries either. However, it’s something to be aware of before you go placing Rc<String> and RefCell<bool> types in your errors. 
+
+Finally, where possible, your error type should be 'static. The most immediate benefit of this is that it allows the caller to more easily propagate your error up the call stack without running into lifetime issues. It also enables your error type to be used more easily with type-erased error types, as we’ll see shortly. 
+
+**Opaque Errors** 
+
+Now let’s consider a different example: an image decoding library. You give the library a bunch of bytes to decode, and it gives you access to various image manipulation methods. If the decoding fails, the user needs to be able to figure out how to resolve the issue, and so must understand the cause. But is it important whether the cause is the size field in the image header being invalid, or the compression algorithm failing to decompress a block? Probably not—the application can’t meaningfully recover from either situation, even if it knows the exact cause. In cases like this, you as the library author may instead want to provide a single, opaque error type. This also makes your library a little nicer to use, because there is only one error type in use everywhere. This error type should implement Send, Debug, Display, and Error (including the source method where appropriate), but beyond that, the caller doesn’t need to know anything more. You might internally represent more fine-grained error states, but there is no need to expose those to the users of the library. Doing so would only serve to unnecessarily increase the size and complexity of your API. 
+
+Exactly what your opaque error type should be is mostly up to you. It could just be a type with all private fields that exposes only limited methods for displaying and introspecting the error, or it could be a severely type-erased error type like Box<dyn Error + Send + Sync + 'static>, which reveals nothing more than the fact that it is an error and does not gener- ally let your users introspect at all. Deciding how opaque to make your error types is mostly a matter of whether there is anything interesting about the error beyond its description. With Box<dyn Error>, you leave your users with little option but to bubble up your error. That might be fine if it truly has no information of value to present to the user—for example, if it’s just a dynamic error message or is one of a large number of unrelated errors from deeper inside your program. But if the error has some inter- esting facets to it, such as a line number or a status code, you may want to expose that through a concrete but opaque type instead. 
+
+*In general, the community consensus is that errors should be rare and therefore should not add much cost to the “happy path.” For that reason, errors are often placed behind a pointer type, such as a* *Box* *or* *Arc**. This way, they’re unlikely to add much to the size of the overall* *Result* *type they’re contained within.* 
+
+One benefit of using type-erased errors is that it allows you to easily combine errors from different sources without having to introduce addi- tional error types. That is, type-erased errors often *compose* nicely, and allow you to express an open-ended set of errors. If you write a function whose return type is Box<dyn Error + ...>, then you can use ? across different error types inside that function, on all sorts of different errors, and they will all be turned into that one common error type. 
+
+The 'static bound on Box<dyn Error + Send + Sync + 'static> is worth spending a bit more time on in the context of erasure. I mentioned in the previous section that it’s useful for letting the caller propagate the error without worrying about the lifetime bounds of the method that failed, but it serves an even bigger purpose: access to downcasting. *Downcasting* is the process of taking an item of one type and casting it to a more specific type. This is one of the few cases where Rust gives you access to type information at runtime; it’s a limited case of the more general type reflection that dynamic languages often provide. In the context of errors, downcasting allows a user to turn a dyn Error into a concrete underlying error type when that dyn Error was originally of that type. For example, the user may want to take a particular action if the error they received was a std::io::Error of kind std::io::ErrorKind ::WouldBlock, but they would not take that same action in any other case. If the user gets a dyn Error, they can use Error::downcast_ref to try to downcast the error into a std::io::Error. The downcast_ref method returns an Option, which tells the user whether or not the downcast succeeded. And here is the key observation: downcast_ref works only if the argument is 'static. If we return an opaque Error that’s not 'static, we take away the user’s ability to do this kind of error introspection should they wish. 
+
+There’s some disagreement in the ecosystem about whether a library’s type-erased errors (or more generally, its type-erased types) are part of its public and stable API. That is, if the method foo in your library returns lib::MyError as a Box<dyn Error>, would changing foo to return a different error type be a breaking change? The type signature hasn’t changed, but users may have written code that assumes that they can use downcast to turn that error back into lib::MyError. My opinion on this matter is that you chose to return Box<dyn Error> (and not lib::MyError) for a reason, and unless explicitly documented, that does not guarantee anything in particular about downcasting. 
+
+*While* *Box* *is an attractive type-erased error type, it counter- intuitively does not itself implement* *Error**. Therefore, consider adding your own* *BoxError* *type for type erasure in libraries that* does *implement* *Error**.* 
+
+You may wonder how Error::downcast_ref can be safe. That is, how does it know whether a provided dyn Error argument is indeed of the given type T? The standard library even has a trait called Any that is implemented for *any* type, and which implements downcast_ref for dyn Any—how can that be okay? The answer lies in the compiler-supported type std::any::TypeId, which allows you to get a unique identifier for any type. The Error trait has a hidden provided method called type_id, whose default implementation is to return TypeId::of::<Self>(). Similarly, Any has a blanket implementation of impl Any for T, and in that implementation, its type_id returns the same. In the context of these impl blocks, the concrete type of Self is known, so this type_id is the type identifier of the real type. That provides all the information downcast_ref needs. downcast_ref calls self.type_id, which forwards through the vtable for dynamically sized types (see Chapter 2) to the implementation for the underlying type and compares that to the type identifier of the provided downcast type. If they match, then the type behind the dyn Error or dyn Any really is T, and it is safe to cast from a reference to one to a reference to the other. 
+
+**Special Error Cases** 
+
+Some functions are fallible but cannot return any meaningful error if they fail. Conceptually, these functions have a return type of Result<T, ()>. In some codebases, you may see this represented as Option<T> instead. While both are legitimate choices for the return type for such a function, they convey different semantic meanings, and you should usually avoid “simplify- ing” a Result<T, ()> to Option<T>. An Err(()) indicates that an operation failed and should be retried, reported, or otherwise handled exceptionally. None, on the other hand, conveys only that the function has nothing to return; 
+
+it is usually not considered an exceptional case or something that should be handled. You can see this in the #[must_use] annotation on the Result type—when you get a Result, the language expects that it is important to handle both cases, whereas with an Option, neither case actually needs to be handled. 
+
+*You should also keep in mind that* *()* *does not implement the* *Error* *trait. This means that it cannot be type-erased into* *Box* *and can be a bit of a pain to use with* *?**. For this reason, it is often better to define your own unit struct type, imple- ment* *Error* *for it, and use that as the error instead of* *()* *in these cases.* 
+
+Some functions, like those that start a continuously running server loop, only ever return errors; unless an error occurs, they run forever. Other functions never error but need to return a Result nonetheless, for example, to match a trait signature. For functions like these, Rust provides the *never type*, written with the ! syntax. The never type represents a value that can never be generated. You cannot construct an instance of this type yourself— the only way to make one is by entering an infinite loop or panicking, or through a handful of other special operations that the compiler knows never return. With Result, when you have an Ok or Err that you know will never be used, you can set it to the ! type. If you write a function that returns Result<T, !>, you will be unable to ever return Err, since the only way to do so is to enter code that will never return. Because the compiler knows that any variant with a ! will never be produced, it can also optimize your code with that in mind, such as by not generating the panic code for an unwrap on Result<T, !>. And when you pattern match, the compiler knows that any vari- ant that contains a ! does not even need to be listed. Pretty neat! 
+
+One last curious error case is the error type std::thread::Result. Here’s its definition: 
+
+```
+type Result<T> = Result<T, Box<dyn Any + Send + 'static>>;
+```
+
+The error type is type-erased, but it’s not erased into a dyn Error as we’ve seen so far. Instead, it is a dyn Any, which guarantees only that the error is *some* type, and nothing more . . . which is not much of a guarantee at all. The reason for this curious-looking error type is that the error vari- ant of std::thread::Result is produced only in response to a panic; specifically, if you try to join a thread that has panicked. In that case, it’s not clear that there’s much the joining thread can do other than either ignore the error or panic itself using unwrap. In essence, the error type is “a panic” and the value is “whatever argument was passed to panic!,” which can truly be any type (even though it’s usually a formatted string). 
+
+Rust’s ? operator acts as a shorthand for *unwrap or return early*, for working easily with errors. But it also has a few other tricks up its sleeve that are worth knowing about. First, ? performs type conversion through the From trait. In a function that returns Result<T, E>, you can use ? on any Result<T, X> where E: From<X>. This is the feature that makes error erasure through Box<dyn Error> so appealing; you can just use ? everywhere and not worry about the particular error type, and it will usually “just work.” 
+
+**FROM AND INTO** 
+
+The standard library has many conversion traits, but two of the core ones are From and Into . It might strike you as odd to have two: if we have From, why do we need Into, and vice versa? There are a couple of reasons, but let’s start with the historical one: it wouldn’t have been possible to have just one in the early days of Rust due to the coherence rules discussed in Chapter 2 . Or, more specifically, what the coherence rules used to be . 
+
+Suppose you want to implement two-way conversion between some local type you have defined in your crate and some type in the standard library . You can write impl<T> From<Vec<T>> for MyType<T> and impl<T> Into<Vec<T>> for MyType<T> easily enough, but if you only had From or Into, you would have to write impl<T> From<MyType<T>> for Vec<T> or impl<T> Into<MyType<T>> for Vec<T> . However, the compiler used to reject those implementations! Only since Rust 1 .41 .0, when the exception for covered types was added to the coherence rules, are they legal . Before that change, it was necessary to have both traits . And since much Rust code was written before Rust 1 .41 .0, neither trait can be removed now . 
+
+Beyond that historical fact, however, there are also good ergonomic reasons to have both of these traits, even if we could start from scratch today . It is often significantly easier to use one or the other in different situations . For example, if you’re writing a method that takes a type that can be turned into a Foo, would you rather write fn(impl Into<Foo>) or fn<T>(T) where Foo: From<T>? And conversely, to turn a string into a syntax identifier, would you rather write Ident::from("foo") or <_ as Into<Ident>>::into("foo")? Both of these traits have their uses, and we’re better off having them both . 
+
+Given that we do have both, you may wonder which you should use in your code today . The answer, it turns out, is pretty simple: implement From, and use Into in bounds . The reason is that Into has a blanket implementation for any T that implements From, so regardless of whether a type explicitly implements From or Into, it implements Into! 
+
+Of course, as simple things frequently go, the story doesn’t quite end there . Since the compiler often has to “go through” the blanket implementation when Into is used as a bound, the reasoning for whether a type implements Into is more complicated than whether it implements From . And in some cases, the compiler is not quite smart enough to figure that puzzle out . For this reason, the ? operator at the time of writing uses From, not Into . Most of the time that doesn’t make a difference, because most types implement From, but it does mean that error types from old libraries that implement Into instead may not work with ? . As the compiler gets smarter, ? will likely be “upgraded” to use Into, at which point that problem will go away, but it's what we have for now . 
+
+Error Handling **63** 
+
+The second aspect of ? to be aware of is that this operator is really just syntax sugar for a trait tentatively called Try. At the time of writing, the Try trait has not yet been stabilized, but by the time you read this, it’s likely that it, or something very similar, will have been settled on. Since the details haven’t all been figured out yet, I’ll give you only an outline of how Try works, rather than the full method signatures. At its heart, Try defines a wrapper type whose state is either one where further computation is useful (the happy path), or one where it is not. Some of you will correctly think of monads, though we won’t explore that connection here. For example, in the case of Result<T, E>, if you have an Ok(t), you can continue on the happy path by unwrapping the t. If you have an Err(e), on the other hand, you want to stop executing and produce the error value immediately, since further computation is not possible as you don’t have the t. 
+
+What’s interesting about Try is that it applies to more types than just Result. An Option<T>, for example, follows the same pattern—if you have a Some(t), you can continue on the happy path, whereas if you have a None, you want to yield None instead of continuing. This pattern extends to more complex types, like Poll<Result<T, E>>, whose happy path type is Poll<T>, which makes ? apply in far more cases than you might expect. When Try stabilizes, we may see ? start to work with all sorts of types to make our happy path code nicer. 
+
+The ? operator is already usable in fallible functions, in doctests, and in fn main. To reach its full potential, though, we also need a way to scope this error handling. For example, consider the function in Listing 4-2. 
+
+```
+fn do_the_thing() -> Result<(), Error> {
+  let thing = Thing::setup()?;
+  // .. code that uses thing and ? ..
+  thing.cleanup();
+  Ok(()) 
+} 
+```
+
+*Listing 4-2: A multi-step fallible function using the *?* operator*
+
+This won’t quite work as expected. Any ? between setup and cleanup will cause an early return from the entire function, which would skip the cleanup code! This is the problem *try blocks* are intended to solve. A try block acts pretty much like a single-iteration loop, where ? uses break instead of return, and the final expression of the block has an implicit break. We can now fix the code in Listing 4-2 to always do cleanup, as shown in Listing 4-3. 
+
+```rust
+fn do_the_thing() -> Result<(), Error> {
+  let thing = Thing::setup()?;
+  let r = try {
+    // .. code that uses thing and ? ..
+  };
+  thing.cleanup();
+  r
+ }
+```
+
+*Listing 4-3: A multi-step fallible function that always cleans up after itself* 
+
+
+Try blocks are also not stable at the time of writing, but there is enough of a consensus on their usefulness that they’re likely to land in a form similar to that described here. 
+
+
+
+## Summary
+
+This chapter covered the two primary ways to construct error types in Rust: enumeration and erasure. We looked at when you may want to use each one and the advantages and drawbacks of each. We also took a look at some of the behind-the-scenes aspects of the ? operator and considered how ? may become even more useful going forward. In the next chapter, we’ll take a step back from the code and look at how you *structure* a Rust project. We’ll look at feature flags, dependency management, and versioning as well as how to manage more complex crates using workspaces and subcrates. See you on the next page! 

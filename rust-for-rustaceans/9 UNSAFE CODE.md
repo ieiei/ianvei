@@ -1,14 +1,4 @@
-**9** 
-
-**UNSAFE CODE** 
-
-The mere mention of unsafe code often elicits strong responses from many in the 
-
-Rust community, and from many of those watching Rust from the sidelines. While some 
-
-maintain it’s “no big deal,” others decry it as “the rea- son all of Rust’s promises are a lie.” In this chapter, 
-
-I hope to pull back the curtain a bit to explain what unsafe is, what it isn’t, and how you should go about using it safely. At the time of writing, and likely also when you read this, Rust’s precise requirements for unsafe code are still being determined, and even if they were all nailed down, the com- plete description would be beyond the scope of this book. Instead, I’ll do my best to arm you with the building blocks, intuition, and tooling you’ll need to navigate your way through most unsafe code. 
+The mere mention of unsafe code often elicits strong responses from many in the Rust community, and from many of those watching Rust from the sidelines. While some maintain it’s “no big deal,” others decry it as “the rea- son all of Rust’s promises are a lie.” In this chapter, I hope to pull back the curtain a bit to explain what unsafe is, what it isn’t, and how you should go about using it safely. At the time of writing, and likely also when you read this, Rust’s precise requirements for unsafe code are still being determined, and even if they were all nailed down, the com- plete description would be beyond the scope of this book. Instead, I’ll do my best to arm you with the building blocks, intuition, and tooling you’ll need to navigate your way through most unsafe code. 
 
 Your main takeaway from this chapter should be this: unsafe code is the mechanism Rust gives developers for taking advantage of invariants that, for whatever reason, the compiler cannot check. We’ll look at the ways in which unsafe does that, what those invariants may be, and what we can do with it as a result. 
 
@@ -25,21 +15,17 @@ The rest of this chapter is split into four sections. We’ll start with a brief
 Before we discuss the powers that unsafe grants you, we need to talk about its two different meanings. The unsafe keyword serves a dual purpose in Rust: it marks a particular function as unsafe to call *and* it enables you to invoke unsafe functionality in a particular code block. For example, the method in Listing 9-1 is marked as unsafe, even though it contains no unsafe code. Here, the unsafe keyword serves as a warning to the caller that there are additional guarantees that someone who writes code that invokes decr must manually check. 
 
 ```
-             impl<T> SomeType<T> {
-                 pub unsafe fn decr(&self) {
-                     self.some_usize -= 1;
-                 }
+ impl<T> SomeType<T> {
+	 pub unsafe fn decr(&self) {
+		 self.some_usize -= 1;
+	 }
+ }
 ```
 
-} 
+
 
 Listing 9-1: An unsafe method that contains only safe code 
 
-**142** 
-
-Chapter 9 
-
-**N O T E** 
 
 Listing 9-2 illustrates the second usage. Here, the method itself is not marked as unsafe, even though it contains unsafe code. 
 
@@ -101,19 +87,15 @@ As raw pointers do not have lifetimes, they can be used in circumstances where t
 ```
 struct Person<'a> {
     name: &'a str,
-```
+	age: usize, 
+} 
 
-age: usize, } 
-
-```
 struct Parsed {
     bytes: [u8; 1024],
     parsed: Person<'???>,
-```
-
 } 
-
-Listing 9-3: Trying, and failing, to name the lifetime of a self-referential reference 
+```
+*Listing 9-3: Trying, and failing, to name the lifetime of a self-referential reference*
 
 Unsafe Code **145** 
 
@@ -134,9 +116,7 @@ The pointer arithmetic methods are unsafe to call even if you don’t want to tu
 
 **To Pointer and Back Again** 
 
-Often when you need to use pointers, it’s because you have some normal Rust type, like a reference, a slice, or a string, and you have to move to the world of pointers for a bit and then go back to the original normal type. Some of the key standard library types therefore provide you with a way to turn them into their raw constituent parts, such as a pointer and a length for a slice, and a way to turn them back into the whole using those same parts. For example, you can get a slice’s data pointer with as_ptr and its length with []::len. You can then reconstruct the slice by providing those 
-
-same values to std::slice::from_raw_parts. Vec, Arc, and String have similar methods that return a raw pointer to the underlying allocation, and Box has Box::into_raw and Box::from_raw, which do the same thing. 
+Often when you need to use pointers, it’s because you have some normal Rust type, like a reference, a slice, or a string, and you have to move to the world of pointers for a bit and then go back to the original normal type. Some of the key standard library types therefore provide you with a way to turn them into their raw constituent parts, such as a pointer and a length for a slice, and a way to turn them back into the whole using those same parts. For example, you can get a slice’s data pointer with as_ptr and its length with []::len. You can then reconstruct the slice by providing those same values to std::slice::from_raw_parts. Vec, Arc, and String have similar methods that return a raw pointer to the underlying allocation, and Box has Box::into_raw and Box::from_raw, which do the same thing. 
 
 **Playing Fast and Loose with Types** 
 
@@ -158,22 +138,15 @@ There’s really no limit to what calling an unsafe function might enable, as it
 
 **Foreign Function Interfaces** 
 
-Rust lets you declare functions and static variables that are defined in a language other than Rust using extern blocks (which we’ll discuss at length in Chapter 11). When you declare such a block, you’re telling Rust that the items appearing within it will be implemented by some external source when the final program binary is linked, such as a C library you are integrating with. Since externs exist outside of Rust’s control, they are inherently unsafe to access. If you call a C function from Rust, all bets are off—it might over- write your entire memory contents and clobber all your neatly arranged 
-
-Unsafe Code **147** 
-
-**148** Chapter 9 
-
-references into random pointers into the kernel somewhere. Similarly, an extern static variable could be modified by external code at any time, and could be filled with all sorts of bad bytes that don’t reflect its declared type at all. In an unsafe block, though, you can access externs to your heart’s delight, as long as you’re willing to vouch for the other side of the extern behaving according to Rust’s rules. 
+Rust lets you declare functions and static variables that are defined in a language other than Rust using extern blocks (which we’ll discuss at length in Chapter 11). When you declare such a block, you’re telling Rust that the items appearing within it will be implemented by some external source when the final program binary is linked, such as a C library you are integrating with. Since externs exist outside of Rust’s control, they are inherently unsafe to access. If you call a C function from Rust, all bets are off—it might over- write your entire memory contents and clobber all your neatly arranged references into random pointers into the kernel somewhere. Similarly, an extern static variable could be modified by external code at any time, and could be filled with all sorts of bad bytes that don’t reflect its declared type at all. In an unsafe block, though, you can access externs to your heart’s delight, as long as you’re willing to vouch for the other side of the extern behaving according to Rust’s rules. 
 
 **I’ll Pass on Safety Checks** 
 
-Some unsafe operations can be made entirely safe by introducing addi- tional runtime checks. For example, accessing an item in a slice is unsafe since you might try to access an item beyond the length of the slice. But, given how common the operation is, it’d be unfortunate if indexing into a slice was unsafe. Instead, the safe implementation includes bounds checks that (depending on the method you use) either panic or return an Option if the index you provide is out of bounds. That way, there is no way to cause undefined behavior even if you pass in an index beyond the slice’s length. Another example is in hash tables, which hash the key you provide rather than letting you provide the hash yourself; this ensures that you’ll never try to access a key using the wrong hash. 
+Some unsafe operations can be made entirely safe by introducing additional runtime checks. For example, accessing an item in a slice is unsafe since you might try to access an item beyond the length of the slice. But, given how common the operation is, it’d be unfortunate if indexing into a slice was unsafe. Instead, the safe implementation includes bounds checks that (depending on the method you use) either panic or return an Option if the index you provide is out of bounds. That way, there is no way to cause undefined behavior even if you pass in an index beyond the slice’s length. Another example is in hash tables, which hash the key you provide rather than letting you provide the hash yourself; this ensures that you’ll never try to access a key using the wrong hash. 
 
-However, in the endless pursuit of ultimate performance, some develop- ers may find these safety checks add just a little too much overhead in their tightest loops. To cater to situations where peak performance is paramount and the caller knows that the indexes are in bounds, many data struc-
- tures provide alternate versions of particular methods without these safety checks. Such methods usually include the word unchecked in the name to indicate that they blindly trust the provided arguments to be safe and that they do not do any of those pesky, slow safety checks. Some examples are NonNull::new_unchecked, slice::get_unchecked, NonZero::new_unchecked, Arc::get _mut_unchecked, and str::from_utf8_unchecked. 
+However, in the endless pursuit of ultimate performance, some develop- ers may find these safety checks add just a little too much overhead in their tightest loops. To cater to situations where peak performance is paramount and the caller knows that the indexes are in bounds, many data structures provide alternate versions of particular methods without these safety checks. Such methods usually include the word unchecked in the name to indicate that they blindly trust the provided arguments to be safe and that they do not do any of those pesky, slow safety checks. Some examples are NonNull::new_unchecked, slice::get_unchecked, NonZero::new_unchecked, Arc::get _mut_unchecked, and str::from_utf8_unchecked. 
 
-In practice, the safety and performance trade-off for unchecked meth- ods is rarely worth it. As always with performance optimization, measure first, then optimize. 
+In practice, the safety and performance trade-off for unchecked methods is rarely worth it. As always with performance optimization, measure first, then optimize. 
 
 **Custom Invariants** 
 
@@ -183,19 +156,13 @@ Most uses of unsafe rely on custom invariants to some degree. That is, they rely
 MaybeUninit::assume_init
 ```
 
-The MaybeUninit type is one of the few ways in which you can store values that are not valid for their type in Rust. You can think of a MaybeUninit<T> as a T that may not be legal to use as a T at the moment. For example, a MaybeUninit<NonNull> is allowed to hold a null pointer, 
-
-a MaybeUninit<Box> is allowed to hold a dangling heap pointer, and a 
-
-MaybeUninit<bool> is allowed to hold the bit pattern for the number 3 (normally it must be 0 or 1). This comes in handy if you are construct- ing a value bit by bit or are dealing with zeroed or uninitialized mem- ory that will eventually be made valid (such as by being filled through a call to std::io::Read::read). The assume_init function asserts that the MaybeUninit now holds a valid value for the type T and can therefore be used as a T. 
+The MaybeUninit type is one of the few ways in which you can store values that are not valid for their type in Rust. You can think of a MaybeUninit<T> as a T that may not be legal to use as a T at the moment. For example, a MaybeUninit<NonNull> is allowed to hold a null pointer, a MaybeUninit<Box> is allowed to hold a dangling heap pointer, and a MaybeUninit<bool> is allowed to hold the bit pattern for the number 3 (normally it must be 0 or 1). This comes in handy if you are construct- ing a value bit by bit or are dealing with zeroed or uninitialized mem- ory that will eventually be made valid (such as by being filled through a call to std::io::Read::read). The assume_init function asserts that the MaybeUninit now holds a valid value for the type T and can therefore be used as a T. 
 
 ```
 ManuallyDrop::drop
 ```
 
-The ManuallyDrop type is a wrapper type around a type T that does not drop that T when the ManuallyDrop is dropped. Or, phrased differently, it decouples the dropping of the outer type (ManuallyDrop) from the drop- ping of the inner type (T). It implements safe access to the T through DerefMut<Target = T> but also provides a drop method (separately from the drop method of the Drop trait) to drop the wrapped T *without* drop- ping the ManuallyDrop. That is, the drop function takes &mut self despite dropping the T, and so leaves the ManuallyDrop behind. This comes in handy if you have to explicitly drop a value that you cannot move, such as in implementations of the Drop trait. Once that value is dropped, it 
-
-is no longer safe to try to access the T, which is why the call to drop is unsafe—it asserts that the T will never be accessed again. 
+The ManuallyDrop type is a wrapper type around a type T that does not drop that T when the ManuallyDrop is dropped. Or, phrased differently, it decouples the dropping of the outer type (ManuallyDrop) from the drop- ping of the inner type (T). It implements safe access to the T through DerefMut<Target = T> but also provides a drop method (separately from the drop method of the Drop trait) to drop the wrapped T *without* drop- ping the ManuallyDrop. That is, the drop function takes &mut self despite dropping the T, and so leaves the ManuallyDrop behind. This comes in handy if you have to explicitly drop a value that you cannot move, such as in implementations of the Drop trait. Once that value is dropped, it is no longer safe to try to access the T, which is why the call to drop is unsafe—it asserts that the T will never be accessed again. 
 
 ```
 std::ptr::drop_in_place
@@ -207,38 +174,25 @@ drop_in_place lets you call a value’s destructor directly through a pointer to
 Waker::from_raw
 ```
 
-In Chapter 8 we talked about the Waker type and how it is made up of a data pointer and a RawWaker that holds a manually implemented vtable. Once a Waker has been constructed, the raw function pointers in the vtable, such as wake and drop, can be called from safe code (through Waker::wake and drop(waker), respectively). Waker::from_raw is where the asynchronous executor asserts that all the pointers in its vtable are 
-
-in fact valid function pointers that follow the contract set forth in the documentation of RawWakerVTable. 
+In Chapter 8 we talked about the Waker type and how it is made up of a data pointer and a RawWaker that holds a manually implemented vtable. Once a Waker has been constructed, the raw function pointers in the vtable, such as wake and drop, can be called from safe code (through Waker::wake and drop(waker), respectively). Waker::from_raw is where the asynchronous executor asserts that all the pointers in its vtable are in fact valid function pointers that follow the contract set forth in the documentation of RawWakerVTable. 
 
 ```
 std::hint::unreachable_unchecked
 ```
 
-The hint module holds functions that give hints to the compiler about the surrounding code but do not actually produce any machine code. The unreachable_unchecked function in particular tells the compiler that it is impossible for the program to reach a section of the code at runtime. This in turn allows the compiler to make optimizations based on that 
-
-Unsafe Code **149** 
-
-**150** Chapter 9 
-
-knowledge, such as eliminating conditional branches to that location. Unlike the unreachable! macro, which panics if the code does reach the line in question, the effects of an erroneous unreachable_unchecked are hard to predict. The compiler optimizations may cause peculiar and hard-to-debug behavior, not to mention that your program will continue running when something it believed to be true was not! 
+The hint module holds functions that give hints to the compiler about the surrounding code but do not actually produce any machine code. The unreachable_unchecked function in particular tells the compiler that it is impossible for the program to reach a section of the code at runtime. This in turn allows the compiler to make optimizations based on that knowledge, such as eliminating conditional branches to that location. Unlike the unreachable! macro, which panics if the code does reach the line in question, the effects of an erroneous unreachable_unchecked are hard to predict. The compiler optimizations may cause peculiar and hard-to-debug behavior, not to mention that your program will continue running when something it believed to be true was not! 
 
 ```
 std::ptr::{read,write}_{unaligned,volatile}
 ```
 
-The ptr module holds a number of functions that let you work with *odd* pointers—those that do not meet the assumptions that Rust generally makes about pointers. The first of these functions are read_unaligned and write_unaligned, which let you access pointers that point to a T even if that T is not stored according to T’s alignment (see the section on align- ment in Chapter 2). This might happen if the T is contained directly in 
-
-a byte array or is otherwise packed in with other values without proper padding. The second notable pair of functions is read_volatile and write_volatile, which let you operate on pointers that don’t point to normal memory. Concretely, these functions will always access the given pointer (they won’t be cached in a register, for example, even if you read the same pointer twice in a row), and the compiler won’t reorder the volatile accesses relative to other volatile accesses. Volatile opera- tions come in handy when working with pointers that aren’t backed 
-
-by normal DRAM memory—we’ll discuss this further in Chapter 11. Ultimately, these methods are unsafe because they dereference the given pointer (and to an owned T, at that), so you as the caller need to sign off on all the contracts associated with doing so. 
+The ptr module holds a number of functions that let you work with *odd* pointers—those that do not meet the assumptions that Rust generally makes about pointers. The first of these functions are read_unaligned and write_unaligned, which let you access pointers that point to a T even if that T is not stored according to T’s alignment (see the section on align- ment in Chapter 2). This might happen if the T is contained directly in a byte array or is otherwise packed in with other values without proper padding. The second notable pair of functions is read_volatile and write_volatile, which let you operate on pointers that don’t point to normal memory. Concretely, these functions will always access the given pointer (they won’t be cached in a register, for example, even if you read the same pointer twice in a row), and the compiler won’t reorder the volatile accesses relative to other volatile accesses. Volatile operations come in handy when working with pointers that aren’t backed by normal DRAM memory—we’ll discuss this further in Chapter 11. Ultimately, these methods are unsafe because they dereference the given pointer (and to an owned T, at that), so you as the caller need to sign off on all the contracts associated with doing so. 
 
 ```
 std::thread::Builder::spawn_unchecked
 ```
 
-The normal thread::spawn that we know and love requires that the provided closure is 'static. That bound stems from the fact that the spawned thread might run for an indeterminate amount of time; if
- we were allowed to use a reference to, say, the caller’s stack, the caller might return well before the spawned thread exits, rendering the ref- erence invalid. Sometimes, however, you know that some non-'static value in the caller will outlive the spawned thread. This might happen if you join the thread before dropping the value in question, or if the value is dropped only strictly after you know the spawned thread will no longer use it. That’s where spawn_unchecked comes in—it does not have the 'static bound and thus lets you implement those use cases as long as you’re willing to sign the contract saying that no unsafe accesses will happen as a result. Be careful of panics, though; if the caller pan- ics, it might drop values earlier than you planned and cause undefined behavior in the spawned thread! 
+The normal thread::spawn that we know and love requires that the provided closure is 'static. That bound stems from the fact that the spawned thread might run for an indeterminate amount of time; if we were allowed to use a reference to, say, the caller’s stack, the caller might return well before the spawned thread exits, rendering the ref- erence invalid. Sometimes, however, you know that some non-'static value in the caller will outlive the spawned thread. This might happen if you join the thread before dropping the value in question, or if the value is dropped only strictly after you know the spawned thread will no longer use it. That’s where spawn_unchecked comes in—it does not have the 'static bound and thus lets you implement those use cases as long as you’re willing to sign the contract saying that no unsafe accesses will happen as a result. Be careful of panics, though; if the caller pan- ics, it might drop values earlier than you planned and cause undefined behavior in the spawned thread! 
 
 Note that all of these methods (and indeed all unsafe methods in the standard library) provide explicit documentation for their safety invariants, as should be the case for any unsafe method. 
 
@@ -248,10 +202,9 @@ Unsafe traits aren’t unsafe to *use*, but unsafe to *implement*. This is becau
 
 **Send and Sync** 
 
-The Send and Sync traits denote that a type is safe to send or share across thread boundaries, respectively. We’ll talk more about these traits in Chapter 10, but for now what you need to know is that they are auto-traits, and so they’ll usually be implemented for most types for you by the com- piler. But, as tends to be the case with auto-traits, Send and Sync will not be implemented if any members of the type in question are not themselves Send or Sync. 
+The Send and Sync traits denote that a type is safe to send or share across thread boundaries, respectively. We’ll talk more about these traits in Chapter 10, but for now what you need to know is that they are auto-traits, and so they’ll usually be implemented for most types for you by the compiler. But, as tends to be the case with auto-traits, Send and Sync will not be implemented if any members of the type in question are not themselves Send or Sync. 
 
-In the context of unsafe code, this problem occurs primarily due to
- raw pointers, which are neither Send nor Sync. At first glance, this might seem reasonable: the compiler has no way to know who else may have a raw pointer to the same value or how they may be using it at the moment, so how can the type be safe to send across threads? Now that we’re seasoned unsafe developers though, that argument seems weak—after all, dereferenc- ing a raw pointer is already unsafe, so why should handling the invariants of Send and Sync be any different? 
+In the context of unsafe code, this problem occurs primarily due to raw pointers, which are neither Send nor Sync. At first glance, this might seem reasonable: the compiler has no way to know who else may have a raw pointer to the same value or how they may be using it at the moment, so how can the type be safe to send across threads? Now that we’re seasoned unsafe developers though, that argument seems weak—after all, dereferenc- ing a raw pointer is already unsafe, so why should handling the invariants of Send and Sync be any different? 
 
 Strictly speaking, raw pointers could be both Send and Sync. The prob- lem is that if they were, the types that contain raw pointers would auto- matically be Send and Sync themselves, even though their author might not realize that was the case. The developer might then unsafely dereference the raw pointers without ever thinking about what would happen if those types were sent or shared across thread boundaries, and thus inadvertently introduce undefined behavior. Instead, the raw pointer types block these automatic implementations as an additional safeguard to unsafe code to make authors explicitly sign the contract that they have also followed the Send and Sync invariants. 
 
@@ -267,16 +220,13 @@ Unsafe Code **151**
 pub unsafe trait GlobalAlloc {
     pub unsafe fn alloc(&self, layout: Layout) -> *mut u8;
     pub unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout);
-```
-
 } 
-
+```
 Listing 9-4: The *GlobalAlloc* trait with its required methods 
 
 At its core, the trait has one method for allocating a new chunk of memory, alloc, and one for deallocating a chunk of memory, dealloc. The Layout argument describes the type’s size and alignment, as we discussed in Chapter 2. Each of those methods is unsafe and carries a number of safety invariants that its callers must uphold. 
 
-GlobalAlloc itself is also unsafe because it places restrictions on the implementer of the trait, not the caller of its methods. Only the unsafety
- of the trait ensures that implementers agree to uphold the invariants that Rust itself assumes of its memory allocator, such as in the standard library’s implementation of Box. If the trait was not unsafe, an implementer could safely implement GlobalAlloc in a way that produced unaligned pointers or incorrectly sized allocations, which would trigger unsafety in otherwise safe code that assumes that allocations are sane. This would break the rule that safe code should not be able to trigger memory unsafety in other safe code, and thus cause all sorts of mayhem. 
+GlobalAlloc itself is also unsafe because it places restrictions on the implementer of the trait, not the caller of its methods. Only the unsafety of the trait ensures that implementers agree to uphold the invariants that Rust itself assumes of its memory allocator, such as in the standard library’s implementation of Box. If the trait was not unsafe, an implementer could safely implement GlobalAlloc in a way that produced unaligned pointers or incorrectly sized allocations, which would trigger unsafety in otherwise safe code that assumes that allocations are sane. This would break the rule that safe code should not be able to trigger memory unsafety in other safe code, and thus cause all sorts of mayhem. 
 
 **Surprisingly Not Unpin** 
 
@@ -288,31 +238,19 @@ There are two main reasons why Unpin isn’t an unsafe trait. First, it’s unne
 
 Few traits in the wild are unsafe, but those that are all follow the same pat- tern. A trait should be unsafe if safe code that assumes that trait is imple- mented correctly can exhibit memory unsafety if the trait is *not* implemented correctly. 
 
-The Send trait is a good example to keep in mind here—safe code can easily spawn a thread and pass a value to that spawned thread, but if Rc were 
-
-**152** Chapter 9 
-
-**N O T E** 
-
-Send, that sequence of operations could trivially lead to memory unsafety. Consider what would happen if you cloned an Rc<Box> and sent it to another thread: the two threads could easily both try to deallocate the Box since they do not correctly synchronize access to the Rc’s reference count. 
+The Send trait is a good example to keep in mind here—safe code can easily spawn a thread and pass a value to that spawned thread, but if Rc were Send, that sequence of operations could trivially lead to memory unsafety. Consider what would happen if you cloned an Rc<Box> and sent it to another thread: the two threads could easily both try to deallocate the Box since they do not correctly synchronize access to the Rc’s reference count. 
 
 The Unpin trait is a good counterexample. While it is possible to write unsafe code that triggers memory unsafety if Unpin is implemented incor- rectly, no entirely safe code can trigger memory unsafety due to an imple- mentation of Unpin. It’s not always easy to determine that a trait can be safe (indeed, the Unpin trait was unsafe throughout most of the RFC process), but you can always err on the side of making the trait unsafe, and then make it safe later on if you realize that is the case! Just keep in mind that that is a backward incompatible change. 
 
-Also keep in mind that just because it feels like an incorrect (or even malicious) implementation of a trait would cause a lot of havoc, that’s not necessarily a good reason to make it unsafe. The unsafe marker should first and foremost be used to highlight cases of *memory* unsafety, not just some- thing that can trigger errors in business logic. For example, the Eq, Ord, Deref, and Hash traits are all safe, even though there is likely much code out in the world that would go haywire if faced with a malicious implementa- tion of, say, Hash that returned a different random hash each time it was called. This extends to unsafe code too—there is almost certainly unsafe code out there that would be memory-unsafe in the presence of such an implementation of Hash—but that does not mean Hash should be unsafe. The same is true for an implementation of Deref that dereferenced to a dif- ferent (but valid) target each time. Such unsafe code would be relying on a contract of Hash or Deref that does not actually hold; Hash never claimed that it was deterministic, and neither did Deref. Or rather, the authors of those implementations never used the unsafe keyword to make that claim! 
+Also keep in mind that just because it feels like an incorrect (or even malicious) implementation of a trait would cause a lot of havoc, that’s not necessarily a good reason to make it unsafe. The unsafe marker should first and foremost be used to highlight cases of *memory* unsafety, not just some- thing that can trigger errors in business logic. For example, the Eq, Ord, Deref, and Hash traits are all safe, even though there is likely much code out in the world that would go haywire if faced with a malicious implementation of, say, Hash that returned a different random hash each time it was called. This extends to unsafe code too—there is almost certainly unsafe code out there that would be memory-unsafe in the presence of such an implementation of Hash—but that does not mean Hash should be unsafe. The same is true for an implementation of Deref that dereferenced to a dif- ferent (but valid) target each time. Such unsafe code would be relying on a contract of Hash or Deref that does not actually hold; Hash never claimed that it was deterministic, and neither did Deref. Or rather, the authors of those implementations never used the unsafe keyword to make that claim! 
 
-*An important implication of traits like* *Eq**,* *Hash**, and* *Deref* *being safe is that unsafe code can rely only on the* safety *of safe code, not its correctness. This applies not only to traits, but to all unsafe/safe code interactions.* 
+**N O T E**  *An important implication of traits like* *Eq**,* *Hash**, and* *Deref* *being safe is that unsafe code can rely only on the* safety *of safe code, not its correctness. This applies not only to traits, but to all unsafe/safe code interactions.* 
 
 **Great Responsibility** 
 
 So far, we’ve looked mainly at the various things that you are allowed to do with unsafe code. But unsafe code is allowed to do those things only if it does so safely. Even though unsafe code can, say, dereference a raw pointer, it must do so only if it knows that pointer is valid as a reference to its poin- tee at that moment in time, subject to all of Rust’s normal requirements of references. In other words, unsafe code is given access to tools that could be used to do unsafe things, but it must do only safe things using those tools. 
 
-That, then, raises the question of what *safe* even means in the first place. When is it safe to dereference a pointer? When is it safe to transmute between two different types? In this section, we’ll explore some of the key 
-
-Unsafe Code **153** 
-
-**154** Chapter 9 
-
-invariants to keep in mind when wielding the power of unsafe, look at some common gotchas, and get familiar with some of the tools that help you write safer unsafe code. 
+That, then, raises the question of what *safe* even means in the first place. When is it safe to dereference a pointer? When is it safe to transmute between two different types? In this section, we’ll explore some of the key invariants to keep in mind when wielding the power of unsafe, look at some common gotchas, and get familiar with some of the tools that help you write safer unsafe code. 
 
 The exact rules around what it means for Rust code to be safe are still being worked out. At the time of writing, the Unsafe Code Guidelines Working Group is hard at work nailing down all the dos and don’ts, but many questions remain unanswered. Most of the advice in this section is more or less settled, but I’ll make sure to call out any that isn’t. If anything, I’m hoping that this section will teach you to be careful about making assumptions when you write unsafe code, and prompt you to double-check the Rust reference before you declare your code production-ready. 
 
@@ -320,17 +258,15 @@ The exact rules around what it means for Rust code to be safe are still being wo
 
 We can’t really get into the rules unsafe code must abide by without talk- ing about what happens if you violate those rules. Let’s say you do mutably access a value from multiple threads concurrently, construct an unaligned reference, or dereference a dangling pointer—now what? 
 
-Unsafe code that is not ultimately safe is referred to as having *undefined behavior*. Undefined behavior generally manifests in one of three ways: not at all, through visible errors, or through invisible corruption. The first is the happy case—you wrote some code that is truly not safe, but the compiler generated sane code that the computer you’re running the code on exe- cutes in a sane way. Unfortunately, the happiness here is very brittle. Should a new and slightly smarter version of the compiler come along, or some sur- rounding code cause the compiler to apply another optimization, the code may no longer do something sane and tip over into one of the worse cases. Even if the same code is compiled by the same compiler, if it runs on a dif- ferent platform or host, the program might act differently! This is why it is important to avoid undefined behavior even if everything currently seems to work fine. Not to do so is like playing a second round of Russian roulette just because you survived the first. 
+Unsafe code that is not ultimately safe is referred to as having *undefined behavior*. Undefined behavior generally manifests in one of three ways: not at all, through visible errors, or through invisible corruption. The first is the happy case—you wrote some code that is truly not safe, but the compiler generated sane code that the computer you’re running the code on exe- cutes in a sane way. Unfortunately, the happiness here is very brittle. Should a new and slightly smarter version of the compiler come along, or some surrounding code cause the compiler to apply another optimization, the code may no longer do something sane and tip over into one of the worse cases. Even if the same code is compiled by the same compiler, if it runs on a different platform or host, the program might act differently! This is why it is important to avoid undefined behavior even if everything currently seems to work fine. Not to do so is like playing a second round of Russian roulette just because you survived the first. 
 
-Visible errors are the easiest undefined behavior to catch. If you deref- erence a null pointer, for example, your program will (in all likelihood) crash with an error, which you can then debug back to the root cause. That debugging may itself be difficult, but at least you have a notification that something is wrong. Visible errors can also manifest in less severe ways, such as deadlocks, garbled output, or panics that are printed but don’t trig- ger a program exit, all of which tell you that there is a bug in your code that you have to go fix. 
+Visible errors are the easiest undefined behavior to catch. If you dereference a null pointer, for example, your program will (in all likelihood) crash with an error, which you can then debug back to the root cause. That debugging may itself be difficult, but at least you have a notification that something is wrong. Visible errors can also manifest in less severe ways, such as deadlocks, garbled output, or panics that are printed but don’t trigger a program exit, all of which tell you that there is a bug in your code that you have to go fix. 
 
-The worst manifestation of undefined behavior is when there is no immediate visible effect, but the program state is invisibly corrupted. Transaction amounts might be slightly off from what they should be, back- ups might be silently corrupted, or random bits of internal memory could be exposed to external clients. The undefined behavior could cause ongo- ing corruption, or extremely infrequent outages. Part of the challenge with undefined behavior is that, as the name implies, the behavior of the non- safe unsafe code is not defined—the compiler might eliminate it entirely, 
-
-dramatically change the semantics of the code, or even miscompile sur- rounding code. What that does to your program is entirely dependent on what the code in question does. The unpredictable impact of undefined behavior is the reason why *all* undefined behavior should be considered a serious bug, no matter how it *currently* manifests. 
+The worst manifestation of undefined behavior is when there is no immediate visible effect, but the program state is invisibly corrupted. Transaction amounts might be slightly off from what they should be, back- ups might be silently corrupted, or random bits of internal memory could be exposed to external clients. The undefined behavior could cause ongoing corruption, or extremely infrequent outages. Part of the challenge with undefined behavior is that, as the name implies, the behavior of the non- safe unsafe code is not defined—the compiler might eliminate it entirely, dramatically change the semantics of the code, or even miscompile surrounding code. What that does to your program is entirely dependent on what the code in question does. The unpredictable impact of undefined behavior is the reason why *all* undefined behavior should be considered a serious bug, no matter how it *currently* manifests. 
 
 **WHY UNDEFINED BEHAVIOR?** 
 
-An argument that often comes up in conversations about undefined behavior is that the compiler should emit an error if code exhibits undefined behavior instead of doing something weird and unpredictable . That way, it would be near-impossible to write bad unsafe code! 
+An argument that often comes up in conversations about undefined behavior is that the compiler should emit an error if code exhibits undefined behavior instead of doing something weird and unpredictable . That way, it would be near impossible to write bad unsafe code! 
 
 Unfortunately, that would be impossible because undefined behavior is rarely explicit or obvious . Instead, what usually happens is that the compiler simply applies optimizations under the assumption that the code follows the specification . Should that turn out to not be the case—which is rarely clear until runtime—it’s difficult to predict what the effect might be . Maybe the optimiza- tion is still valid, and nothing bad happens; but maybe it’s not, and the seman- tics of the code end up slightly different from that of the unoptimized version . 
 
@@ -344,31 +280,23 @@ Perhaps the most important concept to understand before writing unsafe code is *
 
 **Reference Types** 
 
-Rust is very strict about what values its reference types can hold. Specifically, references must never dangle, must always be aligned, and must always point to a valid value for their target type. In addition, a shared and an exclusive reference to a given memory location can never exist at the same time, and neither can multiple exclusive references to a location. These 
-
-Unsafe Code **155** 
-
-**156** Chapter 9 
-
-rules apply regardless of whether your code uses the references or not—you are not allowed to create a null reference even if you then immediately dis- card it! 
+Rust is very strict about what values its reference types can hold. Specifically, references must never dangle, must always be aligned, and must always point to a valid value for their target type. In addition, a shared and an exclusive reference to a given memory location can never exist at the same time, and neither can multiple exclusive references to a location. These rules apply regardless of whether your code uses the references or not—you are not allowed to create a null reference even if you then immediately discard it! 
 
 Shared references have the additional constraint that the pointee is not allowed to change during the reference’s lifetime. That is, any value the pointee contains must remain exactly the same over its lifetime. This applies transitively, so if you have an & to a type that contains a *mut T, you are not allowed to ever mutate the T through that *mut even though you could write code to do so using unsafe. The *only* exception to this rule is a value wrapped by the UnsafeCell type. All other types that provide interior mutability, like Cell, RefCell, and Mutex, internally use an UnsafeCell. 
 
-An interesting result of Rust’s strict rules for references is that for many years, it was impossible to safely take a reference to a field of a packed or partially uninitialized struct that used repr(Rust). Since repr(Rust) leaves
- a type’s layout undefined, the only way to get the address of a field was by writing &some_struct.field as *const _. However, if some_struct is packed, then some_struct.field may not be aligned, and thus creating an & to it is illegal! Further, if some_struct isn’t fully initialized, then the some_struct ref- erence itself cannot exist! In Rust 1.51.0, the ptr::addr_of! macro was stabi- lized, which added a mechanism for directly obtaining a reference to a field without first creating a reference, fixing this particular problem. Internally, it is implemented using something called *raw references* (not to be confused with raw pointers), which directly create pointers to their operands rather than going via a reference. Raw references were introduced in RFC 2582 but haven’t been stabilized themselves yet at the time of writing. 
+An interesting result of Rust’s strict rules for references is that for many years, it was impossible to safely take a reference to a field of a packed or partially uninitialized struct that used repr(Rust). Since repr(Rust) leaves a type’s layout undefined, the only way to get the address of a field was by writing &some_struct.field as *const _. However, if some_struct is packed, then some_struct.field may not be aligned, and thus creating an & to it is illegal! Further, if some_struct isn’t fully initialized, then the some_struct reference itself cannot exist! In Rust 1.51.0, the ptr::addr_of! macro was stabilized, which added a mechanism for directly obtaining a reference to a field without first creating a reference, fixing this particular problem. Internally, it is implemented using something called *raw references* (not to be confused with raw pointers), which directly create pointers to their operands rather than going via a reference. Raw references were introduced in RFC 2582 but haven’t been stabilized themselves yet at the time of writing. 
 
 **Primitive Types** 
 
-Some of Rust’s primitive types have restrictions on what values they can hold. For example, a bool is defined as being 1 byte large but is only allowed to hold the value 0x00 or the value 0x01, and a char is not allowed to hold
- a surrogate or a value above char::MAX. Most of Rust’s primitive types, and indeed most of Rust’s types overall, also cannot be constructed from unini- tialized memory. These restrictions may seem arbitrary, but again often stem from the need to enable optimizations that wouldn’t be possible otherwise. 
+Some of Rust’s primitive types have restrictions on what values they can hold. For example, a bool is defined as being 1 byte large but is only allowed to hold the value 0x00 or the value 0x01, and a char is not allowed to hold a surrogate or a value above char::MAX. Most of Rust’s primitive types, and indeed most of Rust’s types overall, also cannot be constructed from uninitialized memory. These restrictions may seem arbitrary, but again often stem from the need to enable optimizations that wouldn’t be possible otherwise. 
 
 A good illustration of this is the niche optimization, which we discussed briefly when talking about pointer types earlier in this chapter. To recap, the niche optimization tucks away the enum discriminant value in the wrapped type in certain cases. For example, since a reference cannot ever be all zeros, an Option<&T> can use all zeros to represent None, and thus avoid spending an extra byte (plus padding) to store the discriminator byte. The compiler can optimize Booleans in the same way and potentially take it even further. Consider the type Option<Option<bool>>>. Since the compiler knows that the bool is either 0x00 or 0x01, it’s free to use 0x02 to represent Some(None) and 0x03 to represent None. Very nice and tidy! But if someone were to come along and treat the byte 0x03 as a bool, and then place that value in an Option<Option<bool>> optimized in this way, bad things would happen. 
 
-It bears repeating that it’s not important whether the Rust compiler cur- rently implements this optimization or not. The point is that it is allowed to, and therefore any unsafe code you write must conform to that contract or risk hitting a bug later on should the behavior change. 
+It bears repeating that it’s not important whether the Rust compiler currently implements this optimization or not. The point is that it is allowed to, and therefore any unsafe code you write must conform to that contract or risk hitting a bug later on should the behavior change. 
 
 **Owned Pointer Types** 
 
-Types that point to memory they own, like Box and Vec, are generally sub- ject to the same optimizations as if they held an exclusive reference to the pointed-to memory unless they’re explicitly accessed through a shared reference. Specifically, the compiler assumes that the pointed-to memory is not shared or aliased elsewhere, and makes optimizations based on that assumption. For example, if you extracted the pointer from a Box and then constructed two Boxes from that same pointer and wrapped them in ManuallyDrop to prevent a double-free, you’d likely be entering undefined behavior territory. That’s the case even if you only ever access the inner type through shared references. (I say “likely” because this isn’t fully set- tled in the language reference yet, but a rough consensus has arisen.) 
+Types that point to memory they own, like Box and Vec, are generally subject to the same optimizations as if they held an exclusive reference to the pointed-to memory unless they’re explicitly accessed through a shared reference. Specifically, the compiler assumes that the pointed-to memory is not shared or aliased elsewhere, and makes optimizations based on that assumption. For example, if you extracted the pointer from a Box and then constructed two Boxes from that same pointer and wrapped them in ManuallyDrop to prevent a double-free, you’d likely be entering undefined behavior territory. That’s the case even if you only ever access the inner type through shared references. (I say “likely” because this isn’t fully set- tled in the language reference yet, but a rough consensus has arisen.) 
 
 **Storing Invalid Values** 
 
@@ -376,8 +304,7 @@ Sometimes you need to store a value that isn’t currently valid for its type. T
 
 The MaybeUninit<T> type is Rust’s mechanism for working with values that aren’t valid. A MaybeUninit<T> stores exactly a T (it is #[repr(transparent)]), but the compiler knows to make no assumptions about the validity of that T. It won’t assume that references are non-null, that a Box<T> isn’t dangling, or that a bool is either 0 or 1. This means it’s safe to hold a T backed by unini- tialized memory inside a MaybeUninit (as the name implies). MaybeUninit is also a very useful tool in other unsafe code where you have to temporarily store a value that may be invalid. Maybe you have to store an aliased Box<T> or stash a char surrogate for a second—MaybeUninit is your friend. 
 
-You will generally do only three things with a MaybeUninit: create it using the MaybeUninit::uninit method, write to its contents using MaybeUninit::as _mut_ptr, or take the inner T once it is valid again with MaybeUninit::assume_init. As its name implies, uninit creates a new MaybeUninit<T> of the same size as
- a T that initially holds uninitialized memory. The as_mut_ptr method gives you a raw pointer to the inner T that you can then write to; nothing stops you from reading from it, but reading from any of the uninitialized bits is undefined behavior. And finally, the unsafe assume_init method consumes the MaybeUninit<T> and returns its contents as a T following the assertion that the backing memory now makes up a valid T. 
+You will generally do only three things with a MaybeUninit: create it using the MaybeUninit::uninit method, write to its contents using MaybeUninit::as _mut_ptr, or take the inner T once it is valid again with MaybeUninit::assume_init. As its name implies, uninit creates a new MaybeUninit<T> of the same size as a T that initially holds uninitialized memory. The as_mut_ptr method gives you a raw pointer to the inner T that you can then write to; nothing stops you from reading from it, but reading from any of the uninitialized bits is undefined behavior. And finally, the unsafe assume_init method consumes the MaybeUninit<T> and returns its contents as a T following the assertion that the backing memory now makes up a valid T. 
 
 Listing 9-5 shows an example of how we might use MaybeUninit to safely initialize a byte array without explicitly zeroing it. 
 
@@ -389,20 +316,13 @@ fn fill(gen: impl FnMut() -> Option<u8>) {
     let mut last = 0;
     for (i, g) in std::iter::from_fn(gen).take(4096).enumerate() {
         buf[i] = MaybeUninit::new(g);
+		last = i + 1; } 
+	    // Safety: all the u8s up to last are initialized.
+	let init: &[u8] = unsafe {
+		MaybeUninit::slice_assume_init_ref(&buf[..last])
+	}; 
+ } 
 ```
-
-last = i + 1; } 
-
-```
-    // Safety: all the u8s up to last are initialized.
-let init: &[u8] = unsafe {
-  MaybeUninit::slice_assume_init_ref(&buf[..last])
-```
-
-}; 
-
-} 
-
 Listing 9-5: Using *MaybeUninit* to safely initialize an array 
 
 While we could have declared buf as [0; 4096] instead, that would require the function to first write out all those zeros to the stack before executing, even if it’s going to overwrite them all again shortly thereafter. Normally that wouldn’t have a noticeable impact on performance, but if this was in a sufficiently hot loop, it might! Here, we instead allow the array to keep whatever values happened to be on the stack when the function was called, and then overwrite only what we end up needing. 
@@ -411,7 +331,7 @@ While we could have declared buf as [0; 4096] instead, that would require the fu
 
 **Panics** 
 
-An important and often overlooked aspect of ensuring that code using unsafe operations is safe is that the code must also be prepared to handle panics. In particular, as we discussed briefly in Chapter 5, Rust’s default panic handler on most platforms will not crash your program on a panic but will instead *unwind* the current thread. An unwinding panic effec- tively drops everything in the current scope, returns from the current func- tion, drops everything in the scope that enclosed the function, and so on, all the way down the stack until it hits the first stack frame for the current thread. If you don’t take unwinding into account in your unsafe code, you may be in for trouble. For example, consider the code in Listing 9-6, which tries to efficiently push many values into a Vec at once. 
+An important and often overlooked aspect of ensuring that code using unsafe operations is safe is that the code must also be prepared to handle panics. In particular, as we discussed briefly in Chapter 5, Rust’s default panic handler on most platforms will not crash your program on a panic but will instead *unwind* the current thread. An unwinding panic effectively drops everything in the current scope, returns from the current func- tion, drops everything in the scope that enclosed the function, and so on, all the way down the stack until it hits the first stack frame for the current thread. If you don’t take unwinding into account in your unsafe code, you may be in for trouble. For example, consider the code in Listing 9-6, which tries to efficiently push many values into a Vec at once. 
 
 ```
 impl<T: Default> Vec<T> {
@@ -421,31 +341,27 @@ impl<T: Default> Vec<T> {
         let start = self.len();
         unsafe {
 // ... do something with init ...
+
+	self.set_len(start + n);
+            for i in 0..fill {
+                *self.get_unchecked_mut(start + i) = T::default();
+	}}
+}}
 ```
 
 **N O T E** 
 
-**158** Chapter 9 
 
-```
-self.set_len(start + n);
-            for i in 0..fill {
-                *self.get_unchecked_mut(start + i) = T::default();
-```
-
-} } 
-
-} } 
 
 Listing 9-6: A seemingly safe method for filling a vector with *Default* values 
 
-Consider what happens to this code if a call to T::default panics. First, fill_default will drop all its local values (which are just integers) and then return. The caller will then do the same. At some point up the stack, we get to the owner of the Vec. When the owner drops the vector, we have a problem: the length of the vector now indicates that we own more Ts than we actually produced due to the call to set_len. For example, if the very first call to T::default panicked when we aimed to fill eight elements, that means Vec::drop will call drop on eight Ts that actually contain uninitialized memor y! 
+Consider what happens to this code if a call to T::default panics. First, fill_default will drop all its local values (which are just integers) and then return. The caller will then do the same. At some point up the stack, we get to the owner of the Vec. When the owner drops the vector, we have a problem: the length of the vector now indicates that we own more Ts than we actually produced due to the call to set_len. For example, if the very first call to T::default panicked when we aimed to fill eight elements, that means Vec::drop will call drop on eight Ts that actually contain uninitialized memory! 
 
-The fix in this case is simple: the code must update the length *after* writ- ing all the elements. We wouldn’t have realized there was a problem if we didn’t carefully consider the effect of unwinding panics on the correctness of our unsafe code. 
+The fix in this case is simple: the code must update the length *after* writing all the elements. We wouldn’t have realized there was a problem if we didn’t carefully consider the effect of unwinding panics on the correctness of our unsafe code. 
 
 When you’re combing through your code for these kinds of problems, you’ll want to look out for any statements that may panic, and consider whether your code is safe if they do. Alternatively, check whether you can convince yourself that the code in question will never panic. Pay particular attention to anything that calls user-provided code—in those cases, you have no control over the panics and should assume that the user code will panic. 
 
-A similar situation arises when you use the ? operator to return early from a function. If you do this, make sure that your code is still safe if it does not execute the remainder of the code in the function. It’s rarer for ? to catch you off guard since you opted into it explicitly, but it’s worth keep- ing an eye out for. 
+A similar situation arises when you use the ? operator to return early from a function. If you do this, make sure that your code is still safe if it does not execute the remainder of the code in the function. It’s rarer for ? to catch you off guard since you opted into it explicitly, but it’s worth keeping an eye out for. 
 
 **Casting** 
 
@@ -458,11 +374,6 @@ struct Foo<T> {
 }
 struct Bar;
 struct Baz;
-```
-
-Unsafe Code **159** 
-
-```
 type A = Foo<Bar>;
 type B = Foo<Baz>;
 ```
@@ -471,8 +382,7 @@ Listing 9-7: Type layout is not predictable.
 
 The lack of guarantees for repr(Rust) is important to keep in mind when you do type casting in unsafe code—just because two types feel like they should be interchangeable, that is not necessarily the case. Casting between two types that have different representations is a quick path to undefined behavior. At the time of writing, the Rust community is actively working out the exact rules for how types are represented, but for now, very few guarantees are given, so that’s what we have to work with. 
 
-Even if identical types were guaranteed to have the same in-memory representation, you’d still run into the same problem when types are nested. For example, while UnsafeCell<T>, MaybeUninit<T>, and T all really
- just hold a T, and you can cast between them to your heart’s delight, that goes out the window once you have, for example, an Option<MaybeUninit<T>>. Though Option<T> may be able to take advantage of the niche optimization (using some invalid value of T to represent None for the Option), MaybeUninit<T> can hold any bit pattern, so that optimization does not apply, and an extra byte must be kept for the Option discriminator. 
+Even if identical types were guaranteed to have the same in-memory representation, you’d still run into the same problem when types are nested. For example, while UnsafeCell<T>, MaybeUninit<T>, and T all really just hold a T, and you can cast between them to your heart’s delight, that goes out the window once you have, for example, an Option<MaybeUninit<T>>. Though Option<T> may be able to take advantage of the niche optimization (using some invalid value of T to represent None for the Option), MaybeUninit<T> can hold any bit pattern, so that optimization does not apply, and an extra byte must be kept for the Option discriminator. 
 
 It’s not just optimizations that can cause layouts to diverge once wrap- per types come into play. As an example, take the code in Listing 9-8; here, the layout of Wrapper<PhantomData<u8>> and Wrapper<PhantomData<i8>> is com- pletely different even though the provided types are both empty! 
 
@@ -499,11 +409,7 @@ All of this isn’t to say that you can never cast types in Rust. Things get a l
 
 **The Drop Check** 
 
-The Rust borrow checker is, in essence, a sophisticated tool for ensuring the soundness of code at compile time, which is in turn what gives Rust a 
-
-**160** Chapter 9 
-
-way to express code being “safe.” How exactly the borrow checker does its job is beyond the scope of this book, but one check, the *drop check*, is worth going through in some detail since it has some direct implications for unsafe code. To understand drop checking, let’s put ourselves in the Rust compiler’s shoes for a second and look at two code snippets. First, take a look at the little three-liner in Listing 9-9 that takes a mutable reference to a variable and then mutates that same variable right after. 
+The Rust borrow checker is, in essence, a sophisticated tool for ensuring the soundness of code at compile time, which is in turn what gives Rust a way to express code being “safe.” How exactly the borrow checker does its job is beyond the scope of this book, but one check, the *drop check*, is worth going through in some detail since it has some direct implications for unsafe code. To understand drop checking, let’s put ourselves in the Rust compiler’s shoes for a second and look at two code snippets. First, take a look at the little three-liner in Listing 9-9 that takes a mutable reference to a variable and then mutates that same variable right after. 
 
 ```
 let mut x = true;
@@ -513,7 +419,7 @@ x = false;
 
 Listing 9-9: The implementation of *Foo* dictates whether this code should compile 
 
-Without knowing the definition of Foo, can you say whether this code should compile or not? When we set x = false, there is still a foo hanging around that will be dropped at the end of the scope. We know that foo con- tains a mutable borrow of x, which would indicate that the mutable borrow that’s necessary to modify x is illegal. But what’s the harm in allowing it? It turns out that allowing the mutation of x is problematic only if Foo imple- ments Drop—if Foo doesn’t implement Drop, then we know that Foo won’t touch the reference to x after its last use. Since that last use is before we need the exclusive reference for the assignment, we can allow the code! On the other hand, if Foo does implement Drop, we can’t allow this code, since the Drop implementation may use the reference to x. 
+Without knowing the definition of Foo, can you say whether this code should compile or not? When we set x = false, there is still a foo hanging around that will be dropped at the end of the scope. We know that foo contains a mutable borrow of x, which would indicate that the mutable borrow that’s necessary to modify x is illegal. But what’s the harm in allowing it? It turns out that allowing the mutation of x is problematic only if Foo implements Drop—if Foo doesn’t implement Drop, then we know that Foo won’t touch the reference to x after its last use. Since that last use is before we need the exclusive reference for the assignment, we can allow the code! On the other hand, if Foo does implement Drop, we can’t allow this code, since the Drop implementation may use the reference to x. 
 
 Now that you’re warmed up, take a look at Listing 9-10. In this not-so- straightforward code snippet, the mutable reference is buried even deeper. 
 
@@ -526,14 +432,10 @@ x = false;
 
 Listing 9-10: The implementations of both *Foo* and *Bar* dictate whether this code should compile 
 
-Again, without knowing the definitions of Foo and Bar, can you say whether this code should compile or not? Let’s consider what happens if
- Foo implements Drop but Bar does not, since that’s the most interesting case. Usually, when a Bar goes out of scope, or otherwise gets dropped, it’ll still have to drop Foo, which in turn means that the code should be rejected for the same reason as before: Foo::drop might access the reference to x. However, Bar may not contain a Foo directly at all, but instead just a PhantomData<Foo<'a>> or a &'static Foo<'a>, in which case the code is actually okay—even though the Bar is dropped, Foo::drop is never invoked, and the reference to x is never accessed. This is the kind of code we want the compiler to accept because a human will be able to identify that it’s okay, even if the compiler finds it dif- ficult to detect that this is the case. 
+Again, without knowing the definitions of Foo and Bar, can you say whether this code should compile or not? Let’s consider what happens if Foo implements Drop but Bar does not, since that’s the most interesting case. Usually, when a Bar goes out of scope, or otherwise gets dropped, it’ll still have to drop Foo, which in turn means that the code should be rejected for the same reason as before: Foo::drop might access the reference to x. However, Bar may not contain a Foo directly at all, but instead just a PhantomData<Foo<'a>> or a &'static Foo<'a>, in which case the code is actually okay—even though the Bar is dropped, Foo::drop is never invoked, and the reference to x is never accessed. This is the kind of code we want the compiler to accept because a human will be able to identify that it’s okay, even if the compiler finds it dif- ficult to detect that this is the case. 
 
 The logic we’ve just walked through is the drop check. Normally it doesn’t affect unsafe code too much as its default behavior matches user expectations, with one major exception: dangling generic parameters. 
 
-Unsafe Code **161** 
-
-**162** Chapter 9 
 
 **N O T E** 
 
@@ -543,9 +445,7 @@ Imagine that you’re implementing your own Box<T> type, and someone places a &m
 unsafe impl<#[may_dangle] T> Drop for ..
 ```
 
-This escape hatch allows a type to declare that a given generic param- eter isn’t used in Drop, which enables use cases like Box<&mut T>. However,
- it also introduces a new problem if your Box<T> holds a raw heap pointer, *mut T, and allows T to dangle using #[may_dangle]. Specifically, the *mut T makes Rust’s drop check think that your Box<T> doesn’t own a T, and thus that it doesn’t call T::drop either. Combined with the may_dangle assertion that we don’t access T when the Box<T> is dropped, the drop check now con- cludes that it’s fine to have a Box<T> where the T doesn’t live until the Box
- is dropped (like our shortened &mut x in Listing 9-10). But that’s not true, since we *do* call T::drop, which may itself access, say, a reference to said x. 
+This escape hatch allows a type to declare that a given generic param- eter isn’t used in Drop, which enables use cases like Box<&mut T>. However, it also introduces a new problem if your Box<T> holds a raw heap pointer, *mut T, and allows T to dangle using #[may_dangle]. Specifically, the *mut T makes Rust’s drop check think that your Box<T> doesn’t own a T, and thus that it doesn’t call T::drop either. Combined with the may_dangle assertion that we don’t access T when the Box<T> is dropped, the drop check now con- cludes that it’s fine to have a Box<T> where the T doesn’t live until the Box is dropped (like our shortened &mut x in Listing 9-10). But that’s not true, since we *do* call T::drop, which may itself access, say, a reference to said x. 
 
 Luckily, the fix is simple: we add a PhantomData<T> to tell the drop check that even though the Box<T> doesn’t hold any T, and won’t access T on drop, it does still own a T and will drop one when the Box is dropped. Listing 9-11 shows what our hypothetical Box type would look like. 
 
@@ -573,8 +473,7 @@ In the remainder of this chapter, we’ll look at some techniques and tools that
 
 It’s tempting to reason about unsafety *locally*; that is, to consider whether the code in the unsafe block you just wrote is safe without thinking too much about its interaction with the rest of the codebase. Unfortunately, that kind of local reasoning often comes back to bite you. A good example of this is the Unpin trait—you may write some code for your type that uses Pin::new_unchecked to produce a pinned reference to a field of the type, and that code may be entirely safe when you write it. But then at some later point in time, you (or someone else) might add a safe implementation of Unpin for said type, and suddenly the unsafe code is no longer safe, even though it’s nowhere near the new impl! 
 
-Safety is a property that can be checked only at the privacy boundary of all code that relates to the unsafe block. *Privacy boundary* here isn’t so much a formal term as an attempt at describing “any part of your code that can fiddle with the unsafe bits.” For example, if you declare a public type Foo in a module bar that is marked pub or pub(crate), then any other code in the same crate can implement methods on and traits for Foo. So, if the safety
- of your unsafe code depends on Foo not implementing particular traits or methods with particular signatures, you need to remember to recheck the safety of that unsafe block any time you add an impl for Foo. If, on the other hand, Foo is not visible to the entire crate, then a much smaller set of scopes is able to add problematic implementations, and thus, the risk of acciden- tally adding an implementation that breaks the safety invariants goes down accordingly. If Foo is private, then only the current module and any submod- ules can add such implementations. 
+Safety is a property that can be checked only at the privacy boundary of all code that relates to the unsafe block. *Privacy boundary* here isn’t so much a formal term as an attempt at describing “any part of your code that can fiddle with the unsafe bits.” For example, if you declare a public type Foo in a module bar that is marked pub or pub(crate), then any other code in the same crate can implement methods on and traits for Foo. So, if the safety of your unsafe code depends on Foo not implementing particular traits or methods with particular signatures, you need to remember to recheck the safety of that unsafe block any time you add an impl for Foo. If, on the other hand, Foo is not visible to the entire crate, then a much smaller set of scopes is able to add problematic implementations, and thus, the risk of accidentally adding an implementation that breaks the safety invariants goes down accordingly. If Foo is private, then only the current module and any submodules can add such implementations. 
 
 The same rule applies to access to fields: if the safety of an unsafe block depends on certain invariants over a type’s fields, then any code that can touch those fields (including safe code) falls within the privacy boundary of the unsafe block. Here, too, minimizing the privacy boundary is the 
 
@@ -589,51 +488,40 @@ Unsafe Code **163**
 
 module an interface that is entirely safe. That way you only need to audit the internals of that module for your invariants. Or better yet, stick the unsafe bits in their own crate so that you can’t leave any holes open by accident! 
 
-It’s not always possible to fully encapsulate complex unsafe interac- tions to a single, safe interface, however. When that’s the case, try to narrow down the parts of the public interface that have to be unsafe so that you have only a very small number of them, give them names that clearly com- municate that care is needed, and then document them rigorously. 
+It’s not always possible to fully encapsulate complex unsafe interactions to a single, safe interface, however. When that’s the case, try to narrow down the parts of the public interface that have to be unsafe so that you have only a very small number of them, give them names that clearly com- municate that care is needed, and then document them rigorously. 
 
-It is sometimes tempting to remove the unsafe marker on internal APIs so that you don’t have to stick unsafe {} throughout your code. After all, inside your code you know never to invoke frobnify if you’ve previously called bazzify, right? Removing the unsafe annotation can lead to cleaner code but is usually a bad decision in the long run. A year from now, when your codebase has grown, you’ve paged out some of the safety invariants, and you “just want to hack together this one feature real quick,” chances are that you’ll inadvertently violate one of those invariants. And since
- you don’t have to type unsafe, you won’t even think to check. Plus, even
- if you never make mistakes, what about other contributors to your code? Ultimately, cleaner code is not a good enough argument to remove the intentionally noisy unsafe marker. 
+It is sometimes tempting to remove the unsafe marker on internal APIs so that you don’t have to stick unsafe {} throughout your code. After all, inside your code you know never to invoke frobnify if you’ve previously called bazzify, right? Removing the unsafe annotation can lead to cleaner code but is usually a bad decision in the long run. A year from now, when your codebase has grown, you’ve paged out some of the safety invariants, and you “just want to hack together this one feature real quick,” chances are that you’ll inadvertently violate one of those invariants. And since you don’t have to type unsafe, you won’t even think to check. Plus, even if you never make mistakes, what about other contributors to your code? Ultimately, cleaner code is not a good enough argument to remove the intentionally noisy unsafe marker. 
 
 **Read and Write Documentation** 
 
-It goes without saying that if you write an unsafe function, you must docu- ment the conditions under which that function is safe to call. Here, both clarity and completeness are important. Don’t leave any invariants out, even if you’ve already written them somewhere else. If you have a type or module that requires certain global invariants—invariants that must always hold for all uses of the type—then remind the reader that they must also uphold the global invariants in every unsafe function’s documentation too. Developers often read documentation in an ad hoc, on-demand manner, so you can assume they have probably not read your carefully written module-level documentation and need to be given a nudge to do so. 
+It goes without saying that if you write an unsafe function, you must document the conditions under which that function is safe to call. Here, both clarity and completeness are important. Don’t leave any invariants out, even if you’ve already written them somewhere else. If you have a type or module that requires certain global invariants—invariants that must always hold for all uses of the type—then remind the reader that they must also uphold the global invariants in every unsafe function’s documentation too. Developers often read documentation in an ad hoc, on-demand manner, so you can assume they have probably not read your carefully written module-level documentation and need to be given a nudge to do so. 
 
-What may be less obvious is that you should also document all unsafe implementations and blocks—think of this as providing proof that you
- do indeed uphold the contract the operation in question requires. For example, slice::get_unchecked requires that the provided index is within the bounds of the slice; when you call that method, put a comment just above
- it explaining how you know that the index is in fact guaranteed to be in bounds. In some cases, the invariants that the unsafe block requires are extensive, and your comments may get long. That’s a good thing. I have caught mistakes many times by trying to write the safety comment for an unsafe block and realizing halfway through that I actually don’t uphold
- a key invariant. You’ll also thank yourself a year down the road when you have to modify this code and ensure it’s still safe. And so will the contribu- tor to your project who just stumbled across this unsafe call and wants to understand what’s going on. 
+What may be less obvious is that you should also document all unsafe implementations and blocks—think of this as providing proof that you do indeed uphold the contract the operation in question requires. For example, slice::get_unchecked requires that the provided index is within the bounds of the slice; when you call that method, put a comment just above it explaining how you know that the index is in fact guaranteed to be in bounds. In some cases, the invariants that the unsafe block requires are extensive, and your comments may get long. That’s a good thing. I have caught mistakes many times by trying to write the safety comment for an unsafe block and realizing halfway through that I actually don’t uphold a key invariant. You’ll also thank yourself a year down the road when you have to modify this code and ensure it’s still safe. And so will the contribu- tor to your project who just stumbled across this unsafe call and wants to understand what’s going on. 
 
-Before you get too deep into writing unsafe code, I also highly recom- mend that you go read the Rustonomicon (*https://doc.rust-lang.org/nomicon/*) cover to cover. There are so many details that are easy to miss, and will come back to bite you if you’re not aware of them. We’ve covered many
- of them in this chapter, but it never hurts to be more aware. You should also make liberal use of the Rust reference whenever you’re in doubt. It’s added to regularly, and chances are that if you’re even slightly unsure about whether some assumption you have is right, the reference will call it out. If it doesn’t, consider opening an issue so that it’ll be added! 
+Before you get too deep into writing unsafe code, I also highly recom- mend that you go read the Rustonomicon (*https://doc.rust-lang.org/nomicon/*) cover to cover. There are so many details that are easy to miss, and will come back to bite you if you’re not aware of them. We’ve covered many of them in this chapter, but it never hurts to be more aware. You should also make liberal use of the Rust reference whenever you’re in doubt. It’s added to regularly, and chances are that if you’re even slightly unsure about whether some assumption you have is right, the reference will call it out. If it doesn’t, consider opening an issue so that it’ll be added! 
 
 **Check Your Work** 
 
-Okay, so you’ve written some unsafe code, you’ve double- and triple-checked all the invariants, and you think it’s ready to go. Before you put it into pro- duction, there are some automated tools that you should run your test suite through (you have a test suite, right?). 
+Okay, so you’ve written some unsafe code, you’ve double- and triple-checked all the invariants, and you think it’s ready to go. Before you put it into production, there are some automated tools that you should run your test suite through (you have a test suite, right?). 
 
 The first of these is Miri, the mid-level intermediate representation interpreter. Miri doesn’t compile your code into machine code but instead interprets the Rust code directly. This provides Miri with far more visibility into what your program is doing, which in turn allows it to check that your program doesn’t do anything obviously bad, like read from uninitialized memory. Miri can catch a lot of very subtle and Rust-specific bugs and is a lifesaver for anyone writing unsafe code. 
 
 Unfortunately, because Miri has to interpret the code to execute it, code run under Miri often runs orders of magnitude slower than its compiled counterpart. For that reason, Miri should really be used only to execute your test suite. It can also check only the code that actually runs, and thus won’t catch issues in code paths that your test suite doesn’t reach. You should think of Miri as an extension of your test suite, not a replacement for it. 
 
-There are also tools known as *sanitizers*, which instrument machine code to detect erroneous behavior at runtime. The overhead and fidelity of these tools vary greatly, but one widely loved tool is Google’s AddressSanitizer.
- It detects a large number of memory errors, such as use-after-free, buffer overflows, and memory leaks, all of which are common symptoms of incor- rect unsafe code. Unlike Miri, these tools operate on machine code and thus tend to be fairly fast—usually within the same order of magnitude. But like Miri, they are constrained to analyzing the code that actually runs, so here too a solid test suite is vital. 
+There are also tools known as *sanitizers*, which instrument machine code to detect erroneous behavior at runtime. The overhead and fidelity of these tools vary greatly, but one widely loved tool is Google’s AddressSanitizer. It detects a large number of memory errors, such as use-after-free, buffer overflows, and memory leaks, all of which are common symptoms of incorrect unsafe code. Unlike Miri, these tools operate on machine code and thus tend to be fairly fast—usually within the same order of magnitude. But like Miri, they are constrained to analyzing the code that actually runs, so here too a solid test suite is vital. 
 
 The key to using these tools effectively is to automate them through your continuous integration pipeline so they’re run for every change, and to ensure that you add regression tests over time as you discover errors. The tools get better at catching problems as the quality of your test suite improves, so by incorporating new tests as you fix known bugs, you’re earn- ing double points back, so to speak! 
 
-Finally, don’t forget to sprinkle assertions generously through unsafe code. A panic is always better than triggering undefined behavior! Check all of your assumptions with assertions if you can—even things like the size 
-
-Unsafe Code **165** 
-
-of a usize if you rely on that for safety. If you’re concerned about runtime cost, make use of the debug_assert* macros and the if cfg!(debug_assertions) || cfg!(test) construct to execute them only in debug and test contexts. 
+Finally, don’t forget to sprinkle assertions generously through unsafe code. A panic is always better than triggering undefined behavior! Check all of your assumptions with assertions if you can—even things like the size of a usize if you rely on that for safety. If you’re concerned about runtime cost, make use of the debug_assert* macros and the if cfg!(debug_assertions) || cfg!(test) construct to execute them only in debug and test contexts. 
 
 **A HOUSE OF CARDS?** 
 
 Unsafe code can violate all of Rust’s safety guarantees, and this is often touted as a reason why Rust’s whole safety argument is a charade . The concern is that it takes only one bit of incorrect unsafe code for the whole house to come crashing down and all safety to be lost . Proponents of this argument then sometimes argue that at the very least only unsafe code should be able to call unsafe code, so that the unsafety is visible all the way to the highest level of the application . 
 
-The argument is understandable—it is true that the safety of Rust code relies on the safety of all the transitive unsafe code it ends up invoking . And indeed, if some of that unsafe code is incorrect, it may have implications for the safety of the program overall . However, what this argument misses is that all successful safe languages provide a facility for language extensions that are not expressible in the (safe) surface language, usually in the form of code writ- ten in C or assembly . Just as Rust relies on the correctness of its unsafe code, the safety of those languages relies on the correctness of those extensions . 
+The argument is understandable—it is true that the safety of Rust code relies on the safety of all the transitive unsafe code it ends up invoking . And indeed, if some of that unsafe code is incorrect, it may have implications for the safety of the program overall . However, what this argument misses is that all successful safe languages provide a facility for language extensions that are not expressible in the (safe) surface language, usually in the form of code written in C or assembly . Just as Rust relies on the correctness of its unsafe code, the safety of those languages relies on the correctness of those extensions. 
 
 Rust is different in that it doesn’t have a separate extension language, but instead allows extensions to be written in what amounts to a dialect of Rust (unsafe Rust) . This allows much closer integration between the safe and unsafe code, which in turn reduces the likelihood of errors due to impedance mis- matches at the interface between the two, or due to developers being familiar with one but not the other . The closer integration also makes it easier to write tools that analyze the correctness of the unsafe code’s interaction with the safe code, as exemplified by tools like Miri . And since unsafe Rust continues to be subject to the borrow checker for any operation that isn’t explicitly unsafe, there remain many safety checks in place that aren’t present when developers must drop down to a language like C . 
 
-**Summary** 
+## Summary
 
 In this chapter, we’ve walked through the powers that come with the unsafe keyword and the responsibilities we accept by leveraging those powers. We also talked about the consequences of writing unsafe unsafe code, and how you really should be thinking about unsafe as a way to swear to the compiler that you’ve manually checked that the indicated code is still safe. In the next chapter, we’ll jump into concurrency in Rust and see how you can get all those cores on your shiny new computer to pull in the same direction! 
