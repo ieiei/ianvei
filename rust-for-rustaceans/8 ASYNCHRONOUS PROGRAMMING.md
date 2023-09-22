@@ -3,13 +3,13 @@ Asynchronous programming is, as the name implies, programming that is not synchr
 
 If you’re not already familiar with asynchronous programming, that definition may feel insufficient as it doesn’t actually explain what asynchronous programming *is*. To really understand the asynchronous programming model and how it works in Rust, we have to first dig into what the alter- native is. That is, we need to understand the *synchronous* programming model before we can understand the *asynchronous* one. This is important in both clarifying the concepts and demonstrating the trade-offs of using asynchronous programming: an asynchronous solution is not always the right one! We’ll start this chapter by taking a quick journey through what motivates asynchronous programming as a concept in the first place; then we’ll dig into how asynchrony in Rust actually works under the hood. 
 
-**What’s the Deal with Asynchrony?** 
+## What’s the Deal with Asynchrony?
 
 Before we get to the details of the synchronous and asynchronous program- ming models, we first need to take a quick look at what your computer is actually doing when it runs your programs. 
 
 Computers are fast. Really fast. So fast, in fact, that they spend most of their time waiting for things to happen. Unless you’re decompressing files, encoding audio, or crunching numbers, chances are that your CPU mostly sits idle, waiting for operations to complete. It’s waiting for a network packet to arrive, for the mouse to move, for the disk to finish writing some bytes, or maybe even just for a read from main memory to complete. From the CPU’s perspective, eons go by between most such events. When one does occur, the CPU runs a few more instructions, then goes back to waiting again. Take a look at your CPU utilization—it’s probably somewhere in the low single digits, and that’s likely where it hovers the majority of the time. 
 
-**Synchronous Interfaces** 
+***Synchronous Interfaces***
 
 Synchronous interfaces allow your program (or rather, a single thread in your program) to execute only a single operation at a time; each operation has to wait for the previous synchronous operation to finish before it gets to run. Most interfaces you see in the wild are synchronous: you call them, they go do some stuff, and eventually they return when the operation has completed and your program can continue from there. The reason for this, as we’ll see later in this chapter, is that making an operation asynchronous takes a fair bit of extra machinery. Unless you need the benefits of asynchrony, sticking to the synchronous model requires much less pomp and circumstance. 
 
@@ -17,11 +17,9 @@ Synchronous interfaces hide all this waiting; the application calls a function t
 
 An interface that performs operations sequentially in this way is also often referred to as *blocking*, since the operation in the interface that has to wait for some external event to happen in order for it to make progress *blocks* further execution until that event happens. Whether you refer to an interface as synchronous or blocking, the basic idea is the same: the appli- cation does not move on until the current operation finishes. While the operation is waiting, so is the application. 
 
-Synchronous interfaces are usually considered to be easy to work with and simple to reason about, since your code executes just one line at a time. 
+Synchronous interfaces are usually considered to be easy to work with and simple to reason about, since your code executes just one line at a time. But they also allow the application to do only one thing at a time. That means if you want your program to wait for either user input or a network packet, you’re out of luck unless your operating system provides an opera- tion specifically for that. Similarly, even if your application could do some other useful work while the disk is writing a file, it doesn’t have that option as the file write operation blocks the execution! 
 
-But they also allow the application to do only one thing at a time. That means if you want your program to wait for either user input or a network packet, you’re out of luck unless your operating system provides an opera- tion specifically for that. Similarly, even if your application could do some other useful work while the disk is writing a file, it doesn’t have that option as the file write operation blocks the execution! 
-
-**Multithreading** 
+***Multithreading***
 
 By far the most common solution to allowing concurrent execution is to use *multithreading*. In a multithreaded program, each thread is responsible for executing a particular independent sequence of blocking operations, and the operating system multiplexes among the threads so that if any thread can make progress, progress is made. If one thread blocks, some other thread may still be runnable, and so the application can continue to do useful work. 
 
@@ -53,7 +51,7 @@ These nonblocking functions allow us to easily perform multiple tasks concurrent
 
 The word *loop* here should make you a little nervous. You don’t want your program to burn through a loop three billion times a second when it may be minutes until the next input occurs. In the world of blocking interfaces, this wasn’t a problem since the operating system simply put the thread to sleep and then took care of waking it up when a relevant event occurred, but how do we avoid burning cycles while waiting in this brave new nonblocking world? That’s what much of the remainder of this chapter will be about. 
 
-**Standardized Polling** 
+***Standardized Polling***
 
 To get to a world where every library can be used in a nonblocking fashion, we could have every library author cook up their own poll methods, all with slightly different names, signatures, and return types—but that would quickly get unwieldy. Instead, in Rust, polling is standardized through the Future trait. A simplified version of Future is shown in Listing 8-2 (we’ll get back to the real one later in this chapter). 
 
@@ -64,7 +62,7 @@ trait Future {
 }
 ```
 
-Listing 8-2: A simplified view of the *Future* trait 
+*Listing 8-2: A simplified view of the *Future* trait*
 
 Types that implement the Future trait are known as *futures* and repre- sent values that may not be available yet. A future could represent the next time a network packet comes in, the next time the mouse cursor moves, or just the point at which some amount of time has elapsed. You can read Future<Output = Foo> as “a type that will produce a Foo in the future.” Types like this are often referred to in other languages as *promises*—they promise that they will eventually yield the indicated type. When a future eventually returns Poll::Ready(T), we say that the future *resolves* into a T. 
 
@@ -72,7 +70,7 @@ With this trait in place, we can generalize the pattern of providing poll method
 
 **NOTE** *In general, you should not poll a future again after it has returned* *Poll::Ready**. If you do, the future is well within its rights to panic. A future that is safe to poll after it has returned* *Ready* *is sometimes referred to as a* fused *future.* 
 
-**Ergonomic Futures** 
+### Ergonomic Futures
 
 Writing a type that implements Future in the way I’ve described so far is quite a pain. To see why, first take a look at the fairly straightforward asyn- chronous code block in Listing 8-3 that simply tries to forward messages from the input channel rx to the output channel tx. 
 
@@ -84,13 +82,11 @@ async fn forward<T>(rx: Receiver<T>, tx: Sender<T>) {
 }
 ```
 
-} 
-
-*Listing 8-3: Implementing a channel-forwarding future using *async* and *await * 
+*Listing 8-3: Implementing a channel-forwarding future using *async* and await* 
 
 This code, written using async and await syntax, looks very similar to its equivalent synchronous code and is easy to read. We simply send each mes- sage we receive in a loop until there are no more messages, and each await point corresponds to a place where a synchronous variant might block. Now think about if you instead had to express this code by manually implementing the Future trait. Since each call to poll starts at the top of the function, you’d need to package the necessary state to continue from the last place the code yielded. The result is fairly grotesque, as Listing 8-4 demonstrates. 
 
-```
+```rust
 enum Forward<T> { 1
  WaitingForReceive(ReceiveFuture<T>, Option<Sender<T>>), WaitingForSend(SendFuture<T>, Option<Receiver<T>>), 
 
@@ -109,39 +105,34 @@ enum Forward<T> { 1
 impl<T> Future for Forward<T> {
  type Output = (); 2
  fn poll(&mut self) -> Poll<Self::Output> { 
-
-match self { 3 Forward::WaitingForReceive(recv, tx) => { 
-
-                if let Poll::Ready((rx, v)) = recv.poll() {
-                    if let Some(v) = v {
-
-let tx = tx.take().unwrap(); 4
- *self = Forward::WaitingForSend(tx.send(v), Some(rx)); 5 // Try to make progress on sending.
- return self.poll(); 6 
-
-} else { 
-
-		// No more items.
-		Poll::Ready(())
-	}
-} else {
-	Poll::Pending
-
-} } 
-
-            Forward::WaitingForSend(send, rx) => {
-                if let Poll::Ready(tx) = send.poll() {
-                    let rx = rx.take().unwrap();
-                    *self = Forward::WaitingForReceive(rx.receive(), Some(tx));
-                    // Try to make progress on receiving.
-                    return self.poll();
-                } else {
-                    Poll::Pending
-
-} } 
-
-} } 
-
+    match self { 3 	
+      Forward::WaitingForReceive(recv, tx) => { 
+        if let Poll::Ready((rx, v)) = recv.poll() {
+          if let Some(v) = v {
+            let tx = tx.take().unwrap(); 4
+            *self = Forward::WaitingForSend(tx.send(v), Some(rx)); 5 
+            // Try to make progress on sending.
+            return self.poll(); 6 
+          } else { 
+            // No more items.
+            Poll::Ready(())
+          }
+        } else {
+          Poll::Pending
+        } 
+      } 
+      Forward::WaitingForSend(send, rx) => {
+        if let Poll::Ready(tx) = send.poll() {
+          let rx = rx.take().unwrap();
+             *self = Forward::WaitingForReceive(rx.receive(), Some(tx));
+              // Try to make progress on receiving.
+              return self.poll();
+           } else {
+             Poll::Pending
+          } 
+        } 
+      } 
+   } 
 } 
 ```
 
@@ -208,19 +199,17 @@ If you look closely at Listings 8-5 and 8-6, they may seem a little magical once
 
 One subtle but important difference between the manual forward imple- mentation and the async/await version is that the latter can hold references across yield points. This enables functions like Receiver::next and Sender::send in Listing 8-5 to take &mut self rather than the self they took in Listing 8-4. If we tried to use a &mut self receiver for these methods in the manual state machine implementation, the borrow checker would have no way to enforce that the Receiver stored inside Forward cannot be referenced between when Receiver::next is called and when the future it returns resolves, and so it would reject the code. Only by moving the Receiver into the future can we convince the compiler that the Receiver is not otherwise accessible. Meanwhile, with async/await, the borrow checker can inspect the code before the compiler turns it into a state machine and verify that rx is indeed not accessed again until after the future is dropped, when the await on it returns. 
 
-**THE SIZE OF GENERATORS** 
+> **THE SIZE OF GENERATORS** 
 
-The data structure used to back a generator’s state must be able to hold the com- bined state at any one yield point . If your async fn contains, say, a [u8; 8192], those 8KiB must be stored in the generator itself . Even if your async fn contains only smaller local variables, it must also contain any future that it awaits, since it needs to be able to poll such a future later, when poll is invoked . 
+> The data structure used to back a generator’s state must be able to hold the com- bined state at any one yield point . If your async fn contains, say, a [u8; 8192], those 8KiB must be stored in the generator itself . Even if your async fn contains only smaller local variables, it must also contain any future that it awaits, since it needs to be able to poll such a future later, when poll is invoked . 
 
-This nesting means that generators, and thus futures based on async functions and blocks, can get quite large without any visible indicator of that increased size in your code . This can in turn impact your program’s runtime performance, since those giant generators may have to be copied across func- tion calls and in and out of data structures, which amounts to a fair amount of memory copying . In fact, you can usually identify when the size of your gener- ator-based futures is affecting performance by looking for excessive amounts of time spent in the memcpy function in your application’s performance profiles! 
+> This nesting means that generators, and thus futures based on async functions and blocks, can get quite large without any visible indicator of that increased size in your code . This can in turn impact your program’s runtime performance, since those giant generators may have to be copied across func- tion calls and in and out of data structures, which amounts to a fair amount of memory copying . In fact, you can usually identify when the size of your gener- ator-based futures is affecting performance by looking for excessive amounts of time spent in the memcpy function in your application’s performance profiles! 
 
-Finding these large futures isn’t always easy, however, and often requires manually identifying long or complex chains of async functions . Clippy may be able to help with this in the future, but at the time of writing, you’re on your own . When you do find a particularly large future, you have two options: you can try to reduce the amount of local state the async functions need, or you can move the future to the heap (with Box::pin) so that moving the future just requires moving the pointer to it . The latter is by far the easiest way to go, but it also introduces an extra allocation and a pointer indirection . Your best bet is usually to put the problematic future on the heap, measure your performance, and then use your performance benchmarks to guide you from there . 
+> Finding these large futures isn’t always easy, however, and often requires manually identifying long or complex chains of async functions . Clippy may be able to help with this in the future, but at the time of writing, you’re on your own . When you do find a particularly large future, you have two options: you can try to reduce the amount of local state the async functions need, or you can move the future to the heap (with Box::pin) so that moving the future just requires moving the pointer to it . The latter is by far the easiest way to go, but it also introduces an extra allocation and a pointer indirection . Your best bet is usually to put the problematic future on the heap, measure your performance, and then use your performance benchmarks to guide you from there . 
 
 **Pin and Unpin** 
 
-We’re not quite done. While generators are neat, a challenge arises from the technique as I’ve described it so far. In particular, it’s not clear what happens if the code in the generator (or, equivalently, the async block) takes a reference to a local variable. In the code from Listing 8-5, the future that rx.next() returns must necessarily hold a reference to rx if a next message 
-
-is not immediately available so that it knows where to try again when the generator next resumes. When the generator yields, the future and the ref- erence the future contains get stashed away inside the generator. But what now happens if the generator is moved? Specifically, look at the code in Listing 8-7, which calls forward. 
+We’re not quite done. While generators are neat, a challenge arises from the technique as I’ve described it so far. In particular, it’s not clear what happens if the code in the generator (or, equivalently, the async block) takes a reference to a local variable. In the code from Listing 8-5, the future that rx.next() returns must necessarily hold a reference to rx if a next message is not immediately available so that it knows where to try again when the generator next resumes. When the generator yields, the future and the ref- erence the future contains get stashed away inside the generator. But what now happens if the generator is moved? Specifically, look at the code in Listing 8-7, which calls forward. 
 
 ```
 async fn try_forward<T>(rx: Receiver<T>, tx: Sender<T>) -> Option<impl Future>
@@ -280,10 +269,9 @@ First, you’ll notice that Pin holds a *pointer type*. That is, rather than hol
 
 Next, notice that Pin’s constructor, new_unchecked, is unsafe. This is because the compiler has no way to actually check that the pointer type indeed promises that the pointed-to (target) type won’t move again. Con- sider, for example, a variable foo on the stack. If Pin’s constructor were safe, we could do Pin::new(&mut foo), call a method that requires Pin<&mut Self> (and thus assumes that Self won’t move again), and then drop the Pin. At this point, we could modify foo as much as we liked, since it is no longer borrowed—including moving it! We could then pin it again and call the same method, which would be none the wiser that any self-referential point- ers it may have constructed the first time around would now be invalid. 
 
+> **PIN CONSTRUCTOR SAFETY** 
 
-**PIN CONSTRUCTOR SAFETY** 
-
-The other reason the constructor for Pin is unsafe is that its safety depends on the implementation of traits that are themselves safe . For example, the way that Pin<P> implements get_unchecked_mut is to use the implementation of DerefMut::deref_mut for P . While the call to get_unchecked_mut is unsafe, the impl DerefMut for P is not . Yet it receives a &mut self, and can thus freely (and without unsafe code) move the T . The same thing applies to Drop . The safety requirement for Pin::new_unchecked is therefore not only that the pointer type will not let the target type be moved again (like in the Pin<&mut T> example), but also that its Deref, DerefMut, and Drop implementations do not move the pointed-to value behind the &mut self they receive . 
+> The other reason the constructor for Pin is unsafe is that its safety depends on the implementation of traits that are themselves safe . For example, the way that Pin<P> implements get_unchecked_mut is to use the implementation of DerefMut::deref_mut for P . While the call to get_unchecked_mut is unsafe, the impl DerefMut for P is not . Yet it receives a &mut self, and can thus freely (and without unsafe code) move the T . The same thing applies to Drop . The safety requirement for Pin::new_unchecked is therefore not only that the pointer type will not let the target type be moved again (like in the Pin<&mut T> example), but also that its Deref, DerefMut, and Drop implementations do not move the pointed-to value behind the &mut self they receive . 
 
 We then get to the get_unchecked_mut method, which gives you a mutable reference to the T behind the Pin’s pointer type. This method is also unsafe, because once we give out a &mut T, the caller has to promise it won’t use that &mut T to move the T or otherwise invalidate its memory, lest any self- references be invalidated. If this method weren’t unsafe, a caller could 
 call a method that takes Pin<&mut Self> and then call the safe variant of get_unchecked_mut on two Pin<&mut _>s, then use mem::swap to swap the values behind the Pin. If we were to then call a method that takes Pin<&mut Self> again on either Pin, its assumption that the Self hasn’t moved would be vio- lated, and any internal references it stored would be invalid! 
@@ -309,7 +297,7 @@ impl<P> DerefMut for Pin<P> where P: DerefMut, P::Target: Unpin {
 }
 ```
 
-Listing 8-10: The safe API to *Pin* for *Unpin* target types 
+*Listing 8-10: The safe API to *Pin* for *Unpin* target types* 
 
 To make sense of the safe API in Listing 8-10, think about the safety requirements of the unsafe methods from Listing 8-9: the function Pin::new_unchecked is unsafe because the caller must promise that the ref- erent cannot be moved outside of the Pin, and that the implementations of Deref, DerefMut, and Drop for the pointer type do not move the referent through the reference they receive. Those requirements are there to ensure that once we give out a Pin to a T, we never move that T again. But if the T is Unpin, it has declared that it does not care if it is moved even if it was previously pinned, so it’s fine if the caller does not satisfy any of those requirements! 
 
@@ -321,9 +309,9 @@ With our new understanding of Pin and Unpin, we can now make progress toward usi
 
 Let’s start with pinning to the heap. The primary contract of Pin is that once something has been pinned, it cannot move. The pinning API takes care of honoring that contract for all methods and traits on Pin, so the main role of any function that constructs a Pin is to ensure that if the Pin *itself* moves, the referent value does not move too. The easiest way to ensure that is to place the referent on the heap, and then place just a pointer to the refer- ent in the Pin. You can then move the Pin to your heart’s delight, but the tar- get will remain where it was. This is the rationale behind the (safe) method Box::pin, which takes a T and returns a Pin<Box<T>>. There’s no magic to it; it simply asserts that Box follows the Pin constructor, Deref, and Drop contracts. 
 
-**UNPIN BOX** 
+> **UNPIN BOX** 
 
-While we’re on the topic of Box, take a look at the implementation of Unpin for Box . The Box type unconditionally implements Unpin for any T, even if that T is not Unpin . This might strike you as odd, given the earlier assertion that Unpin is an auto-trait that is generally implemented for a type only if all of the type’s members are also Unpin . Box is an exception to this for the same reason that it can provide a safe Pin constructor: if you move a Box<T>, you do not move the T . In other words, the unconditional implementation asserts that you can move a Box<T> out of a Pin even if T cannot be moved out of a Pin . Note, however, that this does not enable you to move a T that is !Unpin out of a Pin<Box<T>> . 
+> While we’re on the topic of Box, take a look at the implementation of Unpin for Box . The Box type unconditionally implements Unpin for any T, even if that T is not Unpin . This might strike you as odd, given the earlier assertion that Unpin is an auto-trait that is generally implemented for a type only if all of the type’s members are also Unpin . Box is an exception to this for the same reason that it can provide a safe Pin constructor: if you move a Box<T>, you do not move the T . In other words, the unconditional implementation asserts that you can move a Box<T> out of a Pin even if T cannot be moved out of a Pin . Note, however, that this does not enable you to move a T that is !Unpin out of a Pin<Box<T>> . 
 
 The other option, pinning to the stack, is a little more involved, and at the time of writing requires a smidgen of unsafe code. We have to ensure that the pinned value cannot be accessed after the Pin with a &mut to it has been dropped. We accomplish that by shadowing the value as shown in the macro in Listing 8-11 or by using one of the crates that provide exactly this macro. One day it may even make it into the standard library! 
 
@@ -338,7 +326,7 @@ macro_rules! pin_mut {
 
 Listing 8-11: Macro for pinning to the stack 
 
-By taking the name of the variable to pin to the stack, the macro ensures that the caller has the value it wants to pin somewhere on the stack already. The shadowing of $var ensures that the caller cannot drop the Pin and continue to use the unpinned value (which would breach the Pin contract for any target type that’s !Unpin). By moving the value stored in $var, the macro also ensures that the caller cannot drop the $var bind- ing the macro declarations without also dropping the original variable. Specifically, without that line, the caller could write (note the extra scope): 
+By taking the name of the variable to pin to the stack, the macro ensures that the caller has the value it wants to pin somewhere on the stack already. The shadowing of \$var ensures that the caller cannot drop the Pin and continue to use the unpinned value (which would breach the Pin contract for any target type that’s !Unpin). By moving the value stored in $var, the macro also ensures that the caller cannot drop the $var bind- ing the macro declarations without also dropping the original variable. Specifically, without that line, the caller could write (note the extra scope): 
 
 ```
 let foo = /* */; { pin_mut!(foo); foo.poll() }; foo.mut_self_method();
@@ -371,11 +359,11 @@ That was an ever-so-slight simplification because, as we’ve seen, you can call
 } 
 ```
 
-Listing 8-12: A more accurate desugaring of *.await* 
+*Listing 8-12: A more accurate desugaring of <expr>.await*
 
 The match 1 is a neat shorthand to not only ensure that the expansion remains a valid expression, but also move the expression result into a variable that we can then pin on the stack. Beyond that, the main new addition is the call to Pin::new_unchecked 2. That call is safe because for the containing async block to be polled, it must already be pinned due to the signature of Future::poll. And the async block was polled for us to reach the call to Pin::new_unchecked, so the generator state is pinned. Since pinned is stored in the generator that corresponds to the async block (it must be so that yield will resume correctly), we know that pinned will not move again. Furthermore, pinned is not accessible except through a Pin once we’re in the loop, so no code is able to move out of the value in pinned. Thus, we meet all the safety requirements of Pin::new_unchecked, and the code is safe. 
 
-**Going to Sleep** 
+### Going to Sleep
 
 We went pretty deep into the weeds with Pin, but now that we’re out the other side, there is another issue around futures that may have been mak- ing your brain itch. If a call to Future::poll returns Poll::Pending, you need something to call poll again at a later time to check whether you can make progress yet. That something is usually called the *executor*. Your executor could be a simple loop that polls all the futures you are waiting on until they’ve all returned Poll::Ready, but that would burn a lot of CPU cycles you could probably have used for other, more useful things, like running your web browser. Instead, we want the executor to do whatever useful work it can do, and then go to sleep. It should stay asleep until one of the futures can make progress, and only then wake up to do another pass, before going to sleep again. 
 
@@ -396,56 +384,35 @@ Listing 8-13: The actual *Future* trait with *Context*
 
 The &mut Context contains the Waker. The argument is a Context, not a Waker directly, so that we can augment the asynchronous ecosystem with additional context for futures should that be deemed necessary. 
 
-Asynchronous Programming **133** 
-
-**134** Chapter 8 
-
-**N O T E** 
-
-The primary method on Waker is wake (and the by-reference variant wake _by_ref), which should be called when the future can again make progress. The wake method takes no arguments, and its effects are entirely defined
- by the executor that constructed the Waker. You see, Waker is secretly generic over the executor. Or, more precisely, whatever constructed the Waker gets to dictate what happens when Waker::wake is called, when a Waker is cloned, and when a Waker is dropped. This all happens through a manually implemented vtable, which functions similarly to the dynamic dispatch we discussed way back in Chapter 2. 
+The primary method on Waker is wake (and the by-reference variant wake _by_ref), which should be called when the future can again make progress. The wake method takes no arguments, and its effects are entirely defined by the executor that constructed the Waker. You see, Waker is secretly generic over the executor. Or, more precisely, whatever constructed the Waker gets to dictate what happens when Waker::wake is called, when a Waker is cloned, and when a Waker is dropped. This all happens through a manually implemented vtable, which functions similarly to the dynamic dispatch we discussed way back in Chapter 2. 
 
 It’s a somewhat involved process to construct a Waker, and the mechan- ics of it aren’t all that important for using one, but you can see the building blocks in the RawWakerVTable type in the standard library. It has a constructor that takes the function pointers for wake and wake_by_ref as well as Clone and Drop. The RawWakerVTable, which is usually shared among all of an executor’s wakers, is bundled up with a raw pointer intended to hold data specific to each Waker instance (like which future it’s for) and is turned into a RawWaker. That is in turn passed to Waker::from_raw to produce a safe Waker that can be passed to Future::poll. 
 
 **Fulfilling the Poll Contract** 
 
-So far we’ve skirted around what a future actually does with a Waker. The idea is fairly simple: if Future::poll returns Poll::Pending, it is the future’s responsibility to ensure that *something* calls wake on the provided Waker
- when the future is next able to make progress. Most futures uphold this property by returning Poll::Pending only if some other future also returned Poll::Pending; in this way, it trivially fulfills the contract of poll since the inner future must follow that same contract. But there can’t be turtles all the way down. At some point, you reach a future that does not poll other futures but instead does something like write to a network socket or attempt to receive on a channel. These are commonly referred to as *leaf futures* since they have no children. A leaf future has no inner future but instead directly represents some resource that may not yet be ready to return a result. 
+So far we’ve skirted around what a future actually does with a Waker. The idea is fairly simple: if Future::poll returns Poll::Pending, it is the future’s responsibility to ensure that *something* calls wake on the provided Waker when the future is next able to make progress. Most futures uphold this property by returning Poll::Pending only if some other future also returned Poll::Pending; in this way, it trivially fulfills the contract of poll since the inner future must follow that same contract. But there can’t be turtles all the way down. At some point, you reach a future that does not poll other futures but instead does something like write to a network socket or attempt to receive on a channel. These are commonly referred to as *leaf futures* since they have no children. A leaf future has no inner future but instead directly represents some resource that may not yet be ready to return a result. 
 
-*The poll contract is the reason why the recursive* *poll* *call* 6 *back in Listing 8-4 is necessary for correctness.* 
+**N O T E** *The poll contract is the reason why the recursive* *poll* *call* 6 *back in Listing 8-4 is necessary for correctness.* 
 
 Leaf futures typically come in one of two shapes: those that wait for events that originate within the same process (like a channel receiver), and those that wait for events external to the process (like a TCP packet read). Those that wait for internal events all tend to follow the same pattern: store the Waker where the code that will wake you up can find it, and have that code call wake on the Waker when it generates the relevant event. For example, consider a leaf future that has to wait for a message on an in-memory chan- nel. It stores its Waker inside the part of the channel that is shared between the sender and the receiver and then returns Poll::Pending. When a sender later comes along and injects a message into the channel, it notices the Waker left there by the waiting receiver and calls wake on the Waker before returning from send. Now the receiver is awoken, and the poll contract is upheld. 
-
-**N O T E** 
 
 Leaf futures that deal with external events are more involved, as the code that generates the event they’re waiting for knows nothing of futures or wakers. Most often the generating code is the operating system kernel, which knows when a disk is ready or a timer expires, but it could also be
  a C library that invokes a callback into Rust when an operation completes or some other such external entity. A leaf future wrapping an external resource like this could spin up a thread that executes a blocking system call (or waits for the C callback) and then use the internal waking mecha- nism, but that would be wasteful; you would spin up a thread every time an operation had to wait and be left with lots of single-use threads sitting around waiting for things. 
 
-Instead, executors tend to provide implementations of leaf futures
- that communicate behind the scenes with the executor to arrange for
- the appropriate interaction with the operating system. How exactly this
- is orchestrated depends on the executor and the operating system, but roughly speaking the executor keeps track of all the event sources that it should listen for the next time it goes to sleep. When a leaf future realizes it must wait for an external event, it updates that executor’s state (which it knows about since it’s provided by the executor crate) to include that exter- nal event source alongside its Waker. When the executor can no longer make progress, it gathers all of the event sources the various pending leaf futures are waiting for and does a big blocking call to the operating system, telling it to return when *any* of the resources the leaf futures are waiting on have
- a new event. On Linux, this is usually achieved with the epoll system call; Windows, the BSDs, macOS, and pretty much every other operating system provide similar mechanisms. When that call returns, the executor calls wake on all the wakers associated with event sources that the operating system reported events for, and thus the poll contract is fulfilled. 
+Instead, executors tend to provide implementations of leaf futures that communicate behind the scenes with the executor to arrange for the appropriate interaction with the operating system. How exactly this is orchestrated depends on the executor and the operating system, but roughly speaking the executor keeps track of all the event sources that it should listen for the next time it goes to sleep. When a leaf future realizes it must wait for an external event, it updates that executor’s state (which it knows about since it’s provided by the executor crate) to include that exter- nal event source alongside its Waker. When the executor can no longer make progress, it gathers all of the event sources the various pending leaf futures are waiting for and does a big blocking call to the operating system, telling it to return when *any* of the resources the leaf futures are waiting on have a new event. On Linux, this is usually achieved with the epoll system call; Windows, the BSDs, macOS, and pretty much every other operating system provide similar mechanisms. When that call returns, the executor calls wake on all the wakers associated with event sources that the operating system reported events for, and thus the poll contract is fulfilled. 
 
-*A* reactor *is the part of an executor that leaf futures register event sources with and that the executor waits on when it has no more useful work to do. It is possible to separate the executor and the reactor, though bundling them together often improves performance as the two can be co-optimized more readily.* 
+**N O T E** *A* reactor *is the part of an executor that leaf futures register event sources with and that the executor waits on when it has no more useful work to do. It is possible to separate the executor and the reactor, though bundling them together often improves performance as the two can be co-optimized more readily.* 
 
 A knock-on effect of the tight integration between leaf futures and the executor is that leaf futures from one executor crate often cannot be used with a different executor. Or at least, they cannot be used unless the leaf future’s executor is *also* running. When the leaf future goes to store
  its Waker and register the event source it’s waiting for, the executor it was built against needs to have that state set up and needs to be running so that the event source will actually be monitored and wake eventually called. There are ways around this, such as having leaf futures spawn an executor if one is not already running, but this is not always advisable as it means that an application can transparently end up with multiple executors run- ning at the same time, which can reduce performance and mean you must inspect the state of multiple executors when debugging. 
 
-Library crates that wish to support multiple executors have to be generic over their leaf resources. For example, instead of using a particular executor’s 
-
-Asynchronous Programming **135** 
-
-**136** Chapter 8 
-
-TcpStream or File future type, a library can store a generic T: AsyncRead + AsyncWrite. However, the ecosystem has yet to settle on exactly what these traits should look like and which traits are needed, so for the moment it’s fairly diffi- cult to make code truly generic over the executor. For example, while AsyncRead and AsyncWrite are somewhat common across the ecosystem (or can be easily adapted if necessary), no traits currently exist for running a future in the background (*spawning*, which we’ll discuss later) or for representing a timer. 
+Library crates that wish to support multiple executors have to be generic over their leaf resources. For example, instead of using a particular executor’s TcpStream or File future type, a library can store a generic T: AsyncRead + AsyncWrite. However, the ecosystem has yet to settle on exactly what these traits should look like and which traits are needed, so for the moment it’s fairly diffi- cult to make code truly generic over the executor. For example, while AsyncRead and AsyncWrite are somewhat common across the ecosystem (or can be easily adapted if necessary), no traits currently exist for running a future in the background (*spawning*, which we’ll discuss later) or for representing a timer. 
 
 **Waking Is a Misnomer** 
 
 You may already have realized that Waker::wake doesn’t necessarily seem to *wake* anything. For example, for external events (as described in the previ- ous section), the executor is already awake, and it might seem silly for it to then call wake on a Waker that belongs to that executor anyway! The reality is that Waker::wake is a bit of a misnomer—in reality, it signals that a particular future is *runnable*. That is, it tells the executor that it should make sure to poll this particular future when it gets around to it rather than go to sleep again, since this future can make progress. This might wake the executor if it is currently sleeping so it will go poll that future, but that’s more of a side effect than its primary purpose. 
 
-It is important for the executor to know which futures are runnable
- for two reasons. First, it needs to know when it can stop polling a future and go to sleep; it’s not sufficient to just poll each future until it returns Poll::Pending, since polling a later future might make it possible to progress an earlier future. Consider the case where two futures bounce messages back and forth on channels to one another. When you poll one, the other becomes ready, and vice versa. In this case, the executor should never go to sleep, as there is always more work to do. 
+It is important for the executor to know which futures are runnable for two reasons. First, it needs to know when it can stop polling a future and go to sleep; it’s not sufficient to just poll each future until it returns Poll::Pending, since polling a later future might make it possible to progress an earlier future. Consider the case where two futures bounce messages back and forth on channels to one another. When you poll one, the other becomes ready, and vice versa. In this case, the executor should never go to sleep, as there is always more work to do. 
 
 Second, knowing which futures are runnable lets the executor avoid polling futures unnecessarily. If an executor manages thousands of pending futures, it shouldn’t poll all of them just because an event made one of them runnable. If it did, executing asynchronous code would get very slow indeed. 
 
@@ -455,23 +422,19 @@ The futures in an asynchronous program form a tree: a future may contain any num
 
 Executors generally construct a separate Waker for each task they poll so that when wake is later called, they know which task was just made runnable and can mark it as such. That is what the raw pointer in RawWaker is for—to dif- ferentiate between tasks while sharing the code for the various Waker methods. 
 
-When the executor eventually polls a task, that task starts running from the top of its implementation of Future::poll and must decide from there how 
-
-to get to the future deeper down that can now make progress. Since each future knows only about its own fields, and nothing about the whole tree, this all happens through calls to poll that each traverse one edge in the tree. 
+When the executor eventually polls a task, that task starts running from the top of its implementation of Future::poll and must decide from there how to get to the future deeper down that can now make progress. Since each future knows only about its own fields, and nothing about the whole tree, this all happens through calls to poll that each traverse one edge in the tree. 
 
 The choice of which inner future to poll is often obvious, but not always. In the case of async/await, the future to poll is the one we’re blocked waiting for. But in a future that waits for the first of several futures to make prog- ress (often called a *select*), or for all of a set of futures (often called a *join*), there are many options. A future that has to make such a choice is basically a subexecutor. It could poll all of its inner futures, but doing so could be quite wasteful. Instead, these subexecutors often wrap the Waker they receive in poll’s Context with their own Waker type before they invoke poll on any inner future. In the wrapping code, they mark the future they just polled as runnable in their own state before they call wake on the original Waker. That way, when the executor eventually polls the subexecutor future again, the subexecutor can consult its own internal state to figure out which of its inner futures caused the current call to poll, and then only poll those. 
 
-**BLOCKING IN ASYNC CODE** 
+> **BLOCKING IN ASYNC CODE** 
 
-You must be careful about calling synchronous code from asynchronous code, since any time an executor thread spends executing the current task is time it’s not spending running other tasks . If a task occupies the current thread for a prolonged period of time without yielding back to the executor, which might happen when executing a blocking system call (like std::sync::sleep), running a subexecutor that doesn’t yield occasionally, or running in a tight loop with no awaits, then other tasks the current executor thread is responsible for won’t get to run during that time . Usually, this manifests as long delays between when certain tasks can make progress (such as when a client connects) and when they actually get to execute . 
+> You must be careful about calling synchronous code from asynchronous code, since any time an executor thread spends executing the current task is time it’s not spending running other tasks . If a task occupies the current thread for a prolonged period of time without yielding back to the executor, which might happen when executing a blocking system call (like std::sync::sleep), running a subexecutor that doesn’t yield occasionally, or running in a tight loop with no awaits, then other tasks the current executor thread is responsible for won’t get to run during that time . Usually, this manifests as long delays between when certain tasks can make progress (such as when a client connects) and when they actually get to execute . 
 
-Some multithreaded executors implement work-stealing techniques, where idle executor threads steal tasks from busy executor threads, but this is more of a mitigation than a solution . Ultimately, you could end up in a situation where all the executor threads are blocked, and thus no tasks get run until one of the blocking operations completes . 
+> Some multithreaded executors implement work-stealing techniques, where idle executor threads steal tasks from busy executor threads, but this is more of a mitigation than a solution . Ultimately, you could end up in a situation where all the executor threads are blocked, and thus no tasks get run until one of the blocking operations completes . 
 
-In general, you should be very careful with executing compute-intensive operations or calling functions that could block in an asynchronous context . Such operations should either be converted to asynchronous operations where possible or executed on dedicated threads that then communicate using a primitive that does support asynchrony, like a channel . Some executors also provide mechanisms for indicating that a particular segment of asynchronous code might block or for yielding voluntarily in the context of loops that might otherwise not yield, which can compose part of the solution . A good rule of thumb is that no future should be able to run for more than 1 ms without return- ing Poll::Pending . 
+> In general, you should be very careful with executing compute-intensive operations or calling functions that could block in an asynchronous context . Such operations should either be converted to asynchronous operations where possible or executed on dedicated threads that then communicate using a primitive that does support asynchrony, like a channel . Some executors also provide mechanisms for indicating that a particular segment of asynchronous code might block or for yielding voluntarily in the context of loops that might otherwise not yield, which can compose part of the solution . A good rule of thumb is that no future should be able to run for more than 1 ms without return- ing Poll::Pending . 
 
-Asynchronous Programming **137** 
-
-**Tying It All Together with spawn** 
+### Tying It All Together with spawn
 
 When working with asynchronous executors, you may come across an operation that spawns a future. We’re now in a position to explore what that means! Let’s do so by way of example. First, consider the simple server implementation in Listing 8-14. 
 
@@ -528,9 +491,8 @@ async fn server(socket: TcpListener) -> Result<()> {
 ```
 Listing 8-16: Spawning futures to create more tasks that can be polled concurrently 
 
-When you spawn a future and thus make it a task, it’s sort of like spawn- ing a thread. The future continues running in the background and is mul- tiplexed concurrently with any other tasks given to the executor. However, unlike a spawned thread, spawned tasks still depend on being polled by the executor. If the executor stops running, either because you drop it or because your code no longer runs the executor’s code, those spawned tasks will stop making progress. In the server example, imagine what will hap- pen if the main server future resolves for some reason. Since the executor has returned control back to your code, it cannot continue doing, well, anything. Multi-threaded executors often spawn background threads that continue to poll tasks even if the executor yields control back to the user’s code, but not all executors do this, so check your executor before you rely on that behavior! 
-
+When you spawn a future and thus make it a task, it’s sort of like spawning a thread. The future continues running in the background and is mul- tiplexed concurrently with any other tasks given to the executor. However, unlike a spawned thread, spawned tasks still depend on being polled by the executor. If the executor stops running, either because you drop it or because your code no longer runs the executor’s code, those spawned tasks will stop making progress. In the server example, imagine what will happen if the main server future resolves for some reason. Since the executor has returned control back to your code, it cannot continue doing, well, anything. Multi-threaded executors often spawn background threads that continue to poll tasks even if the executor yields control back to the user’s code, but not all executors do this, so check your executor before you rely on that behavior! 
 
 ## Summary
 
-In this chapter, we’ve taken a look behind the scenes of the asynchronous constructs available in Rust. We’ve seen how the compiler implements gen- erators and self-referential types, and why that work was necessary to sup- port what we now know as async/await. We’ve also explored how futures are executed, and how wakers allow executors to multiplex among tasks when only some of them can make progress at any given moment. In the next chapter, we’ll tackle what is perhaps the deepest and most discussed area of Rust: unsafe code. Take a deep breath, and then turn the page. 
+In this chapter, we’ve taken a look behind the scenes of the asynchronous constructs available in Rust. We’ve seen how the compiler implements gen- erators and self-referential types, and why that work was necessary to support what we now know as async/await. We’ve also explored how futures are executed, and how wakers allow executors to multiplex among tasks when only some of them can make progress at any given moment. In the next chapter, we’ll tackle what is perhaps the deepest and most discussed area of Rust: unsafe code. Take a deep breath, and then turn the page. 

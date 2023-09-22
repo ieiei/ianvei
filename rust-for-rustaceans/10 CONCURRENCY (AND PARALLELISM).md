@@ -12,17 +12,17 @@ What’s particularly neat about Rust’s approach to type-based safe multithrea
 
 *The Rust Programming Language* already covers most of the basics when it comes to concurrency, including the Send and Sync traits, Arc and Mutex, and channels. I therefore won’t reiterate much of that here, except where it’s worth repeating something specifically in the context of some other topic. Instead, we’ll look at what makes concurrency difficult and some common concurrency patterns intended to deal with those difficulties. We’ll also explore how concurrency and asynchrony interact (and how they don’t) before diving into how to use atomic operations to implement lower-level concurrent operations. Finally, I’ll close out the chapter with some advice for how to retain your sanity when working with concurrent code. 
 
-**The Trouble with Concurrency** 
+### The Trouble with Concurrency
 
 Before we dive into good patterns for concurrent programming and the details of Rust’s concurrency mechanisms, it’s worth taking some time to understand why concurrency is challenging in the first place. That is, why do we need special patterns and mechanisms for concurrent code? 
 
-**Correctness** 
+***Correctness***
 
 The primary difficulty in concurrency is coordinating access—in particular, write access—to a resource that is shared among multiple threads. If lots of threads want to share a resource solely for the purposes of reading it, then that’s usually easy: you stick it in an Arc or place it in something you can get a &'static to, and you’re all done. But once any thread wants to write, all sorts of problems arise, usually in the form of *data races*. Briefly, a data race occurs when one thread updates shared state while a second thread is also accessing that state, either to read it or to update it. Without additional safeguards in place, the second thread may read partially overwritten state, clobber parts of what the first thread wrote, or fail to see the first thread’s write at all! In general, all data races are considered undefined behavior. 
 
 Data races are a part of a broader class of problems that primarily, though not exclusively, occur in a concurrent setting: *race conditions*. A race condition occurs whenever multiple outcomes are possible from a sequence of instructions, depending on the relative timing of other events in the system. These events can be threads executing a particular piece of code, a timer going off, a network packet coming in, or any other time-variable occurrence. Race conditions, unlike data races, are not inherently bad, and are not considered undefined behavior. However, they are a breeding ground for bugs when particularly peculiar races occur, as you’ll see throughout this chapter. 
 
-**Performance** 
+***Performance***
 
 Often, developers introduce concurrency into their programs in the hope of increasing performance. Or, to be more precise, they hope that concurrency will enable them to perform more operations per second in aggregate by taking advantage of more hardware resources. This can be done on a single core by having one thread run while another is waiting, or across multiple cores by having threads do work simultaneously, one on each core, that would otherwise happen serially on one core. Most developers are referring to the latter kind of performance gain when they talk about concurrency, which is often framed in terms of scalability. Scalability in this context means “the performance of this program scales with the number of cores,” implying that if you give your program more cores, its performance improves. 
 
@@ -46,29 +46,25 @@ Mutual exclusion is the most obvious barrier to parallel speedup since, by defin
 
 Unfortunately, even if you achieve perfect concurrency within your tasks, the environment those tasks need to interact with may itself not be perfectly scalable. The kernel can handle only so many sends on a given TCP socket per second, the memory bus can do only so many reads at once, and your GPU has a limited capacity for concurrency. There’s no cure for this. The environment is usually where perfect scalability falls apart in practice, and fixes for such cases tend to require substantial re-engineering (or even new hardware!), so we won’t talk much more about this topic in this chapter. Just remember that scalability is rarely something you can “achieve,” and more something you just strive for. 
 
-**170** Chapter 10 
-
 **False Sharing** 
 
 False sharing occurs when two operations that shouldn’t contend with one another contend anyway, preventing efficient simultaneous execution. This usually happens because the two operations happen to intersect on some shared resource even though they use unrelated parts of that resource. 
 
 The simplest example of this is lock oversharing, where a lock guards some composite state, and two operations that are otherwise independent both need to take the lock to update their particular parts of the state. This in turn means the operations must execute serially instead of in parallel. In some cases it’s possible to split the single lock into two, one for each of the disjoint parts, which enables the operations to proceed in parallel. However, it’s not always straightforward to split a lock like this—the state may share a single lock because some third operation needs to lock over all the parts of the state. Usually you can still split the lock, but you have to be careful about the order in which different threads take the split locks to avoid deadlocks that can occur when two operations attempt to take them in different orders (look up the “dining philosophers problem,” if you’re curious). Alternatively, for some problems, you may be able to avoid the critical section entirely by using a lock-free version of the underlying algo- rithm, though those are also tricky to get right. Ultimately, false sharing is a hard problem to solve, and there isn’t a single catchall solution—but identifying the problem is a good start. 
 
-A more subtle example of false sharing occurs on the CPU level, as we discussed briefly in Chapter 2. The CPU internally operates on memory in terms of cache lines—longer sequences of consecutive bytes in memory— rather than individual bytes, to amortize the cost of memory accesses. For example, on most Intel processors, the cache line size is 64 bytes. This means that every memory operation really ends up reading or writing some multiple of 64 bytes. The false sharing comes into play when two cores 
-
-want to update the value of two different bytes that happen to fall on the same cache line; those updates must execute sequentially even though the updates are logically disjoint. 
+A more subtle example of false sharing occurs on the CPU level, as we discussed briefly in Chapter 2. The CPU internally operates on memory in terms of cache lines—longer sequences of consecutive bytes in memory— rather than individual bytes, to amortize the cost of memory accesses. For example, on most Intel processors, the cache line size is 64 bytes. This means that every memory operation really ends up reading or writing some multiple of 64 bytes. The false sharing comes into play when two cores want to update the value of two different bytes that happen to fall on the same cache line; those updates must execute sequentially even though the updates are logically disjoint. 
 
 This might seem too low-level to matter, but in practice this kind of false sharing can decimate the parallel speedup of an application. Imagine that you allocate an array of integer values to indicate how many operations each thread has completed, but the integers all fall within the same cache line—now, all your otherwise parallel threads will contend on that one cache line for every operation they perform. If the operations are relatively quick, *most* of your execution time may end up being spent contending on those counters! 
 
 The trick to avoiding false cache line sharing is to pad your values so that they are the size of a cache line. That way, two adjacent values always fall on different cache lines. But of course, this also inflates the size of your data structures, so use this approach only when benchmarks indicate a problem. 
 
-**THE COST OF SCALABILITY** 
+> **THE COST OF SCALABILITY** 
 
-A somewhat orthogonal aspect of concurrency that you should be mindful of is the cost of introducing concurrency in the first place . Compilers are really good at optimizing single threaded code—they’ve been doing it for a long time, after all—and single-threaded code tends to get away with fewer expensive safe- guards (like locks, channels, or atomic instructions) than concurrent code can . In aggregate, the various costs of concurrency can make a parallel program slower than its single-threaded counterpart, given any number of cores! This is why it’s important to measure both before and after you optimize and parallel- ize: the results may surprise you . 
+> A somewhat orthogonal aspect of concurrency that you should be mindful of is the cost of introducing concurrency in the first place . Compilers are really good at optimizing single threaded code—they’ve been doing it for a long time, after all—and single-threaded code tends to get away with fewer expensive safe- guards (like locks, channels, or atomic instructions) than concurrent code can . In aggregate, the various costs of concurrency can make a parallel program slower than its single-threaded counterpart, given any number of cores! This is why it’s important to measure both before and after you optimize and parallel- ize: the results may surprise you . 
 
-If you’re curious about this topic, I highly recommend you read Frank McSherry’s 2015 paper “Scalability! But at what COST?” (https://www .frankmcsherry.org/assets/COST.pdf), which uncovers some particularly egregious examples of “costly scaling .” 
+> If you’re curious about this topic, I highly recommend you read Frank McSherry’s 2015 paper “Scalability! But at what COST?” (https://www .frankmcsherry.org/assets/COST.pdf), which uncovers some particularly egregious examples of “costly scaling .” 
 
-**Concurrency Models** 
+### Concurrency Models
 
 Rust has three patterns for adding concurrency to your programs that you’ll come across fairly often: shared memory concurrency, worker pools, and actors. Going through every way you could add concurrency in detail would take a book of its own, so here I’ll focus on just these three patterns. 
 
@@ -82,7 +78,7 @@ Shared memory concurrency is a good fit for use cases where threads need to join
 
 **NOTE** *Some problems have known algorithms that can provide concurrent shared memory operations without the use of locks. As the number of cores grows, these* lock-free *algorithms may scale better than lock-based algorithms, though they also often have slower per-core performance due to their complexity. As always with performance mat- ters, benchmark first, then look for alternative solutions.* 
 
-**Worker Pools** 
+***Worker Pools***
 
 In the worker pool model, many identical threads receive jobs from a shared job queue, which they then execute entirely independently. Web servers, for example, often have a worker pool handling incoming connec- tions, and multithreaded runtimes for asynchronous code tend to use a worker pool to collectively execute all of an application’s futures (or, more accurately, its top-level tasks). 
 
@@ -95,11 +91,11 @@ It’s quite a task to implement a data structure that supports this kind of wor
 Worker pools are a good fit when the work that each thread performs is the same, but the data it performs it *on* varies. In a rayon parallel map operation, every thread performs the same map computation; they just perform
  it on different subsets of the underlying data. In a multithreaded asynchronous runtime, each thread simply calls Future::poll; they just call it on different futures. If you start having to distinguish between the threads in your thread pool, a different design is probably more appropriate. 
 
-**CONNECTION POOLS** 
+> **CONNECTION POOLS** 
 
-A connection pool is a shared memory construct that keeps a set of established connections and hands them out to threads that need a connection . It’s a common design pattern in libraries that manage connections to external services . If a thread needs a connection but one isn’t available, either a new connection is established or the thread is forced to block . When a thread is done with a connection, it returns that connection to the pool, and thus makes it available to other threads that may be waiting . 
+> A connection pool is a shared memory construct that keeps a set of established connections and hands them out to threads that need a connection . It’s a common design pattern in libraries that manage connections to external services . If a thread needs a connection but one isn’t available, either a new connection is established or the thread is forced to block . When a thread is done with a connection, it returns that connection to the pool, and thus makes it available to other threads that may be waiting . 
 
-Usually, the hardest task for a connection pool is managing connection life cycles . A connection can be returned to the pool in whatever state it was put in by the last thread that used it . The connection pool therefore has to make sure any state associated with the connection, whether on the client or on the server, has been reset so that when the connection is subsequently used by another thread, that thread can act as though it was given a fresh, dedicated connection . 
+> Usually, the hardest task for a connection pool is managing connection life cycles . A connection can be returned to the pool in whatever state it was put in by the last thread that used it . The connection pool therefore has to make sure any state associated with the connection, whether on the client or on the server, has been reset so that when the connection is subsequently used by another thread, that thread can act as though it was given a fresh, dedicated connection . 
 
 **Actors** 
 
@@ -113,7 +109,7 @@ Nothing in the actor model requires that each actor is its own thread. To the co
 
 The actor concurrency model is well suited for when you have many resources that can operate relatively independently, and where there is little or no opportunity for concurrency within each resource. For example, an operating system might have an actor responsible for each hardware device, and a web server might have an actor for each backend database connection. The actor model does not work so well if you need only a few actors, if work is skewed significantly among the actors, or if some actors grow large—in all of those cases, your application may end up being bottle- necked on the execution speed of a single actor in the system. And since actors each expect to have exclusive access to their little slice of the world, you can’t easily parallelize the execution of that one bottleneck actor. 
 
-**Asynchrony and Parallelism** 
+### Asynchrony and Parallelism
 
 As we discussed in Chapter 8, asynchrony in Rust enables concurrency without parallelism—we can use constructs like selects and joins to have a single thread poll multiple futures and continue when one, some, or all of them complete. Because there is no parallelism involved, concurrency with futures does not fundamentally require those futures to be Send. Even spawning a future to run as an additional top-level task does not fundamentally require Send, since a single executor thread can manage the polling of many futures at once. 
 
@@ -124,15 +120,15 @@ In particular, two pieces of information must be given to the executor to let it
 The second piece of information is how to split the futures into tasks that can operate independently. This ties back to the discussion of tasks versus futures from Chapter 8: if one giant Future contains a number of Future instances that themselves correspond to tasks that can run in parallel, the executor must still call poll on the top-level Future, and it must do so from
  a single thread, since poll requires &mut self. Thus, to achieve parallelism with futures, you have to explicitly spawn the futures you want to be able to run in parallel. Also, because of the first requirement, the executor function you use to do so will require that the passed-in Future is Send. 
 
-**ASYNCHRONOUS SYNCHRONIZATION PRIMITIVES** 
+> **ASYNCHRONOUS SYNCHRONIZATION PRIMITIVES** 
 
-Most of the synchronization primitives that exist for blocking code (think std::sync) also have asynchronous counterparts . There are asynchronous variants of channels, mutexes, reader/writer locks, barriers, and all sorts of other similar constructs . We need these because, as discussed in Chapter 8, blocking inside a future will hold up other work the executor may need to do, and so is inadvisable . 
+> Most of the synchronization primitives that exist for blocking code (think std::sync) also have asynchronous counterparts . There are asynchronous variants of channels, mutexes, reader/writer locks, barriers, and all sorts of other similar constructs . We need these because, as discussed in Chapter 8, blocking inside a future will hold up other work the executor may need to do, and so is inadvisable . 
 
-However, the asynchronous versions of these primitives are often slower than their synchronous counterparts because of the additional machinery needed to perform the necessary wake-ups . For that reason, you may want to use synchronous synchronization primitives even in asynchronous contexts when- ever the use does not risk blocking the executor . For example, while it’s generally true that acquiring a Mutex might block for a long time, that might not be true for a particular Mutex that, perhaps, is acquired only rarely, and only ever for short periods of time . In that case, blocking for the short time until the Mutex becomes available again might not actually cause any problems . You will want to make sure that you never yield or perform other long-running operations while holding the MutexGuard, but barring that you shouldn’t run into problems . 
+> However, the asynchronous versions of these primitives are often slower than their synchronous counterparts because of the additional machinery needed to perform the necessary wake-ups . For that reason, you may want to use synchronous synchronization primitives even in asynchronous contexts when- ever the use does not risk blocking the executor . For example, while it’s generally true that acquiring a Mutex might block for a long time, that might not be true for a particular Mutex that, perhaps, is acquired only rarely, and only ever for short periods of time . In that case, blocking for the short time until the Mutex becomes available again might not actually cause any problems . You will want to make sure that you never yield or perform other long-running operations while holding the MutexGuard, but barring that you shouldn’t run into problems . 
 
-As always with such optimizations, though, make sure you measure first, and choose only the synchronous primitive if it nets you significant performance improvements . If it does not, the additional footguns introduced by using a syn- chronous primitive in an asynchronous context are probably not worth it . 
+> As always with such optimizations, though, make sure you measure first, and choose only the synchronous primitive if it nets you significant performance improvements . If it does not, the additional footguns introduced by using a syn- chronous primitive in an asynchronous context are probably not worth it . 
 
-**Lower-Level Concurrency** 
+### Lower-Level Concurrency
 
 The standard library provides the std::sync::atomic module, which pro- vides access to the underlying CPU primitives, higher-level constructs like channels and mutexes are built with. These primitives come in the form of atomic types with names starting with Atomic—AtomicUsize, AtomicI32, AtomicBool, AtomicPtr, and so on—the Ordering type, and two functions called fence and compiler_fence. We’ll look at each of these over the next few sections. 
 
@@ -140,29 +136,23 @@ These types are the blocks used to build any code that has to communicate betwee
 
 The atomic types are special in that they have defined semantics for what happens when multiple threads try to access them concurrently. These types all support (mostly) the same API: load, store, fetch_*, and compare_ exchange. In the rest of this section, we’ll look at what those do, how to use them correctly, and what they’re useful for. But first, we have to talk about low-level memory operations and memory ordering. 
 
-**Memory Operations** 
+***Memory Operations***
 
 Informally, we often refer to accessing variables as “reading from” or “writing to” memory. In reality, a lot of machinery between code uses a variable and the actual CPU instructions that access your memory hardware. It’s important to understand that machinery, at least at a high level, in order to understand how concurrent memory accesses behave. 
 
 The compiler decides what instructions to emit when your program reads the value of a variable or assigns a new value to it. It is permitted to perform all sorts of transformations and optimizations on your code and may end up reordering your program statements, eliminating operations it deems redundant, or using CPU registers rather than actual memory to store intermediate computations. The compiler is subject to a number of restrictions on these transformations, but ultimately only a subset of your variable accesses actually end up as memory access instructions. 
 
-At the CPU level, memory instructions come in two main shapes: loads and stores. A load pulls bytes from a location in memory into a CPU register, and a store stores bytes from a CPU register into a location in memory. Loads and stores operate on small chunks of memory at a time: usually 8 bytes or less on modern CPUs. If a variable access spans more bytes than can be accessed with a single load or store, the compiler automatically turns it into multiple load or store instructions, as appropriate. The CPU also has some leeway in how it executes a program’s instructions to make better use of the hardware and improve program performance. For example, modern CPUs often execute instructions in parallel, or even out of order, when they don’t have dependencies on each other. There are also several layers of caches 
-
-Concurrency (and Parallelism) **177** 
-
-**178** Chapter 10 
-
-between each CPU and your computer’s DRAM, which means that a load of a given memory location may not necessarily see the latest store to that memory location, going by wall-clock time. 
+At the CPU level, memory instructions come in two main shapes: loads and stores. A load pulls bytes from a location in memory into a CPU register, and a store stores bytes from a CPU register into a location in memory. Loads and stores operate on small chunks of memory at a time: usually 8 bytes or less on modern CPUs. If a variable access spans more bytes than can be accessed with a single load or store, the compiler automatically turns it into multiple load or store instructions, as appropriate. The CPU also has some leeway in how it executes a program’s instructions to make better use of the hardware and improve program performance. For example, modern CPUs often execute instructions in parallel, or even out of order, when they don’t have dependencies on each other. There are also several layers of caches between each CPU and your computer’s DRAM, which means that a load of a given memory location may not necessarily see the latest store to that memory location, going by wall-clock time. 
 
 In most code, the compiler and CPU are permitted to transform the code only in ways that don’t affect the semantics of the resulting program, so these transformations are invisible to the programmer. However, in the context of parallel execution, these transformations can have a significant impact on application behavior. Therefore, CPUs typically provide multiple different variations of the load and store instructions, each with different guarantees about how the CPU may reorder them and how they may be interleaved with parallel operations on other CPUs. Similarly, compilers (or rather, the language the compiler compiles) provide different annotations you can use to force particular execution constraints for some subset of their memory accesses. In Rust, those annotations come in the form of the atomic types and their methods, which we’ll spend the rest of this section picking apart. 
 
-**Atomic Types** 
+***Atomic Types***
 
 Rust’s atomic types are so called because they can be accessed atomically— that is, the value of an atomic-type variable is written all at once and will never be written using multiple stores, guaranteeing that a load of that vari- able cannot observe that only some of the bytes composing the value have changed while others have not (yet). This is easiest understood by way of contrast with non-atomic types. For example, reassigning a new value to a tuple of type (i64, i64) typically requires two CPU store instructions, one for each 8-byte value. If one thread were to perform both of those stores, another thread could (if we ignore the borrow checker for a second) read the tuple’s value after the first store but before the second, and thus end up with an inconsistent view of the tuple’s value. It would end up reading the new value for the first element and the old value for the second element, a value that was never actually stored by any thread. 
 
 The CPU can atomically access values only of certain sizes, so there are only a few atomic types, all of which live in the atomic module. Each atomic type is of one of the sizes the CPU supports atomic access to, with multiple variations for things like whether the value is signed and to differentiate between an atomic usize and a pointer (which is of the same size as usize). Furthermore, the atomic types have explicit methods for loading and storing the values they hold, and a handful of more complex methods we’ll get back to later, so that the mapping between the code the programmer writes and the resulting CPU instructions is clearer. For example, AtomicI32::load performs a single load of a signed 32-bit value, and AtomicPtr::store per- forms a single store of a pointer-sized (64 bits on a 64-bit platform) value. 
 
-**Memory Ordering** 
+***Memory Ordering***
 
 Most of the methods on the atomic types take an argument of type Ordering, which dictates the memory ordering restrictions the atomic operation is subject to. Across different threads, loads and stores of an atomic value may be sequenced by the compiler and CPU only in interleavings that are compatible with the requested memory ordering of each of the atomic operations on that atomic value. Over the next few sections, we’ll see some examples of why control over the ordering is important and necessary to get the expected semantics out of the compiler and CPU. 
 
@@ -176,18 +166,17 @@ With this in mind, let’s take a look at the Ordering type, which is the primar
 
 Ordering is defined as an enum with the variants shown in Listing 10-1. Concurrency (and Parallelism) **179** 
 
-```
+```rust
 enum Ordering {
     Relaxed,
     Release,
     Acquire,
     AcqRel,
     SeqCst
+}
 ```
 
-} 
-
-Listing 10-1: The definition of *Ordering* 
+*Listing 10-1: The definition of Ordering*
 
 Each of these places different restrictions on the mapping from source code to execution semantics, and we’ll explore each one in turn in the remainder of this section. 
 
@@ -297,7 +286,7 @@ Atomic loads and stores marked with Ordering::SeqCst instruct the com- piler to 
 
 If we replaced all the memory ordering arguments in Listing 10-4 with SeqCst, Z could not possibly be 0 after all the threads have exited, just as we originally expected. Under sequential consistency, it must be possible to say either that t1 definitely ran before t2 or that t2 definitely ran before t1, so the execution where t3 and t4 see different orders is not allowed, and thus Z cannot be 0. 
 
-**Compare and Exchange** 
+***Compare and Exchange***
 
 In addition to load and store, all of Rust’s atomic types provide a method called compare_exchange. This method is used to atomically *and conditionally* replace a value. You provide compare_exchange with the last value you observed for an atomic variable and the new value you want to replace the original value with, and it will replace the value only if it is still the same as it was when you last observed it. To see why this is important, take a look at the (broken) implementation of a mutual exclusion lock in Listing 10-5. This implementation keeps track of whether the lock is held in the static atomic variable LOCK. We use the Boolean value true to represent that the lock is held. To acquire the lock, a thread waits for LOCK to be false, then sets it to true again; it then enters its critical section and sets LOCK to false to release the lock when its work (f) is done. 
 
@@ -354,7 +343,7 @@ Listing 10-6: A corrected implementation of a mutual exclusion lock
 
 This time around, we use compare_exchange in the loop, and it takes care of both checking that the lock is currently not held and storing true to take the lock as appropriate. This happens through the first and second arguments to compare_exchange, respectively: in this case, false and then true. You can read the invocation as “Store true only if the current value is false.” The compare_exchange method returns a Result that indicates either that the value was successfully updated (Ok) or that it could not be updated (Err). In either case, it also returns the current value. This isn’t too useful with an AtomicBool since we know what the value must be if the operation failed, but for something like an AtomicI32, the updated current value will let you quickly recompute what to store and then try again without having to do another load. 
 
-*Note that* *compare_exchange* *checks only whether the value is the same as the one that was passed in as the current value. If some other thread modifies the atomic variable’s value and then resets it to the original value again, a* *compare_exchange* *on that variable will still succeed. This is often referred to as the A-B-A problem.* 
+**N O T E**  *Note that* *compare_exchange* *checks only whether the value is the same as the one that was passed in as the current value. If some other thread modifies the atomic variable’s value and then resets it to the original value again, a* *compare_exchange* *on that variable will still succeed. This is often referred to as the A-B-A problem.* 
 
 Unlike simple loads and stores, compare_exchange takes *two* Ordering arguments. The first is the “success ordering,” and it dictates what memory ordering should be used for the load and store that the compare_exchange represents in the case that the value was successfully updated. The second is the “failure ordering,” and it dictates the memory ordering for the load if the loaded value does not match the expected current value. These two orderings are kept separate so that the developer can give the CPU leeway to improve execution performance by reordering loads and stores on failure when appropriate, but still get the correct ordering on success. In this case, it’s okay to reorder loads and stores across failed iterations of the lock acquisition loop, but it’s *not* okay to reorder loads and stores inside the critical section in such a way that they end up outside of it. 
 
@@ -362,41 +351,39 @@ Even though its interface is simple, compare_exchange is a very powerful synchro
 
 Be aware, though, that a compare_exchange requires that a single CPU has exclusive access to the underlying value, and it is therefore a form of mutual exclusion at the hardware level. This in turn means that compare_exchange can quickly become a scalability bottleneck: only one CPU can make progress at a time, so there’s a portion of your code that will not scale with the number of cores. In fact, it’s probably worse than that—the CPUs have to coordinate to ensure that only one CPU succeeds at a compare_exchange for a variable at a time (take a look at the MESI protocol if you’re curious about how that works), and that coordination grows quadratically more costly the more CPUs are involved! 
 
-**COMPARE_EXCHANGE_WEAK** 
+> **COMPARE_EXCHANGE_WEAK** 
 
-The careful documentation reader will notice that compare_exchange has a suspiciously named cousin, compare_exchange_weak, and wonder what the difference is . The weak variant of compare_exchange is allowed to fail even if the atomic variable’s value does still match the expected value that the user passed in, whereas the strong variant must succeed in this case . 
+> The careful documentation reader will notice that compare_exchange has a suspiciously named cousin, compare_exchange_weak, and wonder what the difference is . The weak variant of compare_exchange is allowed to fail even if the atomic variable’s value does still match the expected value that the user passed in, whereas the strong variant must succeed in this case . 
 
-This might seem odd—how could an atomic value swap fail except if the value has changed? The answer lies in system architectures that do not have a native compare_exchange operation . For example, ARM processors instead have locked load and conditional store operations, where a conditional store will fail if the value read by an associated locked load has not been written to since the load . The Rust standard library implements compare_exchange on ARM by calling this pair of instructions in a loop and returning only once the conditional store succeeds . This makes the code in Listing 10-6 needlessly inefficient—we end up with a nested loop, which requires more instructions and is harder to optimize . Since we already have a loop in this case, we could instead use com- pare_exchange_weak, remove the unreachable!() on Err(false), and get better machine code on ARM and the same compiled code on x86! 
+> This might seem odd—how could an atomic value swap fail except if the value has changed? The answer lies in system architectures that do not have a native compare_exchange operation . For example, ARM processors instead have locked load and conditional store operations, where a conditional store will fail if the value read by an associated locked load has not been written to since the load . The Rust standard library implements compare_exchange on ARM by calling this pair of instructions in a loop and returning only once the conditional store succeeds . This makes the code in Listing 10-6 needlessly inefficient—we end up with a nested loop, which requires more instructions and is harder to optimize . Since we already have a loop in this case, we could instead use com- pare_exchange_weak, remove the unreachable!() on Err(false), and get better machine code on ARM and the same compiled code on x86! 
 
-**The Fetch Methods** 
+***The Fetch Methods***
 
-Fetch methods (fetch_add, fetch_sub, fetch_and, and the like) are designed to allow more efficient execution of atomic operations that commute—that is, operations that have meaningful semantics regardless of the order they execute in. The motivation for this is that the compare_exchange method 
-
-is powerful, but also costly—if two threads both want to update a single atomic variable, one will succeed, while the other will fail and have to retry. If many threads are involved, they all have to mediate sequential access to the underlying value, and there will be plenty of spinning while threads retry on failure. 
+Fetch methods (fetch_add, fetch_sub, fetch_and, and the like) are designed to allow more efficient execution of atomic operations that commute—that is, operations that have meaningful semantics regardless of the order they execute in. The motivation for this is that the compare_exchange method is powerful, but also costly—if two threads both want to update a single atomic variable, one will succeed, while the other will fail and have to retry. If many threads are involved, they all have to mediate sequential access to the underlying value, and there will be plenty of spinning while threads retry on failure. 
 
 For simple operations that commute, rather than fail and retry just because another thread modified the value, we can tell the CPU what operation to perform on the atomic variable. It’ll then perform that opera- tion on whatever the current value happens to be when the CPU eventually gets exclusive access. Think of an AtomicUsize that counts the number of operations a pool of threads has completed. If two threads both complete a job at the same time, it doesn’t matter which one updates the counter first as long as both their increments are counted. 
 
 The fetch methods implement these kinds of commutative operations. They perform a read *and* a store operation in a single step and guarantee that the store operation was performed on the atomic variable when it held exactly the value returned by the method. As an example, AtomicUsize::fetch_add(1, Ordering::Relaxed) never fails—it always adds 1 to the current value of the AtomicUsize, no matter what it is, and returns the value of the AtomicUsize precisely when this thread’s 1 was added. 
 
-The fetch methods tend to be more efficient than compare_exchange because they don’t require threads to fail and retry when multiple threads contend for access to a variable. Some hardware architectures even have specialized fetch method implementations that scale much better as the number of involved CPUs grows. Nevertheless, if enough threads try to operate on the same atomic variable, those operations will begin to slow down and exhibit sublinear scaling due to the coordination required. In general, the best way to significantly improve the performance of a concur- rent algorithm is to split contended variables into more atomic variables that are each less contended, rather than switching from compare_exchange to a fetch method. 
+The fetch methods tend to be more efficient than compare_exchange because they don’t require threads to fail and retry when multiple threads contend for access to a variable. Some hardware architectures even have specialized fetch method implementations that scale much better as the number of involved CPUs grows. Nevertheless, if enough threads try to operate on the same atomic variable, those operations will begin to slow down and exhibit sublinear scaling due to the coordination required. In general, the best way to significantly improve the performance of a concurrent algorithm is to split contended variables into more atomic variables that are each less contended, rather than switching from compare_exchange to a fetch method. 
 
-*The* *fetch_update* *method is somewhat deceptively named—behind the scenes, it is really just a* *compare_exchange_weak* *loop, so its performance profile will more closely match that of* *compare_exchange* *than the other fetch methods.* 
+**N O T E** *The* *fetch_update* *method is somewhat deceptively named—behind the scenes, it is really just a* *compare_exchange_weak* *loop, so its performance profile will more closely match that of* *compare_exchange* *than the other fetch methods.* 
 
-**Sane Concurrency** 
+### Sane Concurrency
 
 Writing correct and performant concurrent code is harder than writing sequential code; you have to consider not only possible execution interleavings but also how your code interacts with the compiler, the CPU, and the memory subsystem. With such a wide array of footguns at your disposal, it’s easy to want to throw your hands in the air and just give up on concurrency altogether. In this section we’ll explore some techniques and tools that can help ensure that you write correct concurrent code without (as much) fear. 
 
-**Start Simple** 
+***Start Simple***
 
 It is a fact of life that simple, straightforward, easy-to-follow code is more likely to be correct. This principle also applies to concurrent code—always start with the simplest concurrent design you can think of, then measure, and only if measurement reveals a performance problem should you optimize your algorithm. 
 
 To follow this tip in practice, start out with concurrency patterns that do not require intricate use of atomics or lots of fine-grained locks. Begin with multiple threads that run sequential code and communicate over channels, or that cooperate through locks, and then benchmark the result- ing performance with the workload you care about. You’re much less likely to make mistakes this way than by implementing fancy lockless algorithms or by splitting your locks into a thousand pieces to avoid false sharing. For many use cases, these designs are plenty fast enough; it turns out a lot of time and effort has gone into making channels and locks perform well! And if the simple approach is fast enough for your use case, why introduce more complex and error-prone code? 
 
-If your benchmarks indicate a performance problem, then figure out exactly which part of your system scales poorly. Focus on fixing that bottle- neck in isolation where you can, and try to do so with small adjustments where possible. Maybe it’s enough to split a lock in two rather than move to a concurrent hash table, or to introduce another thread and a channel rather than implement a lock-free work stealing queue. If so, do that. 
+If your benchmarks indicate a performance problem, then figure out exactly which part of your system scales poorly. Focus on fixing that bottleneck in isolation where you can, and try to do so with small adjustments where possible. Maybe it’s enough to split a lock in two rather than move to a concurrent hash table, or to introduce another thread and a channel rather than implement a lock-free work stealing queue. If so, do that. 
 
 Even when you do have to work directly with atomics and the like, keep things simple until there’s a proven need to optimize—use Ordering::SeqCst and compare_exchange at first, and then iterate if you find concrete evidence that those are becoming bottlenecks that must be taken care of. 
 
-**Write Stress Tests** 
+***Write Stress Tests***
 
 As the author, you have a lot of insight into where bugs in your code may hide, without necessarily knowing what those bugs are (yet, anyway). Writing stress tests is a good way to shake out some of the hidden bugs. Stress tests don’t necessarily perform a complex sequence of steps but instead have lots of threads doing relatively simple operations in parallel. 
 
@@ -404,7 +391,7 @@ For example, if you were writing a concurrent hash map, one stress test might be
 
 Stress tests resemble fuzz tests in many ways; whereas fuzzing gener- ates many random inputs to a given function, the stress test instead gen- erates many random thread and memory access schedules. Just like fuzzers, stress tests are therefore only as good as the assertions in your code; they can’t tell you about a bug that doesn’t manifest in some easy-to-spot way like an assertion failure or some other kind of panic. For that reason, it’s a good idea to litter your low-level concurrency code with assertions, or debug_ assert_* if you’re worried about runtime cost in particularly hot loops. 
 
-**Use Concurrency Testing Tools** 
+***Use Concurrency Testing Tools***
 
 The primary challenge in writing concurrent code is to handle all the pos- sible ways the execution of different threads can interleave. As we saw in the Ordering::SeqCst example in Listing 10-4, it’s not just the thread scheduling that matters, but also which memory values are possible for a given thread to observe at any given point in time. Writing tests that execute every pos- sible legal execution is not only tedious but also difficult—you need very low-level control over which threads execute when and what values their reads return, which the operating system likely doesn’t provide. 
 
@@ -426,15 +413,15 @@ Since TSan only observes your code running and does not execute it over and over
 
 At the time of writing, to use TSan you need to use a nightly version of the Rust compiler and pass in the -Zsanitizer=thread command-line argu- ment (or set it in RUSTFLAGS), though hopefully in time this will be a standard supported option. Other sanitizers are also available that check things like out-of-bounds memory accesses, use-after-free, memory leaks, and reads of uninitialized memory, and you may want to run your concurrent test suite through those too! 
 
-**HEISENBUGS** 
+> **HEISENBUGS** 
 
-Heisenbugs are bugs that seem to disappear when you try to study them . This happens quite frequently when trying to debug highly concurrent code; the additional instrumentation to debug the problem changes the relative timing of concurrent events and might cause the execution interleaving that triggered the bug to no longer happen . 
+> Heisenbugs are bugs that seem to disappear when you try to study them . This happens quite frequently when trying to debug highly concurrent code; the additional instrumentation to debug the problem changes the relative timing of concurrent events and might cause the execution interleaving that triggered the bug to no longer happen . 
 
-A particularly common cause of disappearing concurrency bugs is using print statements, which is by far one of the most common debugging techniques . There are two reasons why print statements have such an outsized effect on concurrency bugs . The first, and perhaps most obvious, is that relatively speak- ing, printing something to the user’s terminal (or wherever standard output points) takes quite a long time, especially if your program is producing a lot of output . Writing to the terminal requires, at the very least, a round-trip to the operating system kernel to perform the write, but the write may also have to wait for the terminal itself to read from the process’s output into its own buffers . All that extra time might so much delay the operation that previously raced with an operation in some other thread that the race condition disappears . 
+> A particularly common cause of disappearing concurrency bugs is using print statements, which is by far one of the most common debugging techniques . There are two reasons why print statements have such an outsized effect on concurrency bugs . The first, and perhaps most obvious, is that relatively speak- ing, printing something to the user’s terminal (or wherever standard output points) takes quite a long time, especially if your program is producing a lot of output . Writing to the terminal requires, at the very least, a round-trip to the operating system kernel to perform the write, but the write may also have to wait for the terminal itself to read from the process’s output into its own buffers . All that extra time might so much delay the operation that previously raced with an operation in some other thread that the race condition disappears . 
 
-The second reason why print statements disturb concurrent execution pat- terns is that writing to standard output is (generally) guarded by a lock . If you look inside the Stdout type in the standard library, you’ll see that it holds a Mutex that guards access to the output stream . It does this so that the output isn’t garbled too badly if multiple threads try to write at the same time—without a lock, a given line might have characters interspersed from multiple thread writes, but with the lock the threads will take turns writing instead . Unfortunately, acquiring the output lock, is another thread synchronization point, and one that every printing thread is involved in . This means that if your code was previously broken due to missing synchronization between two threads, or just because a particular race between two threads was possible, adding print statements might fix that bug as a side effect! 
+> The second reason why print statements disturb concurrent execution pat- terns is that writing to standard output is (generally) guarded by a lock . If you look inside the Stdout type in the standard library, you’ll see that it holds a Mutex that guards access to the output stream . It does this so that the output isn’t garbled too badly if multiple threads try to write at the same time—without a lock, a given line might have characters interspersed from multiple thread writes, but with the lock the threads will take turns writing instead . Unfortunately, acquiring the output lock, is another thread synchronization point, and one that every printing thread is involved in . This means that if your code was previously broken due to missing synchronization between two threads, or just because a particular race between two threads was possible, adding print statements might fix that bug as a side effect! 
 
-In general, when you spot what seems like a Heisenbug, try to find other ways to narrow down the problem . That might involve using Loom or TSan, using gdb or lldb, or using a per-thread in-memory log that you print only at the end . Many logging frameworks also work hard to avoid synchronization points on the critical path of issuing log events, so switching to one of those might make your life easier . As an added bonus, good logging that you leave behind after fixing a particular bug might come in handy later . Personally I’m a big fan of the tracing crate, but there are many good options out there . 
+> In general, when you spot what seems like a Heisenbug, try to find other ways to narrow down the problem . That might involve using Loom or TSan, using gdb or lldb, or using a per-thread in-memory log that you print only at the end . Many logging frameworks also work hard to avoid synchronization points on the critical path of issuing log events, so switching to one of those might make your life easier . As an added bonus, good logging that you leave behind after fixing a particular bug might come in handy later . Personally I’m a big fan of the tracing crate, but there are many good options out there . 
 
 ## Summary
 

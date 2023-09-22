@@ -4,7 +4,7 @@ In this chapter, we’ll look at the various ways in which you can extend Rust�
 
 This chapter is divided into two main sections. The first part covers Rust testing mechanisms, like the standard testing harness and conditional testing code. The second looks at other ways to evaluate the correctness of your Rust code, such as benchmarking, linting, and fuzzing. 
 
-**Rust Testing Mechanisms** 
+### Rust Testing Mechanisms
 
 To understand the various testing mechanisms Rust provides, you must first understand how Rust builds and runs tests. When you run cargo test --lib, the only special thing Cargo does is pass the --test flag to rustc. This flag tells rustc to produce a test binary that runs all the unit tests, rather than just compiling the crate’s library or binary. Behind the scenes, --test has two primary effects. First, it enables cfg(test) so that you can conditionally include testing code (more on that in a bit). Second, it makes the compiler generate a *test harness*: a carefully generated main function that invokes each #[test] function in your program when it’s run. 
 
@@ -31,13 +31,13 @@ harness = false
 
 Without the test harness, none of the magic around #[test] happens. Instead, you’re expected to write your own main function to run the testing code you want to execute. Essentially, you’re writing a normal Rust binary that just happens to be run by cargo test. That binary is responsible for handling all the things that the default harness normally does (if you want to support them), such as command line flags. The harness property is set separately for each integration test, so you can have one test file that uses the standard harness and one that does not. 
 
-**ARGUMENTS TO THE DEFAULT TEST HARNESS** 
+> **ARGUMENTS TO THE DEFAULT TEST HARNESS** 
 
-The default test harness supports a number of command line arguments to configure how the tests are run . These aren’t passed to cargo test directly but rather to the test binary that Cargo compiles and runs for you when you run cargo test . To access that set of flags, pass -- to cargo test, followed by the arguments to the test binary . For example, to see the help text for the test binary, you’d run cargo test -- --help . 
+> The default test harness supports a number of command line arguments to configure how the tests are run . These aren’t passed to cargo test directly but rather to the test binary that Cargo compiles and runs for you when you run cargo test . To access that set of flags, pass -- to cargo test, followed by the arguments to the test binary . For example, to see the help text for the test binary, you’d run cargo test -- --help . 
 
-A number of handy configuration options are available through these command line arguments . The --nocapture flag disables the output capturing that normally happens when you run Rust tests . This is useful if you want to observe a test’s output in real time rather than all at once after the test has failed . You can use the --test-threads option to limit how many tests run concurrently, which is helpful if you have a test that hangs or segfaults and you want to figure out which one it is by running the tests sequentially . There’s also a --skip option for skipping tests that match a certain pattern, --ignored to run tests that would normally be ignored (such as those that require an external program to be running), and --list to just list all the available tests . 
+> A number of handy configuration options are available through these command line arguments . The --nocapture flag disables the output capturing that normally happens when you run Rust tests . This is useful if you want to observe a test’s output in real time rather than all at once after the test has failed . You can use the --test-threads option to limit how many tests run concurrently, which is helpful if you have a test that hangs or segfaults and you want to figure out which one it is by running the tests sequentially . There’s also a --skip option for skipping tests that match a certain pattern, --ignored to run tests that would normally be ignored (such as those that require an external program to be running), and --list to just list all the available tests . 
 
-Keep in mind that these arguments are all implemented by the default test harness, so if you disable it (with harness = false), you’ll have to implement the ones you need yourself in your main function! 
+> Keep in mind that these arguments are all implemented by the default test harness, so if you disable it (with harness = false), you’ll have to implement the ones you need yourself in your main function! 
 
 Integration tests without a harness are primarily useful for benchmarks, as we’ll see later, but they also come in handy when you want to run tests that don’t fit the standard “one function, one test” model. For example, you’ll frequently see harnessless tests used with fuzzers, model checkers, and tests that require a custom global setup (like under WebAssembly or when working with custom targets). 
 
@@ -45,17 +45,17 @@ Integration tests without a harness are primarily useful for benchmarks, as we�
 
 When Rust builds code for testing, it sets the compiler configuration flag test, which you can then use with conditional compilation to have code that is compiled out unless it is specifically being tested. On the surface, this may seem odd: don’t you want to test exactly the same code that’s going into production? You do, but having code exclusively available when testing allows you to write better, more thorough tests, in a few ways. 
 
-**MOCKING** 
+> **MOCKING** 
 
-When writing tests, you often want tight control over the code you’re testing as well as any other types that your code may interact with . For example, if you are testing a network client, you probably do not want to run your unit tests over a real network but instead want to directly control what bytes are emitted by the “network” and when . Or, if you’re testing a data structure, you want your test to use types that allow you to control what each method returns on each invocation . You may also want to gather metrics such as how often a given method was called or whether a given byte sequence was emitted . 
+> When writing tests, you often want tight control over the code you’re testing as well as any other types that your code may interact with . For example, if you are testing a network client, you probably do not want to run your unit tests over a real network but instead want to directly control what bytes are emitted by the “network” and when . Or, if you’re testing a data structure, you want your test to use types that allow you to control what each method returns on each invocation . You may also want to gather metrics such as how often a given method was called or whether a given byte sequence was emitted . 
 
-These “fake” types and implementations are known as mocks, and they are a key feature of any extensive unit test suite . While you can often do the work needed to get this kind of control manually, it’s nicer to have a library take care of most of the nitty-gritty details for you . This is where automated mocking comes into play . A mocking library will have facilities for generating types (including functions) with particular properties or signatures, as well as mechanisms to control and introspect those generated items during a test execution . 
+> These “fake” types and implementations are known as mocks, and they are a key feature of any extensive unit test suite . While you can often do the work needed to get this kind of control manually, it’s nicer to have a library take care of most of the nitty-gritty details for you . This is where automated mocking comes into play . A mocking library will have facilities for generating types (including functions) with particular properties or signatures, as well as mechanisms to control and introspect those generated items during a test execution . 
 
-Mocking in Rust generally happens through generics—as long as your program, data structure, framework, or tool is generic over anything you might want to mock (or takes a trait object), you can use a mocking library to generate conforming types that will instantiate those generic parameters . You then write your unit tests by instantiating your generic constructs with the generated mock types, and you’re off to the races! 
+> Mocking in Rust generally happens through generics—as long as your program, data structure, framework, or tool is generic over anything you might want to mock (or takes a trait object), you can use a mocking library to generate conforming types that will instantiate those generic parameters . You then write your unit tests by instantiating your generic constructs with the generated mock types, and you’re off to the races! 
 
-In situations where generics are inconvenient or inappropriate, such as if you want to avoid making a particular aspect of your type generic to users, you can instead encapsulate the state and behavior you want to mock in a dedicated struct . You would then generate a mocked version of that struct and its methods and use conditional compilation to use either the real or mocked implementation depending on cfg(test) or a test-only feature like cfg(feature = "test_mock_foo") . 
+> In situations where generics are inconvenient or inappropriate, such as if you want to avoid making a particular aspect of your type generic to users, you can instead encapsulate the state and behavior you want to mock in a dedicated struct . You would then generate a mocked version of that struct and its methods and use conditional compilation to use either the real or mocked implementation depending on cfg(test) or a test-only feature like cfg(feature = "test_mock_foo") . 
 
-At the moment, there isn’t a single mocking library, or even a single mocking approach, that has emerged as the One True Answer in the Rust community . The most extensive and thorough mocking library I know of is the mockall crate, but that is still under active development, and there are many other contenders . 
+> At the moment, there isn’t a single mocking library, or even a single mocking approach, that has emerged as the One True Answer in the Rust community . The most extensive and thorough mocking library I know of is the mockall crate, but that is still under active development, and there are many other contenders . 
 
 **Test-Only APIs** 
 
@@ -86,7 +86,9 @@ impl RawTable {
 }
 ```
 
-*Listing 6-3: Using *#[cfg(test)]* to make internal state accessible in the testing context **Bookkeeping for Test Assertions** *
+*Listing 6-3: Using *#[cfg(test)]* to make internal state accessible in the testing context 
+
+**Bookkeeping for Test Assertions** *
 
 The second benefit of having code that exists only during testing is that you can augment the program to perform additional runtime bookkeeping that can then be inspected by tests. For example, imagine you’re writing your own version of the BufWriter type from the standard library. When testing it, you want to make sure that BufWriter does not issue system calls unnecessarily. The most obvious way to do so is to have the BufWriter keep track of how many times it has invoked write on the underlying Write. However, in production this information isn’t important, and keeping track of it introduces (marginal) performance and memory overhead. With #[cfg(test)], you can have the bookkeeping happen only when testing, as shown in Listing 6-4. 
 
@@ -166,25 +168,24 @@ Like with test functions, you can specify the should_panic attribute to indicate
 
 The attribute compile_fail tells rustdoc that the code in the documentation example should not compile. This indicates to the user that a particular use is not possible and serves as a useful test to remind you to update the documentation should the relevant aspect of your library change. You can also use this attribute to check that certain static properties hold for your types. Listing 6-6 shows an example of how you can use compile_fail to check that a given type does not implement Send, which may be necessary to uphold safety guarantees in unsafe code. 
 
-```
-```compile_fail
+```rust
+​```compile_fail
 # struct MyNonSendType(std::rc::Rc<()>);
 fn is_send<T: Send>() {}
 is_send::<MyNonSendType>();
+​```
 ```
 Listing 6-6: Testing that code fails to compile with *compile_fail* 
 
 compile_fail is a fairly crude tool in that it gives no indication of *why* the code does not compile. For example, if code doesn’t compile because of a missing semicolon, a compile_fail test will appear to have been successful. For that reason, you’ll usually want to add the attribute only after you have made sure that the test indeed fails to compile with the expected error. If you need more fine-grained tests for compilation errors, such as when developing macros, take a look at the trybuild crate. 
 
-**Additional Testing Tools** 
+### Additional Testing Tools
 
 There’s a lot more to testing than just running test functions and seeing that they produce the expected result. A thorough survey of testing techniques, methodologies, and tools is outside the scope of this book, but there are some key Rust-specific pieces that you should know about as you expand your testing repertoire. 
 
 **Linting** 
 
-You may not consider a linter’s checks to be tests, but in Rust they often can be. The Rust linter *clippy* categorizes a number of its lints as *correctness* 
-
-**N O T E** *lints*. These lints catch code patterns that compile but are almost certainly bugs. Some examples are a = b; b = a, which fails to swap a and b; std::mem::forget(t), where t is a reference; and for x in y.next(), which will iterate only over the first element in y. If you are not running clippy as part of your CI pipeline already, you probably should be. 
+You may not consider a linter’s checks to be tests, but in Rust they often can be. The Rust linter *clippy* categorizes a number of its lints as *correctness*  *lints*. These lints catch code patterns that compile but are almost certainly bugs. Some examples are a = b; b = a, which fails to swap a and b; std::mem::forget(t), where t is a reference; and for x in y.next(), which will iterate only over the first element in y. If you are not running clippy as part of your CI pipeline already, you probably should be. 
 
 Clippy comes with a number of other lints that, while usually helpful, may be more opinionated than you’d prefer. For example, the type_complexity lint, which is on by default, issues a warning if you use a particularly involved type in your program, like Rc<Vec<Vec<Box<(u32, u32, u32, u32)>>>>. While that warning encourages you to write code that is easier to read, you may find it too pedantic to be broadly useful. If some part of your code erroneously triggers a particular lint, or you just want to allow a specific instance of it, you can opt out of the lint just for that piece of code with #[allow(clippy::name_of_lint)]. 
 
@@ -228,9 +229,9 @@ One downside of property-based testing is that it relies more heavily on the pro
 
 If you’re curious about property-based test generation, I recommend starting with the proptest crate. 
 
-**TESTING SEQUENCES OF OPERATIONS** 
+>  **TESTING SEQUENCES OF OPERATIONS** 
 
-Since fuzzers and property testers allow you to generate arbitrary Rust types, you aren’t limited to testing a single function call in your crate . For example, say you want to test that some type Foo behaves correctly if you perform a particular sequence of operations on it . You could define an enum Operation that lists operations, and make your test function take a Vec<Operation> . Then you could instantiate a Foo and perform each operation on that Foo, one after the other . Most testers have support for minimizing inputs, so they will even search for the smallest sequence of operations that still violates a property if a propertyviolating input is found! 
+>  Since fuzzers and property testers allow you to generate arbitrary Rust types, you aren’t limited to testing a single function call in your crate . For example, say you want to test that some type Foo behaves correctly if you perform a particular sequence of operations on it . You could define an enum Operation that lists operations, and make your test function take a Vec<Operation> . Then you could instantiate a Foo and perform each operation on that Foo, one after the other . Most testers have support for minimizing inputs, so they will even search for the smallest sequence of operations that still violates a property if a propertyviolating input is found! 
 
 **Test Augmentation** 
 
@@ -260,7 +261,7 @@ At the time of writing, if you run this code through Miri, you get an error that
 does not have an appropriate item in the borrow stack
 ```
 
-*Miri is still under development, and its error messages aren’t always the easiest to understand. This is a problem that’s being actively worked on, so by the time you read this, the error output may have already gotten much better!* 
+**N O T E** *Miri is still under development, and its error messages aren’t always the easiest to understand. This is a problem that’s being actively worked on, so by the time you read this, the error output may have already gotten much better!* 
 
 Another tool worth looking at is *Loom*, a clever library that tries to ensure your tests are run with every relevant interleaving of concurrent operations. At a high level, Loom keeps track of all cross-thread synchronization points and runs your tests over and over, adjusting the order in which threads proceed from those synchronization points each time. So, if thread A and thread B both take the same Mutex, Loom will ensure that the test runs once with A taking it first and once with B taking it first. Loom also keeps track of atomic accesses, memory orderings, and accesses to UnsafeCell (which we’ll discuss in Chapter 9) and checks that threads do not access them inappropriately. If a test fails, Loom can give you an exact rundown of which threads executed in what order so you can determine how the crash happened. 
 
@@ -272,11 +273,7 @@ Unlike with functional testing, performance tests do not have a common, well-def
 
 **Performance Variance** 
 
-Performance can vary for a huge variety of reasons, and many factors affect how fast a particular sequence of machine instructions run. Some are obvious, like the CPU and memory clock speed, or how loaded the machine otherwise is, but many are much more subtle. For example, your kernel version may change paging performance, the length of your username might change the 
-
-Testing **97** 
-
-layout of memory, and the temperature in the room might cause the CPU to clock down. Ultimately, it is highly unlikely that if you run a benchmark twice, you’ll get the same result. In fact, you may observe significant variance, even if you are using the same hardware. Or, viewed from another perspective, your code may have gotten slower or faster, but the effect may be invisible due to differences in the benchmarking environment. 
+Performance can vary for a huge variety of reasons, and many factors affect how fast a particular sequence of machine instructions run. Some are obvious, like the CPU and memory clock speed, or how loaded the machine otherwise is, but many are much more subtle. For example, your kernel version may change paging performance, the length of your username might change the layout of memory, and the temperature in the room might cause the CPU to clock down. Ultimately, it is highly unlikely that if you run a benchmark twice, you’ll get the same result. In fact, you may observe significant variance, even if you are using the same hardware. Or, viewed from another perspective, your code may have gotten slower or faster, but the effect may be invisible due to differences in the benchmarking environment. 
 
 There are no perfect ways to eliminate all variance in your performance results, unless you happen to be able to run benchmarks repeatedly on a highly diverse fleet of machines. Even so, it’s important to try to handle this measurement variance as best we can to extract a signal from the noisy measurements benchmarks give us. In practice, our best friend in combating variance is to run each benchmark many times and then look at the *distribution* of measurements rather than just a single one. Rust has tools that can help with this. For example, rather than ask “How long did this function take to run on average?” crates like hdrhistogram enable us to look at statistics like “What range of runtime covers 95% of the samples we observed?” To be even more rigorous, we can use techniques like null hypothesis testing from statistics to build some confidence that a measured difference indeed corresponds to a true change and is not just noise. 
 
@@ -297,15 +294,13 @@ println!("took {:?}", start.elapsed());
 
 Listing 6-9: A suspiciously fast performance benchmark 
 
-**98** Chapter 6 
-
 If you were to look at the assembly output of this code compiled in release mode using something like the excellent *godbolt.org* or cargo-asm, you’d immediately notice that something was wrong: the calls to Vec::with _capacity and Vec::push, and indeed the whole for loop, are nowhere to be seen. They have been optimized out completely. The compiler realized that nothing in the code actually required the vector operations to be performed and eliminated them as dead code. Of course, the compiler is completely within its rights to do so, but for benchmarking purposes, this is not particularly helpful. 
 
 To avoid these kinds of optimizations for benchmarking, the standard library provides std::hint::black_box. This function has been the topic of much debate and confusion and is still pending stabilization at the time of writing, but is so useful it’s worth discussing here nonetheless. At its core, it’s simply an identity function (one that takes x and returns x) that tells the compiler to assume that the argument to the function is used in arbitrary (legal) ways. It does not prevent the compiler from applying optimizations to the input argument, nor does it prevent the compiler from optimizing how the return value is used. Instead, it encourages the compiler to actually compute the argument to the function (under the assumption that it will be used) and to store that result somewhere accessible to the CPU such that black_box could be called with the computed value. The compiler is free to, say, compute the input argument at compile time, but it should still inject the result into the program. 
 
 This function is all we need for many, though admittedly not all, of our benchmarking needs. For example, we can annotate Listing 6-9 so that the vector accesses are no longer optimized out, as shown in Listing 6-10. 
 
-```
+```rust
 let mut vs = Vec::with_capacity(4);
 let start = std::time::Instant::now();
 for i in 0..4 {
@@ -323,20 +318,18 @@ We’ve told the compiler to assume that vs is used in arbitrary ways
 
 Note that we used vs.as_ptr() and not, say, &vs. That’s because of the caveat that the compiler should assume black_box can perform any *legal* operation on its argument. It is not legal to mutate the Vec through a shared reference, so if we used black_box(&vs), the compiler might notice that vs will not change between iterations of the loop and implement optimizations based on that observation! 
 
-Testing **99** 
-
 **I/O Overhead Measurement** 
 
 When writing benchmarks, it’s easy to accidentally measure the wrong thing. For example, we often want to get information in real time about how far along the benchmark is. To do that, we might write code like that in Listing 6-11, intended to measure how fast my_function runs: 
 
+```rust
+let start = std::time::Instant::now();
+for i in 0..1_000_000 {
+  println!("iteration {}", i);
+  my_function();
+}
+println!("took {:?}", start.elapsed());
 ```
-             let start = std::time::Instant::now();
-             for i in 0..1_000_000 {
-               println!("iteration {}", i);
-               my_function();
-             }
-             println!("took {:?}", start.elapsed());
-
 
 Listing 6-11: What are we really benchmarking here? 
 

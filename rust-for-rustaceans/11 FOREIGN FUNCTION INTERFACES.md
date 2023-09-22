@@ -5,11 +5,11 @@ In this chapter we’ll first look at the primary mechanism Rust provides for FF
 
 **N O T E** *While I often refer to FFI as being about crossing the boundary between one language and another, FFI can also occur entirely inside Rust-land. If one Rust program shares memory with another Rust program but the two aren’t compiled together—say, if you’re using a dynamically linked library in your Rust program that happens to be written in Rust, but you just have the C-compatible* .so *file—the same complications arise.* 
 
-**Crossing Boundaries with extern** 
+### Crossing Boundaries with extern
 
 FFI is, ultimately, all about accessing bytes that originate somewhere out- side your application’s Rust code. For that, Rust provides two primary build- ing blocks: *symbols*, which are names assigned to particular addresses in a given segment of your binary that allow you to share memory (be it for data or code) between the external origin and your Rust code, and *calling conventions* that provide a common understanding of how to call functions stored in such shared memory. We’ll look at each of these in turn. 
 
-**Symbols** 
+***Symbols***
 
 Any binary artifact that the compiler produces from your code is filled with symbols—every function or static variable you define has a symbol that points to its location in the compiled binary. Generic functions may even have multiple symbols, one for each monomorphization of the function the compiler generates! 
 
@@ -18,10 +18,6 @@ Normally, you don’t have to think about symbols—they’re used internally by
 However, using random names for symbols won’t work when you want to call a function or access a static variable that isn’t compiled at the same time, such as code that’s written in a different language and thus compiled by a different compiler. You can’t tell Rust about a static variable defined in C if the symbol for that variable has a semirandom name that keeps changing. Conversely, you can’t tell Python’s FFI interface about a Rust function if you can’t produce a stable name for it. 
 
 To use a symbol with an external origin, we also need some way to tell Rust about a variable or function in such a manner that the compiler will look for that same symbol defined elsewhere rather than defining its own (we’ll talk about how that search happens later). Otherwise, we would just end up with two identical symbols for that function or static variable, and no sharing would take place. In fact, in all likelihood, compilation would fail since any code that referred to that symbol wouldn’t know which definition (that is, which address) to use for it! 
-
-**194** 
-
-Chapter 11 
 
 **NOTE** *A quick note about terminology: a symbol can be* declared *multiple times but* defined *only once. Every declaration of a symbol will link to the same single definition for that symbol at linking time. If no definition for a declaration is found, or if there are multiple definitions, the linker will complain.* 
 
@@ -44,11 +40,11 @@ A symbol can be linked either *statically* or *dynamically*. Static linking is t
 The extern keyword is the mechanism that allows us to declare a symbol as residing within a foreign interface. Specifically, it declares the existence of a symbol that’s defined elsewhere. In Listing 11-1 we define a static variable called RS_DEBUG in Rust that we make available to other code via FFI. We also declare a static variable called FOREIGN_DEBUG whose definition is unspecified but will be resolved at linking time. 
 
 ```
-  #[no_mangle]
-  pub static RS_DEBUG: bool = true;
-  extern {
-	  static FOREIGN_DEBUG: bool;
-  }
+#[no_mangle]
+pub static RS_DEBUG: bool = true;
+extern {
+	static FOREIGN_DEBUG: bool;
+}
 ```
 
 Listing 11-1: Exposing a Rust static variable, and accessing one declared elsewhere, through FFI 
@@ -60,8 +56,6 @@ The extern block surrounding the FOREIGN_DEBUG static variable denotes that this
 **NOTE** *Static variables in Rust aren’t mutable by default, regardless of whether they’re in an* *extern* *block. These variables are always available from any thread, so mutable access would pose a data race risk. You can declare a* *static* *as* *mut**, but if you do, it becomes unsafe to access.* 
 
 The procedure to declare FFI functions is very similar. In Listing 11-2, we make hello_rust accessible to non-Rust code and pull in the external hello_foreign function. 
-
-**196** Chapter 11 
 
 ```
 #[no_mangle]
@@ -75,7 +69,7 @@ Listing 11-2: Exposing a Rust function, and accessing one defined elsewhere, thr
 
 The building blocks are all the same as in Listing 11-1 with the exception that the Rust function is declared using extern fn, which we’ll explore in the next section. 
 
-If there are multiple definitions of a given extern symbol like FOREIGN_ DEBUG or hello_foreign, you can explicitly specify which library the symbol should link against using the #[link] attribute. If you don’t, the linker will give you an error saying that it’s found multiple definitions for the symbol in question. For example, if you prefix an extern block with #[link(name = "crypto")], you’re telling the linker to resolve any symbols (whether statics or functions) against a linked library named “crypto.” You can also rename an external static or function in your Rust code by annotating its declara- tion with #[link_name = "**"], and then the item links to whatever name you wish. Similarly, you can rename a Rust item for export using #[export_name = "**"]. 
+If there are multiple definitions of a given extern symbol like FOREIGN_ DEBUG or hello_foreign, you can explicitly specify which library the symbol should link against using the #[link] attribute. If you don’t, the linker will give you an error saying that it’s found multiple definitions for the symbol in question. For example, if you prefix an extern block with #[link(name = "crypto")], you’re telling the linker to resolve any symbols (whether statics or functions) against a linked library named “crypto.” You can also rename an external static or function in your Rust code by annotating its declara- tion with #[link_name = "\*\*"], and then the item links to whatever name you wish. Similarly, you can rename a Rust item for export using #[export_name = "**"]. 
 
 **Link Kinds** 
 
@@ -85,13 +79,11 @@ There are several trade-offs between static and dynamic linking, but the main co
 
 Dynamic linking also tends to produce smaller binaries. Since static compilation includes any linked code into the final binary output, and any code that code in turn pulls in, it produces larger binaries. With dynamic linking, each external item includes just a small bit of wrapper code that loads the indicated library at runtime and then forwards the access. 
 
-Foreign Function Interfaces **197** 
-
 So far, static linking may not seem very attractive, but it has one big advantage over dynamic linking: ease of distribution. With dynamic linking, anyone who wants to run a binary that includes your code must *also* have any libraries your code links against. Not only that, but they must make sure the version of each such library they have is compatible with what your code expects. This may be fine for libraries like glibc or OpenSSL that are available on most systems, but it poses a problem for more obscure libraries. The user then needs to be aware that they should install that library and must hunt for it in order to run your code! With static linking, the library’s code is embedded directly into the binary output, so the user doesn’t need to install it themselves. 
 
 Ultimately, there isn’t a *right* choice between static and dynamic linking. Dynamic linking is usually a good default, but static compilation may be a better option for particularly constrained deployment environments or for very small or niche library dependencies. Use your best judgment! 
 
-**Calling Conventions** 
+***Calling Conventions***
 
 Symbols dictate *where* a given function or variable is defined, but that’s not enough to allow function calls across FFI boundaries. To call a foreign function in any language, the compiler also needs to know its *calling convention*, which dictates the assembly code to use to invoke the function. We won’t get into the actual technical details of each calling convention here, but as a general overview, the convention dictates: 
 
@@ -115,19 +107,19 @@ Rust also supports a number of other calling conventions that you supply as a st
 
 **N O T E** *A function’s calling convention is part of its type. That is, the type* *extern "C" fn()* *is not the same as* *fn()* *(or* *extern "Rust" fn()**), which is different again from* *extern "system" fn()**.* 
 
-**OTHER BINARY ARTIFACTS** 
+> **OTHER BINARY ARTIFACTS** 
 
-Normally, you compile Rust code only to run its tests or build a binary that you’re then going to distribute or run . Unlike in many other languages, you don’t generally compile a Rust library to distribute it to others—if you run a command like cargo publish, it just wraps up your crate’s source code and uploads it to crates.io . This is mostly because it is difficult to distribute generic code as anything but source code . Since the compiler monomorphizes each generic function to the provided type arguments, and those types may be defined in the caller’s crate, the compiler must have access to the function’s generic form, which means no optimized machine code! 
+> Normally, you compile Rust code only to run its tests or build a binary that you’re then going to distribute or run . Unlike in many other languages, you don’t generally compile a Rust library to distribute it to others—if you run a command like cargo publish, it just wraps up your crate’s source code and uploads it to crates.io . This is mostly because it is difficult to distribute generic code as anything but source code . Since the compiler monomorphizes each generic function to the provided type arguments, and those types may be defined in the caller’s crate, the compiler must have access to the function’s generic form, which means no optimized machine code! 
 
-Technically speaking, Rust does compile binary library artifacts, called rlibs, of each dependency that it combines in the end . These rlibs include the informa- tion necessary to resolve generic types, but they are specific to the exact com- piler used and can’t generally be distributed in any meaningful way . 
+> Technically speaking, Rust does compile binary library artifacts, called rlibs, of each dependency that it combines in the end . These rlibs include the informa- tion necessary to resolve generic types, but they are specific to the exact com- piler used and can’t generally be distributed in any meaningful way . 
 
-So what do you do if you want to write a library in Rust that you then want to interface with from another programming language? The solution is to produce C-compatible library files in the form of dynamically linked libraries (.so files on Unix, .dylib files on macOS, and .dll files on Windows) and stati- cally linked libraries (.a files on Unix/macOS and .lib files on Windows) . Those files look like files produced by C code, so they can also be used by other lan- guages that know how to interact with C . 
+> So what do you do if you want to write a library in Rust that you then want to interface with from another programming language? The solution is to produce C-compatible library files in the form of dynamically linked libraries (.so files on Unix, .dylib files on macOS, and .dll files on Windows) and stati- cally linked libraries (.a files on Unix/macOS and .lib files on Windows) . Those files look like files produced by C code, so they can also be used by other lan- guages that know how to interact with C . 
 
-To produce these C-compatible binary artifacts, you set the crate-type field of the [lib] section of your Cargo.toml file . The field takes an array of val- ues, which would normally just be "lib" to indicate a standard Rust library (an rlib) . Cargo applies some heuristics that will set this value automatically if your crate is clearly not a library (for example, if it's a procedural macro), but best practice is to set this value explicitly if you’re producing anything but a good ol’ Rust library . 
+> To produce these C-compatible binary artifacts, you set the crate-type field of the [lib] section of your Cargo.toml file . The field takes an array of val- ues, which would normally just be "lib" to indicate a standard Rust library (an rlib) . Cargo applies some heuristics that will set this value automatically if your crate is clearly not a library (for example, if it's a procedural macro), but best practice is to set this value explicitly if you’re producing anything but a good ol’ Rust library . 
 
-There are a number of different crate types, but the relevant ones here are "cdylib" and "staticlib", which produce C-compatible library files that are dynamically and statically linked, respectively . Keep in mind that when you produce one of these artifact types, only publicly available symbols are available—that is, public and #[no_mangle] static variables and functions . Things like types and constants won’t be available, even if they’re marked pub, since they have no meaningful representation in a binary library file . 
+> There are a number of different crate types, but the relevant ones here are "cdylib" and "staticlib", which produce C-compatible library files that are dynamically and statically linked, respectively . Keep in mind that when you produce one of these artifact types, only publicly available symbols are available—that is, public and #[no_mangle] static variables and functions . Things like types and constants won’t be available, even if they’re marked pub, since they have no meaningful representation in a binary library file . 
 
-**Types Across Language Boundaries** 
+### Types Across Language Boundaries
 
 With FFI, type layout is crucial; if one language lays out the memory for some shared data one way but the language on the other side of the FFI boundary expects it to be laid out differently, then the two sides will inter- pret the data inconsistently. In this section, we’ll look at how to make types match up over FFI, and other aspects of types to be aware of when you cross the boundaries between languages. 
 
@@ -135,11 +127,9 @@ With FFI, type layout is crucial; if one language lays out the memory for some s
 
 Types aren’t shared across the FFI boundary. When you declare a type in Rust, that type information is lost entirely upon compilation. All that’s communicated to the other side is the bits that make up values of that type. You therefore need to declare the type for those bits on both sides of the boundary. When you declare the Rust version of the type, you first must make sure the primitives contained within the type match up. For example, if C is used on the other side of the boundary, and the C type uses an int, the Rust code had better use the exact Rust equivalent: an i32. To take some of the guesswork out of that process, for interfaces that use C-like types the Rust standard library provides you with the correct C types in the std::os::raw module, which defines type c_int = i32, type c_char = i8/u8 depending on whether char is signed, type c_long = i32/i64 depending on the target pointer width, and so on. 
 
-*Take particular note of quirky integer types in C like* *__be32**. These often do not trans- late directly to Rust types and may be best left as something like* *[u8; 4]**. For example,* *__be32* *is always encoded as big-endian, whereas Rust’s* *i32* *uses the endianness of the current platform.* 
+**N O T E** *Take particular note of quirky integer types in C like* *__be32**. These often do not trans- late directly to Rust types and may be best left as something like* *[u8; 4]**. For example,* *__be32* *is always encoded as big-endian, whereas Rust’s* *i32* *uses the endianness of the current platform.* 
 
 With more complex types like vectors and strings, you usually need to do the mapping manually. For example, since C tends to represent a string as a sequence of bytes terminated with a 0 byte, rather than a UTF-8–encoded string with the length stored separately, you cannot generally use Rust’s string types over FFI. Instead, assuming the other side uses a C-style string representation, you should use the std::ffi::CStr and std::ffi::CString types for borrowed and owned strings, respectively. For vectors, you’ll likely want to use a raw pointer to the first element and then pass the length separately—the Vec::into_raw_parts method may come in handy for that. 
-
-**N O T E** 
 
 For types that contain other types, such as structs and unions, you also need to deal with layout and alignment. As we discussed in Chapter 2, Rust lays out types in an undefined way by default, so at the very least you will want to use #[repr(C)] to ensure that the type has a deterministic layout and alignment that mirrors what’s (likely and hopefully) used across the FFI boundary. If the interface also specifies other configurations for the type, such as manually setting its alignment or removing padding, you’ll need to adjust your #[repr] accordingly. 
 
@@ -158,17 +148,13 @@ enum Foo {
 	Baz = 2, } 
 ```
 
-Listing 11-3: Defining explicit variant values for a dataless enum 
+*Listing 11-3: Defining explicit variant values for a dataless enum*
 
-*Technically, the specification says that the first variant’s value is* *0* *and every subse- quent variant’s value is one greater than that of the previous one. This makes a dif- ference if you manually set the value for some variants but not others—those you do not set will continue from the last one you did set.* 
+**N O T E** *Technically, the specification says that the first variant’s value is* *0* *and every subse- quent variant’s value is one greater than that of the previous one. This makes a dif- ference if you manually set the value for some variants but not others—those you do not set will continue from the last one you did set.* 
 
 You should be careful about mapping enum-like types in C to Rust this way, however, as only the values for defined variants are valid for an instance of the enum type. This tends to get you into trouble with C-style enumerations that often function more like bitsets, where variants can be bitwise ORed together to produce a value that encapsulates multiple variants at once. In the example from Listing 11-3, for instance, a value of 3 produced by taking Bar | Baz would not be valid for Foo in Rust! If you need to model a C API that uses an enumeration for a set of bitflags that can be set and unset individually, consider using a newtype wrapper around an inte- ger type, with associated constants for each variant and implementations of the various Bit* traits for improved ergonomics. Or use the bitflags crate. 
 
-*For fieldless enums, you can also pass a numeric type to* *#[repr]* *to use a different type than* *isize* *for the discriminator. For example,* *#[repr(u8)]* *will encode the dis- criminator using a single unsigned byte. For a data-carrying enum, you can pass* *#[repr(C, u8)]* *to get the same effect.* 
-
-**N O T E** 
-
-Foreign Function Interfaces **201** 
+**N O T E** *For fieldless enums, you can also pass a numeric type to* *#[repr]* *to use a different type than* *isize* *for the discriminator. For example,* *#[repr(u8)]* *will encode the dis- criminator using a single unsigned byte. For a data-carrying enum, you can pass* *#[repr(C, u8)]* *to get the same effect.* 
 
 On an enum that contains data, the #[repr(C)] attribute causes the enum to be represented using a *tagged union*. That is, it is represented in memory by a #[repr(C)] struct with two fields, where the first is the discriminator as it would be encoded if none of the variants had fields, and the second is a union of the data structures for each variant. For a concrete example, con- sider the enum and associated representation in Listing 11-4. 
 
@@ -199,9 +185,9 @@ struct Foo {
 
 Listing 11-4: Rust enums with *#[repr(C)]* are represented as tagged unions. 
 
-**THE NICHE OPTIMIZATION IN FFI** 
+> **THE NICHE OPTIMIZATION IN FFI** 
 
-In Chapter 9 we talked about the niche optimization, where the Rust compiler uses invalid bit patterns to represent enum variants that hold no data . The fact that this optimization is guaranteed leads to an interesting interaction with FFI . Specifically, it means that nullable pointers can always be represented in FFI types using an Option-wrapped pointer type . For example, a nullable function pointer can be represented as Option<extern fn(...)>, and a nullable data pointer can be represented as Option<*mut T> . These will transparently do the right thing if an all-zero bit pattern value is provided, and will represent it as None in Rust . 
+> In Chapter 9 we talked about the niche optimization, where the Rust compiler uses invalid bit patterns to represent enum variants that hold no data . The fact that this optimization is guaranteed leads to an interesting interaction with FFI . Specifically, it means that nullable pointers can always be represented in FFI types using an Option-wrapped pointer type . For example, a nullable function pointer can be represented as Option<extern fn(...)>, and a nullable data pointer can be represented as Option<*mut T> . These will transparently do the right thing if an all-zero bit pattern value is provided, and will represent it as None in Rust . 
 
 **Allocations** 
 
@@ -241,7 +227,7 @@ In some instances, it may even be impossible for the caller to know ahead of tim
 
 When you’re forced to make a trade-off, go with caller-allocated memory for anything that is either *large* or *frequent*. In those cases the caller is likely to care the most about controlling the allocations itself. For anything else, it’s probably okay for your code to allocate and then expose destructor functions for each relevant type. 
 
-**Callbacks** 
+***Callbacks***
 
 You can pass function pointers across the FFI boundary and call the referenced function through those pointers as long as the function pointer’s type has an extern annotation that matches the function’s calling convention. That is, you can define an extern "C" fn(c_int) -> c_int in Rust and then pass a reference to that function to C code as a callback that the C code will eventually invoke. 
 
@@ -315,7 +301,7 @@ Listing 11-9: Opaque pointer types that cannot be confused
 
 Since Foo and Bar are both zero-sized types, they can be used in place of () in the extern method signatures. Even better, since they are now distinct types, Rust won’t let you use one where the other is required, so it’s now impossible to call take_bar with a pointer you got back from foo. Adding the #[non_exhaustive] annotation ensures that the Foo and Bar types cannot be constructed outside of this crate. 
 
-**bindgen and Build Scripts** 
+### bindgen and Build Scripts
 
 Mapping out the Rust types and externs for a larger external library can be quite a chore. Big libraries tend to have a large enough number of type and method signatures to match up that writing out all the Rust equivalents is time-consuming. They also have enough corner cases and C oddities that some patterns are bound to require more careful thought to translate. 
 
@@ -325,7 +311,7 @@ bindgen provides a stand-alone binary that generates the Rust code for C headers
 
 **NOTE** *If you check in the bindings directly, keep in mind that they will be correct only on the platform they were generated for. Generating the bindings in a build script will generate them specifically for the current target platform, which is less likely to cause platform-related layout inconsistencies.* 
 
-You declare a build script by adding build = "**" to the [package] section of your *Cargo.toml*. This tells Cargo that, before compiling your crate, it should compile ** as a stand-alone Rust program and run it; only then should it compile the source code of your crate. The build script also gets its own dependencies, which you declare in the [build- dependencies] section of your *Cargo.toml*. 
+You declare a build script by adding build = "\*\*" to the [package] section of your *Cargo.toml*. This tells Cargo that, before compiling your crate, it should compile ** as a stand-alone Rust program and run it; only then should it compile the source code of your crate. The build script also gets its own dependencies, which you declare in the [build- dependencies] section of your *Cargo.toml*. 
 
 **NOTE** *If you name your build script* build.rs*, you don’t need to declare it in your* Cargo.toml*.* 
 
@@ -343,9 +329,7 @@ Since the code in *bindings.rs* is autogenerated, it’s generally best prac- ti
 
 **N O T E** *Remember that if you include any of the types from the* *-sys* *crate in the public inter- face of your main library crate, changing the dependency on the* *-sys* *crate to a new major version still constitutes a breaking change for your main library!* 
 
-If your crate instead produces a library file that you intend others to use through FFI, you should also publish a C header file for its interface to make it easier to generate native bindings to your library from other languages. However, that C header file then needs to be kept up to date as your crate changes, which can become cumbersome as your library grows in size. Fortunately, the Rust community has also developed a tool to automate this task: cbindgen. Like bindgen, cbindgen is a build tool, and it also comes as both a binary and a library for use in build scripts. Instead of taking in a C header file and producing Rust, it takes Rust in and produces a C header file. Since the C header file represents the main computer-readable 
-
-description of your crate’s FFI, I recommend manually looking it over to make sure the autogenerated C code isn’t too unwieldy, though in general cbindgen tends to produce fairly reasonable code. If it doesn’t, file a bug! 
+If your crate instead produces a library file that you intend others to use through FFI, you should also publish a C header file for its interface to make it easier to generate native bindings to your library from other languages. However, that C header file then needs to be kept up to date as your crate changes, which can become cumbersome as your library grows in size. Fortunately, the Rust community has also developed a tool to automate this task: cbindgen. Like bindgen, cbindgen is a build tool, and it also comes as both a binary and a library for use in build scripts. Instead of taking in a C header file and producing Rust, it takes Rust in and produces a C header file. Since the C header file represents the main computer-readable description of your crate’s FFI, I recommend manually looking it over to make sure the autogenerated C code isn’t too unwieldy, though in general cbindgen tends to produce fairly reasonable code. If it doesn’t, file a bug! 
 
 >**C++** 
 
@@ -354,10 +338,3 @@ description of your crate’s FFI, I recommend manually looking it over to make 
 ## Summary
 
 In this chapter, we’ve covered how to use the extern keyword to call out of Rust into external code, as well as how to use it to make Rust code accessible to external code. We’ve also discussed how to align Rust types with types on the other side of the FFI boundary, and some of the common pitfalls in trying to get code written in two different languages to mesh well. Finally, we talked about the bindgen and cbindgen tools, which make the experience of keeping FFI bindings up to date much more pleasant. In the next chapter, we’ll look at how to use Rust in more restricted environments, like embedded devices, where the standard library may not be available and where even a simple operation like allocating memory may not be possible. 
-
-
-**RUST WITHOUT THE STANDARD LIBRARY** 
-
-Rust is intended to be a language for systems programming, but it isn’t always clear what that really means. At the very least, a systems programming language is usually expected to allow the programmer to write programs that do not rely on the operating system and can run directly on the hardware, whether that is a thousand core supercomputer or an embedded device with a single-core ARM processor with a clock speed of 72MHz and 256KiB of memory. 
-
-In this chapter, we’ll take a look at how you can use Rust in unorthodox environments, such as those without an operating system, or those that don’t even have the ability to dynamically allocate memory! Much of our discussion will focus on the #![no_std] attribute, but we’ll also investigate 

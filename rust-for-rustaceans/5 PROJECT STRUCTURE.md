@@ -1,7 +1,7 @@
 
 This chapter provides some ideas for structuring your Rust projects. For simple projects, the structure set up by cargo new is likely to be something you think little about. You may add some modules to split up the code, and some dependencies for additional functionality, but that’s about it. However, as a project grows in size and complexity, you’ll find that you need to go beyond that. Maybe the compilation time for your crate is getting out of hand, or you need conditional dependencies, or you need a better strategy for continuous integration. In this chapter, we will look at some of the tools that the Rust language, and Cargo in particular, provide that make it easier to manage such things. 
 
-**Features** 
+### Features
 
 *Features* are Rust’s primary tool for customizing projects. At its core, a feature is just a build flag that crates can pass to their dependencies in order to add optional functionality. Features carry no semantic meaning in and of themselves—instead, *you* choose what a feature means for *your* crate. 
 
@@ -59,11 +59,9 @@ optional = true
 
 Here, if a crate depends on foo and does not explicitly opt out of the default features, it will also compile foo’s syn dependency. In turn, syn will be built with only the three listed features, and no others. Opting out of default features this way, and opting in to only what you need, is a great way to cut down on your compile times! 
 
-**OPTIONAL DEPENDENCIES AS FEATURES** 
+> **OPTIONAL DEPENDENCIES AS FEATURES** 
 
-When you define a feature, the list that follows the equal sign is itself a list of features . This might, at first, sound a little odd—in Listing 5-3, syn is a dependency, not a feature . It turns out that Cargo makes every optional dependency a feature with the same name as the dependency . You’ll see this if you try to add a feature with the same name as an optional dependency; Cargo won’t allow it . Support for a different namespace for features and dependencies is in the works in Cargo, but has not been stabilized at the time of writing . In the meantime, if you want to have a feature named after a dependency, you can rename the dependency using package = "" to avoid the name collision . The list of features that a feature enables can also include features of dependencies . For example, you can write derive = ["syn/derive"] to have your derive feature enable the derive feature of the syn dependency . 
-
-Project Structure **69** 
+> When you define a feature, the list that follows the equal sign is itself a list of features . This might, at first, sound a little odd—in Listing 5-3, syn is a dependency, not a feature . It turns out that Cargo makes every optional dependency a feature with the same name as the dependency . You’ll see this if you try to add a feature with the same name as an optional dependency; Cargo won’t allow it . Support for a different namespace for features and dependencies is in the works in Cargo, but has not been stabilized at the time of writing . In the meantime, if you want to have a feature named after a dependency, you can rename the dependency using package = "" to avoid the name collision . The list of features that a feature enables can also include features of dependencies . For example, you can write derive = ["syn/derive"] to have your derive feature enable the derive feature of the syn dependency . 
 
 **Using Features in Your Crate** 
 
@@ -77,7 +75,7 @@ Remember that modifying certain public parts of your API may inadvertently make 
 
 **NOTE** *If you’re writing a large crate where you expect that your users will need only a subset of the functionality, you should consider making it so that larger components (usually modules) are guarded by features. That way, users can opt in to, and pay the compilation cost of, only the parts they really need.* 
 
-**Workspaces** 
+### Workspaces
 
 Crates play many roles in Rust—they are the vertices in the dependency graph, the boundaries for trait coherence, and the scopes for compilation features. Because of this, each crate is managed as a single compilation unit; the Rust compiler treats a crate more or less as one big source file compiled as one chunk that is ultimately turned into a single binary output (either a binary or a library). 
 
@@ -100,7 +98,7 @@ The members array is a list of directories that each contain a crate in the work
 
 Perhaps the most important feature of workspaces is that you can interact with all of the workspace’s members by invoking cargo in the root of the workspace. Want to check that they all compile? cargo check will check them all. Want to run all your tests? cargo test will test them all. It’s not quite as convenient as having everything in one crate, so don’t go splitting everything into minuscule crates, but it’s a pretty good approximation. 
 
-*Cargo commands will generally do the “right thing” in a workspace. If you ever need to disambiguate, such as if two workspace crates both have a binary by the same name, use the* *-p* *flag (for package). If you are in the subdirectory for a particular workspace crate, you can pass* *--workspace* *to perform the command for the entire workspace instead.* 
+**N O T E** *Cargo commands will generally do the “right thing” in a workspace. If you ever need to disambiguate, such as if two workspace crates both have a binary by the same name, use the* *-p* *flag (for package). If you are in the subdirectory for a particular workspace crate, you can pass* *--workspace* *to perform the command for the entire workspace instead.* 
 
 Once you have a workspace-level *Cargo.toml* with the array of workspace members, you can set your crates to depend on one another using path dependencies, as shown in Listing 5-5. 
 
@@ -119,19 +117,19 @@ foo = { path = "../../foo" }
 
 Now if you make a change to the crate in *bar/two*, then only that crate is re-compiled, since foo and *bar/one* did not change. It may even be faster to compile your project from scratch, since the compiler does not need to evaluate your entire project source for optimization opportunities. 
 
-**SPECIFYING INTRA-WORKSPACE DEPENDENCIES** 
+> **SPECIFYING INTRA-WORKSPACE DEPENDENCIES** 
 
-The most obvious way to specify that one crate in a workspace depends on another is to use the path specifier, as shown in Listing 5-5 . However, if your individual subcrates are intended for public consumption, you may want to use version specifiers instead . 
+> The most obvious way to specify that one crate in a workspace depends on another is to use the path specifier, as shown in Listing 5-5 . However, if your individual subcrates are intended for public consumption, you may want to use version specifiers instead . 
 
-Say you have a crate that depends on a Git version of the one crate from the bar workspace in Listing 5-5 with one = { git = ". . ." }, and a released version of foo (also from bar) with foo = "1.0.0" . Cargo will dutifully fetch the one Git repository, which holds the entire bar workspace, and see that one in turn depends on foo, located at ../../foo inside the workspace . But Cargo doesn’t know that the released version foo = "1.0.0" and the foo in the Git repository are the same crate! It considers them two separate dependencies that just happen to have the same name . 
+> Say you have a crate that depends on a Git version of the one crate from the bar workspace in Listing 5-5 with one = { git = ". . ." }, and a released version of foo (also from bar) with foo = "1.0.0" . Cargo will dutifully fetch the one Git repository, which holds the entire bar workspace, and see that one in turn depends on foo, located at ../../foo inside the workspace . But Cargo doesn’t know that the released version foo = "1.0.0" and the foo in the Git repository are the same crate! It considers them two separate dependencies that just happen to have the same name . 
 
-You may already see where this is going . If you try to use any type from foo (1.0.0) with an API from one that accepts a type from foo, the compiler will reject the code . Even though the types have the same name, the compiler can’t know that they are the same underlying type . And the user will be thoroughly confused, since the compiler will say something like “expected foo::Type, got foo::Type .” 
+> You may already see where this is going . If you try to use any type from foo (1.0.0) with an API from one that accepts a type from foo, the compiler will reject the code . Even though the types have the same name, the compiler can’t know that they are the same underlying type . And the user will be thoroughly confused, since the compiler will say something like “expected foo::Type, got foo::Type .” 
 
-The best way to mitigate this problem is to use path dependencies between subcrates only if they depend on unpublished changes . As long as one works with foo 1.0.0, it should list foo = "1.0.0" in its dependencies . Only if you make a change to foo that one needs should you change one to use a path dependency . And once you release a new version of foo that one can depend on, you should remove the path dependency again . 
+> The best way to mitigate this problem is to use path dependencies between subcrates only if they depend on unpublished changes . As long as one works with foo 1.0.0, it should list foo = "1.0.0" in its dependencies . Only if you make a change to foo that one needs should you change one to use a path dependency . And once you release a new version of foo that one can depend on, you should remove the path dependency again . 
 
-This approach also has its shortcomings . Now if you change foo and then run the tests for one, you’ll see that one will be tested using the old foo, which may not be what you expected . You’ll probably want to configure your continuous integration infrastructure to test each subcrate both with the latest released versions of the other subcrates and with all of them configured to use path dependencies . 
+> This approach also has its shortcomings . Now if you change foo and then run the tests for one, you’ll see that one will be tested using the old foo, which may not be what you expected . You’ll probably want to configure your continuous integration infrastructure to test each subcrate both with the latest released versions of the other subcrates and with all of them configured to use path dependencies . 
 
-**Project Configuration** 
+### Project Configuration
 
 Running cargo new sets you up with a minimal *Cargo.toml* that has the crate’s name, its version number, some author information, and an empty list of dependencies. That will take you pretty far, but as your project matures, there are a number of useful things you may want to add to your *Cargo.toml*. 
 
@@ -141,7 +139,7 @@ The first and most obvious thing to add to your *Cargo.toml* is all the metadata
 
 For crates with a more convoluted project layout, it’s also useful to set the include and exclude metadata fields. These dictate which files should be included and published in your package. By default, Cargo includes all files in a crate’s directory except any listed in your *.gitignore* file, but this may not be what you want if you also have large test fixtures, unrelated scripts, or other auxiliary data in the same directory that you *do* want under version control. As their names suggest, include and exclude allow you to include only a specific set of files or exclude files matching a given set of patterns, respectively. 
 
-*If you have a crate that should never be published, or should be published only to certain alternative registries (that is, not to* crates.io*), you can set the* *publish* *directive to* *false* *or to a list of allowed registries.* 
+**N O T E** *If you have a crate that should never be published, or should be published only to certain alternative registries (that is, not to* crates.io*), you can set the* *publish* *directive to* *false* *or to a list of allowed registries.* 
 
 The list of metadata directives you can use continues to grow, so make sure to periodically check in on the Manifest Format page of the Cargo reference (*https://doc.rust-lang.org/cargo/reference/manifest.html*). 
 
@@ -152,8 +150,6 @@ The list of metadata directives you can use continues to grow, so make sure to p
 **[patch]** 
 
 The [patch] section of *Cargo.toml* allows you to specify a different source for a dependency that you can use temporarily, no matter where in your dependencies the patched dependency appears. This is invaluable when you need to compile your crate against a modified version of some transitive dependency to test a bug fix, a performance improvement, or a new minor release you’re about to publish. Listing 5-6 shows an example of how you might temporarily use a variant of a set of dependencies. 
-
-Project Structure **73** 
 
 ```rust
 [patch.crates-io]
@@ -182,9 +178,9 @@ Cargo will look at the *Cargo.toml* inside each path, realize that /nom4 contain
 
 Keep in mind that patches are not taken into account in the package that’s uploaded when you publish a crate. A crate that depends on your crate will use only its own [patch] section (which may be empty), not that of your crate! 
 
-**CRATES VS. PACKAGES** 
+> **CRATES VS. PACKAGES** 
 
-You may wonder what the difference between a package and a crate is. These two terms are often used interchangeably in informal contexts, but they also have specific definitions that vary depending on whether you’re talking about the Rust compiler, Cargo, crates.io, or something else . I personally think of a crate as a Rust module hierarchy starting at a root.rs file (one where you can use crate-level attributes like #![feature])—usually something like lib.rs or main.rs . In contrast, a package is a collection of crates and metadata, so essentially all that’s described by a Cargo.toml file . That may include a library crate, multiple binary crates, some integration test crates, and maybe even multiple workspace members that themselves have Cargo.toml files . 
+> You may wonder what the difference between a package and a crate is. These two terms are often used interchangeably in informal contexts, but they also have specific definitions that vary depending on whether you’re talking about the Rust compiler, Cargo, crates.io, or something else . I personally think of a crate as a Rust module hierarchy starting at a root.rs file (one where you can use crate-level attributes like #![feature])—usually something like lib.rs or main.rs . In contrast, a package is a collection of crates and metadata, so essentially all that’s described by a Cargo.toml file . That may include a library crate, multiple binary crates, some integration test crates, and maybe even multiple workspace members that themselves have Cargo.toml files . 
 
 **[profile]** 
 
@@ -212,21 +208,17 @@ Normally in Rust, when your program panics, the thread that panicked starts *unw
 
 When a thread panics and unwinds, other threads continue running unaffected. Only when (and if) the thread that ran main exits does the program terminate. That is, the panic is generally isolated to the thread in which the panic occurred. 
 
-This means unwinding is a double-edged sword; the program is limping along with some failed components, which may cause all sorts of strange behaviors. For example, imagine a thread that panics halfway through updating the state in a Mutex. Any thread that subsequently acquires that Mutex must now be prepared to handle the fact that the state may be in a partially updated, inconsistent state. For this reason, some synchronization primitives (like Mutex) will remember if a panic occurred when they were last accessed 
-
-**WARNING** 
-
-and communicate that to any thread that tries to access the primitive subsequently. If a thread encounters such a state, it will normally also panic, which leads to a cascade that eventually terminates the entire program. But that is arguably better than continuing to run with corrupted state! 
+This means unwinding is a double-edged sword; the program is limping along with some failed components, which may cause all sorts of strange behaviors. For example, imagine a thread that panics halfway through updating the state in a Mutex. Any thread that subsequently acquires that Mutex must now be prepared to handle the fact that the state may be in a partially updated, inconsistent state. For this reason, some synchronization primitives (like Mutex) will remember if a panic occurred when they were last accessed and communicate that to any thread that tries to access the primitive subsequently. If a thread encounters such a state, it will normally also panic, which leads to a cascade that eventually terminates the entire program. But that is arguably better than continuing to run with corrupted state! 
 
 The bookkeeping needed to support unwinding is not free, and it often requires special support by the compiler and the target platform. For example, many embedded platforms cannot unwind the stack efficiently at all. Rust therefore supports a different panic mode: abort ensures the whole program simply exits immediately when a panic occurs. In this mode, no threads get to do any cleanup. This may seem severe, and it is, but it ensures that the program is never running in a half-working state and that errors are made visible immediately. 
 
-*The panic setting is global—if you set it to* *abort**, all your dependencies are also compiled with* *abort**.* 
+**WARNING** *The panic setting is global—if you set it to* *abort**, all your dependencies are also compiled with* *abort**.* 
 
 You may have noticed that when a thread panics, it tends to print a *backtrace*: the trail of function calls that led to where the panic occurred. This is also a form of unwinding, though it is separate from the unwinding panic behavior discussed here. You can have backtraces even with panic=abort by passing -Cforce-unwind-tables to rustc, which makes rustc include the information necessary to walk back up the stack while still terminating the program on a panic. 
 
-**PROFILE OVERRIDES** 
+> **PROFILE OVERRIDES** 
 
-You can set profile options for just a particular dependency, or a particular profile, using profile overrides . For example, Listing 5-8 shows how to enable aggressive optimizations for the serde crate and moderate optimizations for all other crates in debug mode, using the [profile.**.package.**] syntax . 
+> You can set profile options for just a particular dependency, or a particular profile, using profile overrides . For example, Listing 5-8 shows how to enable aggressive optimizations for the serde crate and moderate optimizations for all other crates in debug mode, using the [profile.**.package.**] syntax . ?
 
 ```toml
 [profile.dev.package.serde]
@@ -235,13 +227,13 @@ opt-level = 3
 opt-level = 2
 ```
 
-*Listing 5-8: Overriding profile options for a specific dependency or for a specific mode*
+> *Listing 5-8: Overriding profile options for a specific dependency or for a specific mode*
 
-This kind of optimization override can be handy if some dependency would be prohibitively slow in debug mode (such as decompression or video encoding), and you need it optimized so that your test suite won’t take several days to complete . You can also specify global profile defaults using a [profile.dev] (or similar) section in the Cargo configuration file in ~/.cargo/config . 
+> This kind of optimization override can be handy if some dependency would be prohibitively slow in debug mode (such as decompression or video encoding), and you need it optimized so that your test suite won’t take several days to complete . You can also specify global profile defaults using a [profile.dev] (or similar) section in the Cargo configuration file in ~/.cargo/config . 
 
-When you set optimization parameters for a specific dependency, keep in mind that the parameters apply only to the code compiled as part of that crate; if serde in this example has a generic method or type that you use in your crate,  the code of that method or type will be monomorphized and optimized in your crate, and your crate’s profile settings will apply, not those in the profile override for serde . 
+> When you set optimization parameters for a specific dependency, keep in mind that the parameters apply only to the code compiled as part of that crate; if serde in this example has a generic method or type that you use in your crate,  the code of that method or type will be monomorphized and optimized in your crate, and your crate’s profile settings will apply, not those in the profile override for serde . 
 
-**Conditional Compilation** 
+### Conditional Compilation
 
 Most Rust code you write is universal—it’ll work the same regardless of what CPU or operating system it runs on. But sometimes you’ll have to do something special to get the code to work on Windows, on ARM chips, or when compiled against a particular platform application binary interface (ABI). Or maybe you want to write an optimized version of a particular function when a given CPU instruction is available, or disable some slow but uninteresting setup code when running in a continuous integration (CI) environment. To cater to cases like these, Rust provides mechanisms for *conditional compilation*, in which a particular segment of code is compiled only if certain conditions are true of the compilation environment. 
 
@@ -284,9 +276,7 @@ winrt = "0.7"
 nix = "0.17"
 ```
 
-*Listing 5-9: Conditional dependencies*
-
-Project Structure **79** 
+*Listing 5-9: Conditional dependencies* 
 
 Here, we specify that winrt version 0.7 should be considered a dependency only under cfg(windows) (so, on Windows), and nix version 0.17 only under cfg(unix) (so, on Linux, macOS, and other Unix-based platforms). One thing to keep in mind is that the [dependencies] section is evaluated very early in the build process, when only certain cfg options are available. In particular, feature and context options are not yet available at this point, so you cannot use this syntax to pull in dependencies based on features and contexts. You can, however, use any cfg that depends only on the target specification or architecture, as well as any options explicitly set by tools that call into rustc (like cfg(miri)). 
 
@@ -294,7 +284,7 @@ Here, we specify that winrt version 0.7 should be considered a dependency only u
 
 It’s also quite simple to add your own custom conditional compilation options. You just have to make sure that --cfg=myoption is passed to rustc when rustc compiles your crate. The easiest way to do this is to add your --cfg to the RUSTFLAGS environment variable. This can come in handy in CI, where you may want to customize your test suite depending on whether it’s being run on CI or on a dev machine: add --cfg=ci to RUSTFLAGS in your CI setup, and then use cfg(ci) and cfg(not(ci)) in your code. Options set this way are also available in *Cargo.toml* dependencies. 
 
-**Versioning** 
+### Versioning
 
 All Rust crates are versioned and are expected to follow Cargo’s implementation of semantic versioning. *Semantic versioning* dictates the rules for what kinds of changes require what kinds of version increases and for which versions are considered compatible, and in what ways. The RFC 1105 standard itself is well worth reading (it’s not horribly technical), but to summarize, it differentiates between three kinds of changes: breaking changes, which require a major version change; additions, which require a minor version change; and bug fixes, which require only a patch version change. RFC 1105 does a decent job of outlining what constitutes a breaking change in Rust, and we’ve touched on some aspects of it elsewhere in this book. 
 
@@ -324,9 +314,7 @@ This is unfortunate, as it could well be that your crate compiles fine with, say
 
 The right strategy is to list the earliest version that has all the things your crate depends on and to make sure that this remains the case even as you add new code to your crate. But how do you establish that beyond trawling the changelogs, or through trial and error? Your best bet is to use Cargo’s unstable -Zminimal-versions flag, which makes your crate use the minimum acceptable version for all dependencies, rather than the maximum. Then, set all your dependencies to just the latest major version number, try to compile, and add a minor version to any dependencies that don’t. Rinse and repeat until everything compiles fine, and you now have your minimum version requirements! 
 
-It’s worth noting that, like with MSRV, minimal version checking faces an ecosystem adoption problem. While you may have set all your version specifiers correctly, the projects you depend on may not have. This makes the Cargo minimal versions flag hard to use in practice (and is why it’s still unstable). If you depend on foo, and foo depends on bar with a specifier of bar = "1" when it actually requires bar = "1.4", Cargo will report that it failed to compile foo no matter how you list foo because the -Z flag tells it 
-
-to always prefer minimal versions. You can work around this by listing bar directly in *your* dependencies with the appropriate version requirement, but these workarounds can be painful to set up and maintain. You may end up listing a large number of dependencies that are only really pulled in through your transitive dependencies, and you’ll have to keep that list up to date as time goes on. 
+It’s worth noting that, like with MSRV, minimal version checking faces an ecosystem adoption problem. While you may have set all your version specifiers correctly, the projects you depend on may not have. This makes the Cargo minimal versions flag hard to use in practice (and is why it’s still unstable). If you depend on foo, and foo depends on bar with a specifier of bar = "1" when it actually requires bar = "1.4", Cargo will report that it failed to compile foo no matter how you list foo because the -Z flag tells it to always prefer minimal versions. You can work around this by listing bar directly in *your* dependencies with the appropriate version requirement, but these workarounds can be painful to set up and maintain. You may end up listing a large number of dependencies that are only really pulled in through your transitive dependencies, and you’ll have to keep that list up to date as time goes on. 
 
 **NOTE** *One current proposal is to present a flag that favors minimal versions for the current crate but maximal ones for dependencies, which seems quite promising.* 
 

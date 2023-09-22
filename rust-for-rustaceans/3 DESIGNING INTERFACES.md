@@ -145,8 +145,7 @@ Ultimately, you should choose whichever of these approaches fits your applicatio
 
 While some users may be familiar with aspects of the implementation that underpins your interface, they are unlikely to understand all of its rules and limitations. They won’t know that it’s never okay to call foo after calling bar, or that it’s only safe to call the unsafe method baz when the moon is at a 47-degree angle and no one has sneezed in the past 18 seconds. Only if the interface makes it clear that something strange is going on will they reach for the documentation or carefully read type signatures. It’s therefore criti- cal for you to make it as easy as possible for users to understand your inter- face and as hard as possible for them to use it incorrectly. The two primary techniques at your disposal for this are your documentation and the type system, so let’s look at each of those in turn. 
 
-*You can also take advantage of naming to suggest to the user when there’s more to
- an interface than meets the eye. If a user sees a method named* *dangerous**, chances are they will read its documentation.* 
+**N O T E** *You can also take advantage of naming to suggest to the user when there’s more to an interface than meets the eye. If a user sees a method named* *dangerous**, chances are they will read its documentation.*
 
 ***Documentation***
 
@@ -156,7 +155,7 @@ First, clearly document any cases where your code may do something unexpected, o
 
 Second, include end-to-end usage examples for your code on a crate and module level. These are more important than examples for specific types or methods, since they give the user a feel for how everything fits together. With a decent high-level understanding of the interface’s struc- ture, the developer may soon realize what particular methods and types do and where they should be used. End-to-end examples also give the user a starting point for customizing their usage, and they can, and often will, copy-paste the example and then modify it to suit their needs. This kind of “learning by doing” tends to work better than having them try to piece something together from the components. 
 
-*Very method-specific examples that show that, yes, the* *len* *method indeed returns the length are unlikely to tell the user anything new about your code.* 
+**N O T E** *Very method-specific examples that show that, yes, the* *len* *method indeed returns the length are unlikely to tell the user anything new about your code.*
 
 Third, organize your documentation. Having all your types, traits, and functions in a single top-level module makes it difficult for the user to get a sense of where to start. Take advantage of modules to group together semantically related items. Then, use intra-documentation links to interlink items. If the documentation on type A talks about trait B, then it should link to that trait right there. If you make it easy for the user to explore your interface, they are less likely to miss important connections or dependen- cies. Also consider marking parts of your interface that are not intended to be public but are needed for legacy reasons with #[doc(hidden)], so that they do not clutter up your documentation. 
 
@@ -212,8 +211,7 @@ Many backward incompatible changes are obvious, like renaming a public type or r
 
 Removing or renaming a public type will almost certainly break some user’s code. To counter this, you’ll want to take advantage of Rust’s visibility modi- fiers, like pub(crate) and pub(in path), whenever possible. The fewer public types you have, the more freedom you have to change things later without breaking existing code. 
 
-User code can depend on your types in more ways than just by name, though. Consider the public type in Listing 3-3 and the given use of
- that code. 
+User code can depend on your types in more ways than just by name, though. Consider the public type in Listing 3-3 and the given use of that code. 
 
 ```
 // in your interface
@@ -244,9 +242,7 @@ Rust provides the #[non_exhaustive] attribute to help mitigate these issues. You
 
 ***Trait Implementations*** 
 
-As you’ll recall from Chapter 2, Rust’s coherence rules disallow multiple implementations of a given trait for a given type. Since we do not know what implementations downstream code may have added, adding a blanket implementation of an existing trait is generally a breaking change. The same holds true for implementing a foreign trait for an existing type, or 
-
-an existing trait for a foreign type—in both cases, the owner of the foreign trait or type may simultaneously add a conflicting implementation, so this must be a breaking change. 
+As you’ll recall from Chapter 2, Rust’s coherence rules disallow multiple implementations of a given trait for a given type. Since we do not know what implementations downstream code may have added, adding a blanket implementation of an existing trait is generally a breaking change. The same holds true for implementing a foreign trait for an existing type, or an existing trait for a foreign type—in both cases, the owner of the foreign trait or type may simultaneously add a conflicting implementation, so this must be a breaking change. 
 
 Removing a trait implementation is a breaking change, but implement- ing traits for a *new* type is never a problem, since no crate can have imple- mentations that conflict with that type. 
 
@@ -317,23 +313,19 @@ If your crate moves from itercrate 1.0 to itercrate 2.0 but otherwise does not c
 
 To mitigate issues like this, it’s often best to wrap foreign types using the newtype pattern, and then expose only the parts of the foreign type that you think are useful. In many cases, you can avoid the newtype wrap- per altogether by using impl Trait to provide only the very minimal contract to the caller. By promising less, you make fewer changes breaking. 
 
-**THE SEMVER TRICK** 
+> **THE SEMVER TRICK** 
 
-The itercrate example may have rubbed you the wrong way . If the Empty type did not change, then why does the compiler not allow anything that uses it to keep working, regardless of whether the code is using version 1 .0 or 2 .0 of it? The answer is  .  .  . complicated . It boils down to the fact that the Rust compiler does not assume that just because two types have the same fields, they are the same . To take a simple example of this, imagine that itercrate 2 .0 added a #[derive(Copy)] for Empty . Now, the type suddenly has different move seman- tics depending on whether you are using 1 .0 or 2 .0! And code written with one in mind won’t work with the other . 
+> The itercrate example may have rubbed you the wrong way . If the Empty type did not change, then why does the compiler not allow anything that uses it to keep working, regardless of whether the code is using version 1 .0 or 2 .0 of it? The answer is  .  .  . complicated . It boils down to the fact that the Rust compiler does not assume that just because two types have the same fields, they are the same . To take a simple example of this, imagine that itercrate 2 .0 added a #[derive(Copy)] for Empty . Now, the type suddenly has different move seman- tics depending on whether you are using 1 .0 or 2 .0! And code written with one in mind won’t work with the other . 
 
-This problem tends to crop up in large, widely used libraries, where over time, breaking changes are likely to have to happen somewhere in the crate . Unfortunately, semantic versioning happens at the crate level, not the type level, so a breaking change anywhere is a breaking change everywhere . 
+> This problem tends to crop up in large, widely used libraries, where over time, breaking changes are likely to have to happen somewhere in the crate . Unfortunately, semantic versioning happens at the crate level, not the type level, so a breaking change anywhere is a breaking change everywhere . 
 
-But all is not lost . A few years ago, David Tolnay (the author of serde, among a vast number of other Rust contributions) came up with a neat trick to handle exactly this kind of situation . He called it “the semver trick .” The idea is simple: if some type T stays the same across a breaking change (from 1 .0 to 2 .0, say), then after releasing 2 .0, you can release a new 1 .0 minor version that depends on 2 .0 and replaces T with a re-export of T from 2 .0 . 
+> But all is not lost . A few years ago, David Tolnay (the author of serde, among a vast number of other Rust contributions) came up with a neat trick to handle exactly this kind of situation . He called it “the semver trick .” The idea is simple: if some type T stays the same across a breaking change (from 1 .0 to 2 .0, say), then after releasing 2 .0, you can release a new 1 .0 minor version that depends on 2 .0 and replaces T with a re-export of T from 2 .0 . 
 
-By doing this, you’re ensuring that there is in fact only a single type T across both major versions . This, in turn, means that any crate that depends on 1 .0 will be able to use a T from 2 .0, and vice versa . And because this happens only for types you explicitly opt into with this trick, changes that were in fact breaking will continue to be . 
+> By doing this, you’re ensuring that there is in fact only a single type T across both major versions . This, in turn, means that any crate that depends on 1 .0 will be able to use a T from 2 .0, and vice versa . And because this happens only for types you explicitly opt into with this trick, changes that were in fact breaking will continue to be . 
 
 **Auto-Traits** 
 
-Rust has a handful of traits that are automatically implemented for every type depending on what that type contains. The most relevant of these for this discussion are Send and Sync, though the Unpin, Sized, and UnwindSafe 
-
-**54** Chapter 3 
-
-traits have similar issues. By their very nature, these add a hidden promise made by nearly every type in your interface. These traits even propagate through otherwise type-erased types like impl Trait. 
+Rust has a handful of traits that are automatically implemented for every type depending on what that type contains. The most relevant of these for this discussion are Send and Sync, though the Unpin, Sized, and UnwindSafe traits have similar issues. By their very nature, these add a hidden promise made by nearly every type in your interface. These traits even propagate through otherwise type-erased types like impl Trait. 
 
 Implementations for these traits are (generally) automatically added by the compiler, but that also means that they are *not* automatically added if they no longer apply. So, if you have a public type A that contains a private type B, and you change B so that it is no longer Send, then A is now *also* not Send. That is a breaking change! 
 
@@ -351,9 +343,9 @@ fn normal_types() {
 
 Notice that this test does not run any code, but simply tests that the code compiles. If MyType no longer implements Sync, the test code will not compile, and you will know that the change you just made broke the auto- trait implementation. 
 
-**HIDING ITEMS FROM DOCUMENTATION** 
+> **HIDING ITEMS FROM DOCUMENTATION** 
 
-The #[doc(hidden)] attribute lets you hide a public item from your documentation without making it inaccessible to code that happens to know it is there . This is often used to expose methods and types that are needed by macros, but not by user code . How such hidden items interact with your interface contract is a matter of some debate . In general, items marked as #[doc(hidden)] are only considered part of your contract insofar as their public effects; for example, if user code may end up containing a hidden type, then whether that type is Send or not is part of the contract, whereas its name is not . Hidden inherent methods and hidden trait methods on sealed traits are not generally part of your interface contract, though you should make sure to state this clearly in the documentation for those methods . And yes, hidden items should still be documented! 
+> The #[doc(hidden)] attribute lets you hide a public item from your documentation without making it inaccessible to code that happens to know it is there . This is often used to expose methods and types that are needed by macros, but not by user code . How such hidden items interact with your interface contract is a matter of some debate . In general, items marked as #[doc(hidden)] are only considered part of your contract insofar as their public effects; for example, if user code may end up containing a hidden type, then whether that type is Send or not is part of the contract, whereas its name is not . Hidden inherent methods and hidden trait methods on sealed traits are not generally part of your interface contract, though you should make sure to state this clearly in the documentation for those methods . And yes, hidden items should still be documented! 
 
 ## Summary
 
