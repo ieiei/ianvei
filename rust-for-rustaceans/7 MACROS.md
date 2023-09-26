@@ -1,23 +1,22 @@
+本质上，宏是让编译器为您编写代码的工具。您为编译器提供一个公式，用于在给定一些输入参数的情况下生成代码，编译器会将宏的每次调用替换为运行该公式的结果。您可以将宏视为自动代码替换，您可以在其中定义替换规则。
 
-Macros are, in essence, a tool for making the compiler write code for you. You give the compiler a formula for generating code given some input parameters, and the compiler replaces every invocation of the macro with the result of running through the formula. You can think of macros as automatic code substitution where you get to define the rules for the substitution. 
+Rust 的宏有许多不同的形状和大小，可以轻松实现许多不同形式的代码生成。两种主要类型是“声明性”宏和“过程性”宏，我们将在本章中探讨这两种类型。我们还将研究宏在日常编码中派上用场的一些方法，以及更高级的使用中出现的一些陷阱。
 
-Rust’s macros come in many different shapes and sizes to make it easy to implement many different forms of code generation. The two primary types are *declarative* macros and *procedural* macros, and we will explore both of them in this chapter. We’ll also look at some of the ways macros can come in handy in your everyday coding and some of the pitfalls that arise with more advanced use. 
-
-Programmers coming from C-based languages may be used to the unholy land of C and C++ where you can use #define to change each true to false, or to remove all occurrences of the else keyword. If that’s the case for you, you’ll need to disassociate macros from a feeling of doing something “bad.” Macros in Rust are far from the Wild West of C macros. They follow (mostly) well-defined rules and are fairly misuse-resistant. 
+来自基于 C 语言的程序员可能已经习惯了 C 和 C++ 的邪恶之地，您可以使用 #define 将每个 true 更改为 false，或者删除所有出现的 else 关键字。如果你是这种情况，你需要将宏与做“坏事”的感觉分开。 Rust 中的宏与 C 宏的狂野西部相去甚远。它们（大部分）遵循明确定义的规则，并且相当防误用。
 
 ### Declarative Macros
 
-Declarative macros are those defined using the macro_rules! syntax, which lets you conveniently define function-like macros without having to resort to writing a dedicated crate for the purpose (as you do with procedural macros). Once you’ve defined a declarative macro, you can invoke it using the name of the macro followed by an exclamation mark. I like to think of this kind of macro as a sort of compiler-assisted search and replace: it does the job for many regular, well-structured transformation tasks, and for eliminating repetitive boilerplate. In your experience with Rust up until this point, most of the macros you have recognized as macros are likely to have been declarative macros. Note, however, that not all function-like macros are declarative macros; macro_rules! itself is one example of this, and format_args! is another. The ! suffix merely indicates to the compiler that the macro invocation will be replaced with different source code at compile time. 
+声明性宏是使用 Macro_rules 定义的宏！语法，它使您可以方便地定义类似函数的宏，而无需为此目的编写专用的包（就像处理过程宏一样）。定义声明性宏后，您可以使用宏名称后跟感叹号来调用它。我喜欢将这种宏视为一种编译器辅助的搜索和替换：它可以完成许多常规的、结构良好的转换任务，并消除重复的样板文件。根据到目前为止您使用 Rust 的经验，您识别为宏的大多数宏可能都是声明性宏。但请注意，并非所有类似函数的宏都是声明性宏；宏规则！ format_args 本身就是一个例子！是另一个。这 ！后缀仅向编译器指示宏调用将在编译时替换为不同的源代码。
 
-**N O T E**  *Since Rust’s parser specifically recognizes and parses macro invocations annotated with* *!**, you can use them only in places where the parser allows them. They work in most places you’d expect, like in expression position or in an* *impl* *block, but not every- where. For example, you cannot (at the time of writing) invoke a function-like macro where an identifier or match arm is expected.* 
+**N O T E**  *Since Rust’s parser specifically recognizes and parses macro invocations annotated with* *!**, you can use them only in places where the parser allows them. They work in most places you’d expect, like in expression position or in an* *impl* *block, but not everywhere. For example, you cannot (at the time of writing) invoke a function-like macro where an identifier or match arm is expected.* 
 
-It may not be immediately obvious why declarative macros are called declarative. After all, don’t you “declare” everything in your program? In this context, *declarative* refers to the fact that you don’t say *how* the macro’s inputs should be translated into the output, just that you want the output to look like A when the input is B. You declare that it shall be so, and the compiler figures out all the parsing rewiring that has to happen to make your declaration reality. This makes declarative macros concise and expressive, though it also has a tendency to make them rather cryptic since you have a limited language with which to express your declarations. 
+为什么声明性宏被称为声明性宏可能不是很明显。毕竟，您不是“声明”了程序中的所有内容吗？在这种情况下，*声明性*指的是这样一个事实：您不说*如何*将宏的输入转换为输出，只是您希望当输入是 B 时输出看起来像 A。您声明它应该如此，编译器会计算出使您的声明成为现实所必须发生的所有解析重新连接。这使得声明性宏变得简洁和富有表现力，尽管它也有使它们变得相当神秘的趋势，因为你用来表达声明的语言有限。
 
 **When to Use Them** 
 
-Declarative macros are primarily useful when you find yourself writing the same code over and over, and you’d like to, well, not do that. They’re best suited for fairly mechanical replacements—if you’re aiming to do fancy code transformations or lots of code generation, procedural macros are likely a better fit. 
+当您发现自己一遍又一遍地编写相同的代码并且您不想这样做时，声明性宏主要有用。它们最适合相当机械的替换 - 如果您的目标是进行奇特的代码转换或大量代码生成，那么过程宏可能更适合。
 
-I most frequently use declarative macros in cases where I find myself writing repetitive and structurally similar code, such as in tests and trait implementations. For tests, I often want to run the same test multiple times but with slightly different configurations. I might have something like what is shown in Listing 7-1. 
+当我发现自己编写重复且结构相似的代码时（例如在测试和特征实现中），我最常使用声明性宏。对于测试，我经常想多次运行相同的测试，但配置略有不同。我可能有如清单 7-1 所示的内容。
 
 ```
 fn test_inner<T>(init: T, frobnify: bool) { ... }
@@ -35,7 +34,7 @@ fn test_1i128_not_frobnified() {
 
 Listing 7-1: Repetitive testing code 
 
-While this works, it’s too verbose, too repetitive, and too prone to man- ual error. With macros we can do much better, as shown in Listing 7-2. 
+虽然这种方法可行，但它太冗长、太重复，而且太容易出现手动错误。使用宏我们可以做得更好，如清单 7-2 所示。
 
 ```
 macro_rules! test_battery {
@@ -59,9 +58,9 @@ test_battery! {
 ```
 *Listing 7-2: Making a macro repeat for you*
 
-This macro expands each comma-separated directive into its own module that then contains two tests, one that calls test_inner with true, and one with false. While the macro definition isn’t trivial, it makes adding more tests much easier. Each type is one line in the test_battery! invocation, and the macro will take care of generating tests for both true and false arguments. We could also have it generate tests for different values for init. We’ve now significantly reduced the likelihood that we’ll forget to test a particular configuration! 
+该宏将每个逗号分隔的指令扩展为自己的模块，然后包含两个测试，一个用 true 调用 test_inner，另一个用 false 调用 test_inner。虽然宏定义并不简单，但它使得添加更多测试变得更加容易。每种类型都是 test_battery 中的一行！调用，宏将负责生成 true 和 false 参数的测试。我们还可以让它为 init 的不同值生成测试。我们现在已经大大降低了忘记测试特定配置的可能性！
 
-The story for trait implementations is similar. If you define your own trait, you’ll often want to implement that trait for a number of types in the standard library, even if those implementations are trivial. Let’s imagine you invented the Clone trait and want to implement it for all the Copy types in the standard library. Instead of manually writing an implementation for each one, you can use a macro like the one in Listing 7-3. 
+特征实现的故事是类似的。如果您定义自己的特征，您通常会希望为标准库中的许多类型实现该特征，即使这些实现很简单。假设您发明了 Clone 特征，并希望为标准库中的所有 Copy 类型实现它。您可以使用清单 7-3 中的宏，而不是为每个宏手动编写实现。
 
 ```
 macro_rules! clone_from_copy {
@@ -76,15 +75,15 @@ clone_from_copy![bool, f32, f64, u8, i8, /* ... */];
 
 *Listing 7-3: Using a macro to implement a trait for many similar types in one fell swoop*
 
-Here, we generate an implementation of Clone for each provided type whose body just uses * to copy out of &self. You may wonder why we don’t add a blanket implementation of Clone for T where T: Copy. We could do that, but a big reason not to is that it would force types in other crates to also use that same implementation of Clone for their own types that happen to be Copy. An experimental compiler feature called *specialization* could offer a workaround, but at the time of writing the stabilization of that feature is still some way off. So, for the time being, we’re better off enumerating the types specifically. This pattern also extends beyond simple forwarding implementations: for example, you could easily alter the code in Listing 7-3 to implement an AddOne trait to all integer types! 
+在这里，我们为每个提供的类型生成一个 Clone 实现，其主体仅使用 * 来复制 &self。您可能想知道为什么我们不添加 Clone for T where T: Copy 的全面实现。我们可以这样做，但不这样做的一个重要原因是，它会强制其他板条箱中的类型也对它们自己恰好是 Copy 的类型使用相同的 Clone 实现。一个名为“专业化”的实验性编译器功能可以提供一种解决方法，但在撰写本文时，该功能的稳定性仍有一段路要走。因此，目前我们最好专门枚举类型。这种模式还扩展到简单的转发实现之外：例如，您可以轻松地更改清单 7-3 中的代码来为所有整数类型实现 AddOne 特征！
 
-**N O T E**  *If you ever find yourself wondering if you should use generics or a declarative macro, you should use generics. Generics are generally more ergonomic than macros and integrate much better with other constructs in the language. Consider this rule of thumb: if your code changes based on type, use generics; otherwise, use macros.* 
+**N O T E** *如果您发现自己想知道是否应该使用泛型或声明性宏，那么您应该使用泛型。泛型通常比宏更符合人体工程学，并且与语言中的其他结构集成得更好。考虑这个经验法则：如果您的代码根据类型而更改，请使用泛型；否则，使用宏。*
 
 **How They Work** 
 
-Every programming language has a *grammar* that dictates how the indi- vidual characters that make up the source code can be turned into *tokens*. Tokens are the lowest-level building blocks of a language, such as numbers, punctuation characters, string and character literals, and identifiers; at this level, there’s no distinction between language keywords and variable names. For example, the text (value + 4) would be represented by the five- token sequence (, value, +, 4, ) in Rust-like grammar. The process of turning text into tokens also provides a layer of abstraction between the rest of the compiler and the gnarly low-level details of parsing text. For example, in the token representation, there is no notion of whitespace, and /*"foo"*/ and "/*foo*/" have distinct representations (the former is no token, and the latter is a string literal token with the content /*foo*/). 
+Every programming language has a *grammar* that dictates how the indi- vidual characters that make up the source code can be turned into *tokens*. Tokens are the lowest-level building blocks of a language, such as numbers, punctuation characters, string and character literals, and identifiers; at this level, there’s no distinction between language keywords and variable names. For example, the text (value + 4) would be represented by the fivetoken sequence (, value, +, 4, ) in Rust-like grammar. The process of turning text into tokens also provides a layer of abstraction between the rest of the compiler and the gnarly low-level details of parsing text. For example, in the token representation, there is no notion of whitespace, and /*"foo"*/ and "/*foo*/" have distinct representations (the former is no token, and the latter is a string literal token with the content /*foo*/). 
 
-Once the source code has been turned into a sequence of tokens, the compiler walks that sequence and assigns syntactic meaning to the tokens. For example, ()-delimited tokens make up a group, ! tokens denote macro invo- cations, and so on. This is the process of *parsing*, which ultimately produces an abstract syntax tree (AST) that describes the structure represented by the source code. As an example, consider the expression let x = || 4, which con- sists of the sequence of tokens let (keyword), x (identifier), = (punctuation), two instances of | (punctuation), and 4 (literal). When the compiler turns that into a syntax tree, it represents it as a *statement* whose *pattern* is the *identifier* x and whose right-hand *expression* is a *closure* that has an empty *argument list* and a *literal expression* of the *integer literal* 4 as its body. Notice how the syntax tree representation is much richer than the token sequence, since it assigns syntactic meaning to the token combinations following the language’s grammar. 
+Once the source code has been turned into a sequence of tokens, the compiler walks that sequence and assigns syntactic meaning to the tokens. For example, ()-delimited tokens make up a group, ! tokens denote macro invo- cations, and so on. This is the process of *parsing*, which ultimately produces an abstract syntax tree (AST) that describes the structure represented by the source code. As an example, consider the expression let x = || 4, which consists of the sequence of tokens let (keyword), x (identifier), = (punctuation), two instances of | (punctuation), and 4 (literal). When the compiler turns that into a syntax tree, it represents it as a *statement* whose *pattern* is the *identifier* x and whose right-hand *expression* is a *closure* that has an empty *argument list* and a *literal expression* of the *integer literal* 4 as its body. Notice how the syntax tree representation is much richer than the token sequence, since it assigns syntactic meaning to the token combinations following the language’s grammar. 
 
 Rust macros dictate the syntax tree that a given sequence of tokens gets turned into—when the compiler encounters a macro invocation during parsing, it has to evaluate the macro to determine the replacement tokens, which will ultimately become the syntax tree for the macro invocation. At this point, however, the compiler is still parsing the tokens and might not be in a position to evaluate a macro yet, since all it has done is parse the tokens of the macro definition. Instead, then, the compiler defers the parsing of anything contained within the delimiters of a macro invocation and remembers the input token sequence. When the compiler is ready to evaluate the indicated macro, it evaluates the macro over the token sequence, parses the tokens it yields, and substitutes the resulting syntax tree into the tree where the macro invocation was. 
 
@@ -98,7 +97,7 @@ That’s really all there is to declarative macros at a high level—when the co
 
 An exhaustive explanation of all the syntax that declarative macros support is outside the scope of this book. However, we’ll cover the basics as there are some oddities worth pointing out. 
 
-Declarative macros consist of two main parts: *matchers* and *transcribers*. A given macro can have many matchers, and each matcher has an associ- ated transcriber. When the compiler finds a macro invocation, it walks the macro’s matchers from first to last, and when it finds a matcher that matches the tokens in the invocation, it substitutes the invocation by walk- ing the tokens of the corresponding transcriber. Listing 7-4 shows how the different parts of a declarative macro rule fit together. 
+Declarative macros consist of two main parts: *matchers* and *transcribers*. A given macro can have many matchers, and each matcher has an associated transcriber. When the compiler finds a macro invocation, it walks the macro’s matchers from first to last, and when it finds a matcher that matches the tokens in the invocation, it substitutes the invocation by walking the tokens of the corresponding transcriber. Listing 7-4 shows how the different parts of a declarative macro rule fit together. 
 
 ```
 macro_rules! /* macro name */ {
@@ -121,11 +120,11 @@ $($key:expr => $value:expr),+
 
 And, crucially, code that invokes a macro with this matcher can give an arbitrarily complex expression for the key or value—the magic of match- ers will make sure that the key and value expressions are partitioned appropriately. 
 
-Macro rules support a wide variety of *fragment types*; you’ve already seen :ident for identifiers and :expr for expressions, but there is also :ty for types and even :tt for any single token tree! You can find a full list of the frag- ment types in Chapter 3 of the Rust language reference (*https://doc.rust-lang .org/reference/macros-by-example.html*). These, plus the mechanism for match- ing a pattern repeatedly ($()), enable you to match most straightforward code patterns. If, however, you find that it is difficult to express the pattern you want with a matcher, you may want to try a procedural macro instead, where you don’t need to follow the strict syntax that macro_rules! requires. We’ll look at these in more detail later in the chapter. 
+Macro rules support a wide variety of *fragment types*; you’ve already seen :ident for identifiers and :expr for expressions, but there is also :ty for types and even :tt for any single token tree! You can find a full list of the fragment types in Chapter 3 of the Rust language reference (*https://doc.rust-lang .org/reference/macros-by-example.html*). These, plus the mechanism for match- ing a pattern repeatedly ($()), enable you to match most straightforward code patterns. If, however, you find that it is difficult to express the pattern you want with a matcher, you may want to try a procedural macro instead, where you don’t need to follow the strict syntax that macro_rules! requires. We’ll look at these in more detail later in the chapter. 
 
 **Transcribers** 
 
-Once the compiler has matched a declarative macro matcher, it generates code using the matcher’s associated transcriber. The variables defined by a macro matcher are called *metavariables*, and the compiler substitutes any occurrence of each metavariable in the transcriber (like \$(),+ in that same example), you can use the same syntax in the transcriber and it will be repeated once for each match in the input, with each expansion holding the appropriate sub- stitution for each metavariable for that iteration. For example, for the $key and $value matcher, we could write the following transcriber to generate an insert call into some map for each $key/$value pair that was matched: 
+Once the compiler has matched a declarative macro matcher, it generates code using the matcher’s associated transcriber. The variables defined by a macro matcher are called *metavariables*, and the compiler substitutes any occurrence of each metavariable in the transcriber (like \$(),+ in that same example), you can use the same syntax in the transcriber and it will be repeated once for each match in the input, with each expansion holding the appropriate substitution for each metavariable for that iteration. For example, for the $key and $value matcher, we could write the following transcriber to generate an insert call into some map for each $key/$value pair that was matched: 
 
 ```
 $(map.insert($key, $value);)+
@@ -137,7 +136,7 @@ Notice that here we want a semicolon for each repetition, not just to delimit th
 
 **Hygiene** 
 
-You may have heard that Rust macros are *hygienic*, and perhaps that being hygienic makes them safer or nicer to work with, without necessarily under- standing what that means. When we say Rust macros are hygienic, we mean that a declarative macro (generally) cannot affect variables that aren’t explic- itly passed to it. A trivial example is that if you declare a variable with the name foo, and then call a macro that also defines a variable named foo, the macro’s foo is by default not visible at the call site (the place where the macro is called from). Similarly, macros cannot access variables defined at the call site (even self) unless they are explicitly passed in. You can, most of the time, think of macro identifiers as existing in their own namespace that is separate from that of the code they expand into. For an example, take a look at the code in Listing 7-5, which has a macro that tries (and fails) to shadow a variable at the call site. 
+You may have heard that Rust macros are *hygienic*, and perhaps that being hygienic makes them safer or nicer to work with, without necessarily understanding what that means. When we say Rust macros are hygienic, we mean that a declarative macro (generally) cannot affect variables that aren’t explicitly passed to it. A trivial example is that if you declare a variable with the name foo, and then call a macro that also defines a variable named foo, the macro’s foo is by default not visible at the call site (the place where the macro is called from). Similarly, macros cannot access variables defined at the call site (even self) unless they are explicitly passed in. You can, most of the time, think of macro identifiers as existing in their own namespace that is separate from that of the code they expand into. For an example, take a look at the code in Listing 7-5, which has a macro that tries (and fails) to shadow a variable at the call site. 
 
 ```
 macro_rules! let_foo {
@@ -181,7 +180,7 @@ We could have used = $i + 1 in the macro instead, but we could not have used = x
 
 One last note on declarative macros and scoping: unlike pretty much everything else in Rust, declarative macros exist in the source code only after they are declared. If you try to use a macro that you define further down in the file, this will not work! This applies globally to your project; if you declare a macro in one module and want to use it in another, the module you declare the macro in must appear earlier in the crate, not later. If foo and bar are mod- ules at the root of a crate, and foo declares a macro that bar wants to use, then mod foo must appear before mod bar in *lib.rs*! 
 
-**NOTE** *There is one exception to this odd scoping of macros (formally called* textual scop- ing*), and that is if you mark the macro with* *#[macro_export]**. That annotation effec- tively hoists the macro to the root of the crate and marks it as* *pub* *so that it can then be used anywhere in your crate or by your crate’s dependents.* 
+**NOTE** *There is one exception to this odd scoping of macros (formally called* textual scoping*), and that is if you mark the macro with* *#[macro_export]**. That annotation effectively hoists the macro to the root of the crate and marks it as* *pub* *so that it can then be used anywhere in your crate or by your crate’s dependents.* 
 
 ### Procedural Macros
 
@@ -199,11 +198,11 @@ Procedural macros come in three different flavors, each specialized to a particu
 
 - Derive macros, like #[derive(Serialize)] 
 
-  All three types use the same underlying mechanism: the compiler pro- vides your macro with a sequence of tokens, and it expects you to produce a sequence of tokens in return that are (probably) related to the input tree. However, they differ in how the macro is invoked and how its output is handled. We’ll cover each one briefly. 
+  All three types use the same underlying mechanism: the compiler provides your macro with a sequence of tokens, and it expects you to produce a sequence of tokens in return that are (probably) related to the input tree. However, they differ in how the macro is invoked and how its output is handled. We’ll cover each one briefly. 
 
 **Function-Like Macros** 
 
-The function-like macro is the simplest form of procedural macro. Like a declarative macro, it simply replaces the macro code at the call site with the code that the procedural macro returns. However, unlike with declarative macros, all the guard rails are off: these macros (like all procedural mac- ros) are not required to be hygienic and will not protect you from interact- ing with identifiers in the surrounding code at the call site. Instead, your macros are expected to explicitly call out which identifiers should overlap with the surrounding code (using Span::call_site) and which should be treated as private to the macro (using Span::mixed_site, which we’ll discuss later). 
+The function-like macro is the simplest form of procedural macro. Like a declarative macro, it simply replaces the macro code at the call site with the code that the procedural macro returns. However, unlike with declarative macros, all the guard rails are off: these macros (like all procedural macros) are not required to be hygienic and will not protect you from interacting with identifiers in the surrounding code at the call site. Instead, your macros are expected to explicitly call out which identifiers should overlap with the surrounding code (using Span::call_site) and which should be treated as private to the macro (using Span::mixed_site, which we’ll discuss later). 
 
 **Attribute Macros** 
 
@@ -223,7 +222,7 @@ Procedural macros can significantly increase compile times for two main reasons.
 
 The second reason why procedural macros increase compile time is that they make it easy for you to generate a lot of code without realizing it. While the macro saves you from having to actually type the generated code, it does not save the compiler from having to parse, compile, and optimize it. As you use more procedural macros, that generated boilerplate adds up, and it can bloat your compile times. 
 
-That said, the actual execution time of procedural macros is rarely a factor in overall compile time. While the compiler has to wait for the procedural macro to do its thing before it can continue, in practice, most procedural macros don’t do any heavy computation. That said, if your procedural macro is particularly involved, you may end up with your compiles spend- ing a significant chunk of execution time on your procedural macro code, which is worth keeping an eye out for! 
+That said, the actual execution time of procedural macros is rarely a factor in overall compile time. While the compiler has to wait for the procedural macro to do its thing before it can continue, in practice, most procedural macros don’t do any heavy computation. That said, if your procedural macro is particularly involved, you may end up with your compiles spending a significant chunk of execution time on your procedural macro code, which is worth keeping an eye out for! 
 
 **So You Think You Want a Macro** 
 
@@ -238,7 +237,7 @@ The second condition may seem stranger, however: what does it mean for the imple
 
 **When to Use Function-Like Macros** 
 
-Function-like macros are harder to give a general rule of thumb for. You might say you should use function-like macros when you want a function- like macro but can’t express it with macro_rules!, but that’s a fairly subjective guideline. You can do a lot with declarative macros if you really put your mind to it, after all! 
+Function-like macros are harder to give a general rule of thumb for. You might say you should use function-like macros when you want a function-like macro but can’t express it with macro_rules!, but that’s a fairly subjective guideline. You can do a lot with declarative macros if you really put your mind to it, after all! 
 
 There are two particularly good reasons to reach for a function-like macro: 
 
@@ -259,11 +258,11 @@ That leaves us with attribute macros. Though these are arguably the most general
 
 ​	Libraries like rocket use attribute macros to augment functions and types with additional information that the framework then uses without the user having to do a lot of manual configuration. It’s so much more convenient to be able to write #[get("/<name>")] fn hello(name: String) than to have to set up a configuration struct with function pointers and 
 
-the like. Essentially, the attributes make up a miniature domain-specific language (DSL) that hides a lot of boilerplate that’d otherwise be necessary. Similarly, the asynchronous I/O framework tokio lets you use #[tokio::main] async fn main() to automatically set up a runtime and run your asynchronous code, thereby saving you from writing the same run- time setup in every asynchronous application’s main function. 
+the like. Essentially, the attributes make up a miniature domain-specific language (DSL) that hides a lot of boilerplate that’d otherwise be necessary. Similarly, the asynchronous I/O framework tokio lets you use #[tokio::main] async fn main() to automatically set up a runtime and run your asynchronous code, thereby saving you from writing the same runtime setup in every asynchronous application’s main function. 
 
 **Transparent middleware** 
 
-​	Some libraries want to inject themselves into your application in unobtru- sive ways to provide added value that does not change the application’s functionality. For example, tracing and logging libraries like tracing and metric collection libraries like metered allow you to transparently instru- ment a function by adding an attribute to it, and then every call to that function will run some additional code dictated by the library. 
+​	Some libraries want to inject themselves into your application in unobtrusive ways to provide added value that does not change the application’s functionality. For example, tracing and logging libraries like tracing and metric collection libraries like metered allow you to transparently instrument a function by adding an attribute to it, and then every call to that function will run some additional code dictated by the library. 
 
 **Type transformers** 
 
@@ -277,7 +276,7 @@ With most procedural macros, you want to not only parse a TokenStream but also p
 
 **NOTE** *TokenStream* *also implements* *Display**, which pretty-prints the tokens in the stream. This comes in super handy for debugging!* 
 
-Tokens are very slightly more magical than I’ve described so far in that every token, and indeed every TokenTree, also has a *span*. Spans are how the compiler ties generated code back to the source code that generated it. Every token’s span marks where that token originated. For example, con- sider a (declarative) macro like the one in Listing 7-7, which generates a trivial Debug implementation for the provided type. 
+Tokens are very slightly more magical than I’ve described so far in that every token, and indeed every TokenTree, also has a *span*. Spans are how the compiler ties generated code back to the source code that generated it. Every token’s span marks where that token originated. For example, consider a (declarative) macro like the one in Listing 7-7, which generates a trivial Debug implementation for the provided type. 
 
 ```rust
 macro_rules! name_as_debug {
@@ -296,7 +295,7 @@ The span of the $t in the generated code is the code mapped to $t in the macro i
 
 Spans are quite flexible, and they enable you to write procedural macros that can produce sophisticated error messages if you use the compile_error! macro. As its name implies, compile_error! causes the compiler to emit an error wherever it is placed with the provided string as the message. This may not seem very useful, until you pair it with a span. By setting the span of the TokenTree you generate for the compile_error! invocation to be equal to the span of some subset of the input, you are effectively telling the compiler to emit this compiler error and point the user to this part of the source. Together, these two mechanisms let a macro produce errors that seem to stem from the relevant part of the code, even though the actual compiler error is somewhere in the generated code that the user never even sees! 
 
-**NOTE** *If you’ve ever been curious how* *syn**’s error handling works, its* *Error* *type imple- ments an* *Error::to_compile_error* *method, which turns it into a* *TokenStream* *that holds only a* *compile_error!* *directive. What’s particularly neat with* *syn**’s* *Error* *type is that it internally holds a collection of errors, each of which produces a distinct* *compile_error!* *directive with its own span so that you can easily produce multiple independent errors from your procedural macro.* 
+**NOTE** *If you’ve ever been curious how* *syn**’s error handling works, its* *Error* *type implements an* *Error::to_compile_error* *method, which turns it into a* *TokenStream* *that holds only a* *compile_error!* *directive. What’s particularly neat with* *syn**’s* *Error* *type is that it internally holds a collection of errors, each of which produces a distinct* *compile_error!* *directive with its own span so that you can easily produce multiple independent errors from your procedural macro.* 
 
 The power of spans doesn’t end there; spans are also how Rust’s macro hygiene is implemented. When you construct an Ident token, you also give the span for that identifier, and that span dictates the scope of that identifier. If you set the identifier’s span to be Span::call_site(), the identifier is resolved where the macro was called from and will thus not be isolated from the surrounding scope. If, on the other hand, you set it to Span::mixed _site() then (variable) identifiers are resolved at the macro definition site, and so will be completely hygienic with respect to similarly named variables at the call site. Span::mixed_site is so called because it matches the rules around identifier hygiene for macro_rules!, which, as we discussed earlier, “mixes” identifier resolution between using the macro definition site for variables and using the call site for types, modules, and everything else. 
 

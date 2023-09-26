@@ -1,56 +1,56 @@
-Every project, no matter how large or small, has an API. In fact, it usually has several. Some of these are user-facing, like an HTTP endpoint or a command line interface, and some are developer-facing, like a library’s public interface. On top of these, Rust crates also have a number of internal interfaces: every type, trait, and module boundary has its own miniature API that the rest of your code interfaces with. As your codebase grows in size and complexity, you’ll find it worth- while to invest some thought and care into how you design even the inter- nal APIs to make the experience of using and maintaining the code over time as pleasant as possible. 
+每个项目，无论大小，都有一个 API。事实上，它通常有几个。其中一些是面向用户的，例如 HTTP 端点或命令行接口，有些是面向开发人员的，例如库的公共接口。除此之外，Rust 箱还具有许多内部接口：每种类型、特征和模块边界都有其自己的微型 API，其余代码可以与它们交互。随着代码库规模和复杂性的增加，您会发现值得在如何设计内部 API 上投入一些思考和关注，以使随着时间的推移使用和维护代码的体验尽可能愉快。
 
-In this chapter we’ll look at some of the most important considerations for writing idiomatic interfaces in Rust, whether the users of those inter- faces are your own code or other developers using your library. These essentially boil down to four principles: your interfaces should be *unsurprising*, *flexible*, *obvious*, and *constrained*. I’ll discuss each of these principles in turn, to provide some guidance for writing reliable and usable interfaces. 
+在本章中，我们将讨论在 Rust 中编写惯用接口的一些最重要的考虑因素，无论这些接口的用户是您自己的代码还是使用您的库的其他开发人员。这些本质上可以归结为四个原则：您的接口应该*不令人惊讶*、*灵活*、*明显*和*受约束*。我将依次讨论这些原则，为编写可靠且可用的接口提供一些指导。
 
-I highly recommend taking a look at the Rust API Guidelines (*https:// rust-lang.github.io/api-guidelines/*) after you’ve read this chapter. There’s an excellent checklist you can follow, with a detailed run-through of each recommendation. Many of the recommendations in this chapter are also checked by the cargo clippy tool, which you should start running on your code if you aren’t already. I also encourage you to read through Rust RFC 1105 (*https://rust-lang.github.io/rfcs/1105-api-evolution.html*) and the chapter of *The Cargo Book* on SemVer compatibility (*https://doc.rust-lang.org/cargo/ reference/semver.html*), which cover what is and is not a breaking change in Rust. 
+我强烈建议您在阅读本章后查看 Rust API 指南 (*https://rust-lang.github.io/api-guidelines/*)。您可以遵循一份出色的清单，其中包含每项建议的详细说明。本章中的许多建议也经过了 Cargo Clippy 工具的检查，如果您还没有开始在代码上运行该工具，您应该开始运行它。我还鼓励您阅读 Rust RFC 1105 (*https://rust-lang.github.io/rfcs/1105-api-evolution.html*) 和 *The Cargo Book* 关于 SemVer 兼容性的章节 (*https ://doc.rust-lang.org/cargo/reference/semver.html*)，其中涵盖了 Rust 中的重大变更和非重大变更。
 
-### Unsurprising
+### 不足为奇
 
-The Principle of Least Surprise, otherwise known as the Law of Least Astonishment, comes up a lot in software engineering, and it holds true for Rust interfaces as well. Where possible, your interfaces should be intuitive enough that if the user has to guess, they usually guess correctly. Of course, not everything about your application is going to be immediately intuitive in this way, but anything that *can* be unsurprising should be. The core idea here is to stick close to things the user is likely to already know so that they don’t have to relearn concepts in a different way than they’re used to. That way you can save their brain power for figuring out the things that are actually specific to your interface. 
+最小惊讶原则，也称为最小惊讶法则，在软件工程中经常出现，它也适用于 Rust 接口。如果可能的话，你的接口应该足够直观，如果用户必须猜测，他们通常会猜对。当然，并不是应用程序的所有内容都会以这种方式立即变得直观，但任何“可能”不会令人惊讶的事情都应该如此。这里的核心思想是紧贴用户可能已经知道的事情，这样他们就不必以与习惯不同的方式重新学习概念。这样，您就可以节省他们的脑力来弄清楚你的接口实际特定的内容。
 
-There are a variety of ways you can make your interfaces predictable. Here, we’ll look at how you can use naming, common traits, and ergonomic trait tricks to help the user out. 
+有多种方法可以使你的接口变得可预测。在这里，我们将了解如何使用命名、常见特征和人体工程学特征技巧来帮助用户。
 
 ***Naming Practices***
 
-A user of your interface will encounter it first through its names; they will immediately start to infer things from the names of types, methods, variables, fields, and libraries they come across. If your interface reuses names for things—say, methods and types—from other (perhaps common) inter- faces, the user will know they can make certain assumptions about your methods and types. A method called iter probably takes &self, and prob- ably gives you an iterator. A method called into_inner probably takes self and likely returns some kind of wrapped type. A type called SomethingError probably implements std::error::Error and appears in various Results. By reusing common names for the same purpose, you make it easier for the user to guess what things do and allow them to more easily understand the things that are different about your interface. 
+你的接口的使用者首先会通过其名称遇到它；他们会立即开始从遇到的类型、方法、变量、字段和库的名称中推断事物。如果你的接口重用其他（可能是常见的）接口中对象的名称（例如方法和类型），用户就会知道他们可以对你的方法和类型做出某些假设。一个名为 iter 的方法可能需要 &self，并且可能会为您提供一个迭代器。名为 into_inner 的方法可能采用 self 并可能返回某种包装类型。名为 SomethingError 的类型可能实现 std::error::Error 并出现在各种结果中。通过为同一目的重复使用通用名称，您可以让用户更容易猜测事物的作用，并让他们更容易理解接口的不同之处。
 
-A corollary to this is that things that share a name *should* in fact work the same way. Otherwise—for example, if your iter method takes self, or if your SomethingError type does not implement Error—the user will likely write incorrect code based on how they expect the interface to work. They will be surprised and frustrated and will have to spend time digging into how your interface differs from their expectations. When we can save the user this kind of friction, we should. 
+由此推论，共享名称的事物“应该”实际上以相同的方式工作。否则，例如，如果您的 iter 方法采用 self，或者您的 SomethingError 类型未实现 Error，则用户可能会根据他们期望接口的工作方式编写不正确的代码。他们会感到惊讶和沮丧，并且必须花时间深入研究您的界面与他们的期望有何不同。当我们能够为用户节省这种麻烦时，我们就应该这样做。
 
 ***Common Traits for Types***
 
-Users in Rust will also make the major assumption that everything in the interface “just works.” They expect to be able to print any type with {:?} and send anything and everything to another thread, and they expect that every type is Clone. Where possible, we should again avoid surprising the user and eagerly implement most of the standard traits even if we do not need them immediately. 
+Rust 用户还会做出这样的主要假设：界面中的所有内容都“正常工作”。他们希望能够使用 {:?} 打印任何类型并将任何内容发送到另一个线程，并且他们希望每种类型都是克隆的。在可能的情况下，我们应该再次避免让用户感到惊讶，并急切地实现大多数标准特征，即使我们不立即需要它们。
 
-Because of the coherence rules discussed in Chapter 2, the compiler will not allow users to implement these traits when they need them. Users aren’t allowed to implement a foreign trait (like Clone) for a foreign type like one from your interface. They would instead need to wrap your interface type in their own type, and even then it may be quite difficult to write a reasonable implementation without access to the type’s internals. 
+由于第 2 章中讨论的一致性规则，编译器将不允许用户在需要时实现这些特征。不允许用户为外部类型（例如界面中的类型）实现外部特征（例如克隆）。相反，他们需要将您的接口类型包装在自己的类型中，即使这样，在不访问类型内部的情况下编写合理的实现也可能相当困难。
 
-First among these standard traits is the Debug trait. Nearly every type can, and should, implement Debug, even if it only prints the type’s name. Using #[derive(Debug)] is often the best way to implement the Debug trait in your interface, but keep in mind that all derived traits automatically add the same bound for any generic parameters. You could also simply write your own implementation by leveraging the various debug_ helpers on fmt::Formatter. 
+这些标准特征中的第一个是调试特征。几乎每种类型都可以而且应该实现调试，即使它只打印类型的名称。使用 #[derive(Debug)] 通常是在界面中实现 Debug 特征的最佳方法，但请记住，所有派生特征都会自动为任何通用参数添加相同的绑定。您还可以通过利用 fmt::Formatter 上的各种 debug_ 帮助程序来简单地编写自己的实现。
 
-Tied in close second are the Rust auto-traits Send and Sync (and, to a lesser extent, Unpin). If a type does not implement one of these traits, it should be for a very good reason. A type that is not Send can’t be placed in a Mutex and can’t be used even transitively in an application that contains a thread pool. A type that is not Sync can’t be shared through an Arc or placed in a static variable. Users have come to expect that types *just work* in these contexts, especially in the asynchronous world where nearly everything runs on a thread pool, and will become frustrated if you don’t ensure that your types implement these traits. If your types cannot implement them, make sure that fact, and the reason why, is well documented! 
+紧随其后的是 Rust 自动特征发送和同步（以及较小程度上的取消固定）。如果一个类型没有实现这些特征之一，那应该是有充分理由的。非 Send 的类型不能放入互斥体中，甚至不能在包含线程池的应用程序中传递使用。非 Sync 的类型无法通过 Arc 共享或放置在静态变量中。用户已经开始期望类型在这些上下文中“正常工作”，特别是在几乎所有东西都在线程池上运行的异步世界中，如果您不能确保您的类型实现这些特征，他们将会感到沮丧。如果您的类型无法实现它们，请确保事实及其原因有据可查！
 
-The next set of nearly universal traits you should implement is Clone and Default. These traits can be derived or implemented easily and make sense to implement for most types. If your type cannot implement these traits, make sure to call it out in your documentation, as users will usually expect to be able to easily create more (and new) instances of types as they see fit. If they cannot, they will be surprised. 
+您应该实现的下一组几乎通用的特征是克隆和默认。这些特征可以轻松导出或实现，并且对于大多数类型来说实现都是有意义的。如果您的类型无法实现这些特征，请确保在文档中指出它，因为用户通常希望能够轻松创建他们认为合适的更多（和新的）类型实例。如果他们不能，他们会感到惊讶。
 
-One step further down in the hierarchy of expected traits is the comparison traits: PartialEq, PartialOrd, Hash, Eq, and Ord. The PartialEq trait is particularly desirable, because users will at some point inevitably have two instances of your type that they wish to compare with == or assert_eq!. Even if your type would compare equal for only the same instance of the type, it’s worth implementing PartialEq to enable your users to use assert_eq!. 
+在预期特征的层次结构中再往下一层是比较特征：PartialEq、PartialOrd、Hash、Eq 和 Ord。 PartialEq 特征是特别理想的，因为用户在某些时候不可避免地会拥有您的类型的两个实例，他们希望将它们与 == 或 assert_eq! 进行比较。即使您的类型仅对于该类型的同一实例比较相等，也值得实现 PartialEq 以使您的用户能够使用 assert_eq!。
 
-PartialOrd and Hash are more specialized, and may not apply quite as broadly, but where possible you will want to implement them too. This is especially true for types a user might use as the key in a map, or a type they may deduplicate using any of the std::collection set types, since they tend to require these bounds. Eq and Ord come with additional semantic requirements on the implementing type’s comparison operations beyond those of PartialEq and PartialOrd. These are well documented in the documentation for those traits, and you should implement them *only* if you’re sure those semantics actually apply to your type. 
+PartialOrd 和 Hash 更专业，可能应用范围不那么广泛，但在可能的情况下您也想实现它们。对于用户可能用作映射中的键的类型，或者他们可能使用任何 std::collection 集类型进行重复数据删除的类型尤其如此，因为它们往往需要这些边界。除了 PartialEq 和 PartialOrd 之外，Eq 和 Ord 对实现类型的比较操作还有额外的语义要求。这些特征的文档中有详细记录，并且*仅*如果您确定这些语义确实适用于您的类型，则应该实现它们。
 
-Finally, for most types, it makes sense to implement the serde crate’s Serialize and Deserialize traits. These can be easily derived, and the serde _derive crate even comes with mechanisms for overwriting the serialization for just one field or enum variant. Since serde is a third-party crate, you may not wish to add a required dependency on it. Most libraries therefore choose to provide a serde feature that adds support for serde only when the user opts into it. 
+最后，对于大多数类型，实现 serde 箱的序列化和反序列化特征是有意义的。这些可以很容易地导出，并且 serde _derive 箱甚至附带了仅覆盖一个字段或枚举变体的序列化的机制。由于 serde 是第三方包，您可能不希望添加对它的必需依赖项。因此，大多数库选择提供 serde 功能，仅在用户选择时添加对 serde 的支持。
 
-You might be wondering why I haven’t included the derivable trait Copy in this section. There are two things that set Copy apart from the other traits mentioned. The first is that users do not generally expect types to be Copy; quite to the contrary, they tend to expect that if they want two copies of something, they have to call clone. Copy changes the semantics of moving a value of the given type, which might surprise the user. This ties in to the second observation: it is very easy for a type to *stop* being Copy, because Copy types are highly restricted. A type that starts out simple can easily end up having to hold a String, or some other non-Copy type. Should that happen, and you have to remove the Copy implementation, that’s a backward incom- patible change. In contrast, you rarely have to remove a Clone implementa- tion, so that’s a less onerous commitment. 
+您可能想知道为什么我没有在本节中包含可导出特征 Copy。有两件事使复制与提到的其他特征不同。首先，用户通常不希望类型是 Copy；恰恰相反，他们倾向于期望，如果他们想要某个东西的两个副本，他们必须调用克隆。复制会更改移动给定类型的值的语义，这可能会让用户感到惊讶。这与第二个观察结果相关：类型很容易“停止”被复制，因为复制类型受到严格限制。开始时很简单的类型很容易最终不得不保存 String 或其他一些非 Copy 类型。如果发生这种情况，您必须删除 Copy 实现，这是一个向后不兼容的更改。相比之下，您很少需要删除克隆实现，因此这是一个不那么繁重的承诺。
 
 ***Ergonomic Trait Implementations***
 
-Rust does not automatically implement traits for references to types that implement traits. To phrase this a different way, you cannot generally call fn foo<T: Trait>(t: T) with a &Bar, even if Bar: Trait. This is because Trait may contain methods that take &mut self or self, which obviously cannot be called on &Bar. Nonetheless, this behavior might be very surprising to a user who sees that Trait has only &self methods! 
+Rust 不会自动实现对实现特征的类型的引用的特征。换句话说，您通常不能使用 &Bar 调用 fn foo<T: Trait>(t: T) ，即使 Bar: Trait 也是如此。这是因为 Trait 可能包含采用 &mut self 或 self 的方法，这显然不能在 &Bar 上调用。尽管如此，对于看到 Trait 只有 &self 方法的用户来说，这种行为可能会非常令人惊讶！
 
-For this reason, when you define a new trait, you’ll usually want to pro- vide blanket implementations as appropriate for that trait for &T where T: Trait, &mut T where T: Trait, and Box<T> where T: Trait. You may be able to implement only some of these depending on what receivers the methods of Trait have. Many of the traits in the standard library have similar implemen- tations, precisely because that leads to fewer surprises for the user. 
+因此，当您定义一个新特征时，您通常需要为 &T where T: Trait、&mut T where T: Trait 和 Box<T> where T: Trait 提供适合该特征的一揽子实现。您可能只能实现其中的一些，具体取决于 Trait 方法具有的接收器。标准库中的许多特征都有类似的实现，正是因为这会减少用户的意外。
 
-Iterators are another case where you’ll often want to specifically add trait implementations on references to a type. For any type that can be iterated over, consider implementing IntoIterator for both &MyType and &mut MyType where applicable. This makes for loops work with borrowed instances of your type as well out of the box, just like users would expect. 
+迭代器是另一种情况，您经常希望在对类型的引用上专门添加特征实现。对于任何可以迭代的类型，请考虑在适用的情况下为 &MyType 和 &mut MyType 实现 IntoIterator。这使得 for 循环可以立即使用您类型的借用实例，就像用户所期望的那样。
 
 ***Wrapper Types***
 
-Rust does not have object inheritance in the classical sense. However, the Deref trait and its cousin AsRef both provide something a little like inheritance. These traits allow you to have a value of type T and call methods on some type U by calling them directly on the T-typed value if T: Deref<Target = U>. This feels like magic to the user, and is generally great. 
+Rust 没有经典意义上的对象继承。然而，Deref 特性及其表亲 AsRef 都提供了有点像继承的功能。这些特征允许您拥有 T 类型的值，并通过直接在 T 类型值上调用方法来调用某些类型 U 的方法（如果 T: Deref<Target = U>）。这对用户来说就像魔法一样，而且通常都很棒。
 
-If you provide a relatively transparent wrapper type (like Arc), there’s a good chance you’ll want to implement Deref so that users can call methods on the inner type by just using the . operator. If accessing the inner type does not require any complex or potentially slow logic, you should also consider implementing AsRef, which allows users to easily use a &WrapperType as an &InnerType. For most wrapper types, you will also want to implement From<InnerType> and Into<InnerType> where possible so that your users can easily add or remove your wrapping. 
+如果您提供相对透明的包装类型（如 Arc），那么您很有可能想要实现 Deref，以便用户只需使用 .操作员。如果访问内部类型不需要任何复杂或可能缓慢的逻辑，您还应该考虑实现 AsRef，它允许用户轻松地将 &WrapperType 用作 &InnerType。对于大多数包装类型，您还需要尽可能实现 From<InnerType> 和 Into<InnerType> ，以便您的用户可以轻松添加或删除包装。
 
-You may also have come across the Borrow trait, which feels very similar to Deref and AsRef but is really a bit of a different beast. Specifically, Borrow is tailored for a much narrower use case: allowing the caller to supply any one of multiple essentially identical variants of the same type. It could, per- haps, have been called Equivalent instead. For example, for a HashSet<String>, Borrow allows the caller to supply either a &str *or* a &String. While the same could have been achieved with AsRef, that would not be safe without Borrow’s additional requirement that the target type implements Hash, Eq, and Ord exactly the same as the implementing type. Borrow also has a blanket imple- mentation of Borrow<T> for T, &T, and &mut T, which makes it convenient to use in trait bounds to accept either owned *or* referenced values of a given type. In general, Borrow is intended only for when your type is essentially equiva- lent to another type, whereas Deref and AsRef are intended to be imple- mented more widely for anything your type can “act as.” 
+您可能还遇到过 Borrow 特征，它感觉与 Deref 和 AsRef 非常相似，但实际上有点不同。具体来说，Borrow 是为更狭窄的用例量身定制的：允许调用者提供同一类型的多个基本相同的变体中的任何一个。也许，它可以被称为“等效”。例如，对于 HashSet<String>，Borrow 允许调用者提供 &str *或* &String。虽然使用 AsRef 也可以实现相同的效果，但如果没有 Borrow 的额外要求（目标类型实现的 Hash、Eq 和 Ord 与实现类型完全相同），那就不安全。 Borrow 还为 T、&T 和 &mut T 提供了 Borrow<T> 的全面实现，这使得可以方便地在特征边界中使用来接受给定类型的自有 * 或 * 引用值。一般而言，Borrow 仅适用于您的类型本质上等同于另一种类型的情况，而 Deref 和 AsRef 则旨在更广泛地实现您的类型可以“充当”的任何类型。
 
 > **DEREF AND INHERENT METHODS** 
 
@@ -60,9 +60,9 @@ You may also have come across the Borrow trait, which feels very similar to Dere
 
 ### Flexible
 
-Every piece of code you write includes, implicitly or explicitly, a contract. The contract consists of a set of requirements and a set of promises. The requirements are restrictions on how the code can be used, while the promises are guarantees about how the code can be used. When designing a new interface, you want to think carefully about this contract. A good rule of thumb is to avoid imposing unnecessary restrictions and to only make promises you can keep. Adding restrictions or removing promises usually requires a major semantic version change and is likely to break code else- where. Relaxing restrictions or giving additional promises, on the other hand, is usually backward compatible. 
+您编写的每段代码都隐式或显式地包含合同。合同由一组要求和一组承诺组成。需求是对如何使用代码的限制，而承诺是对如何使用代码的保证。当设计一个新的界面时，你需要仔细考虑这个契约。一个好的经验法则是避免施加不必要的限制，只做出你可以兑现的承诺。添加限制或删除承诺通常需要进行重大语义版本更改，并且可能会破坏其他地方的代码。另一方面，放宽限制或给予额外的承诺通常是向后兼容的。
 
-In Rust, restrictions usually come in the form of trait bounds and argument types, and promises come in the form of trait implementations and return types. For example, compare the three function signatures in Listing 3-1. 
+在 Rust 中，限制通常以特征边界和参数类型的形式出现，承诺以特征实现和返回类型的形式出现。例如，比较清单 3-1 中的三个函数签名。
 
 ```
 fn frobnicate1(s: String) -> String
@@ -72,104 +72,103 @@ fn frobnicate3(s: impl AsRef<str>) -> impl AsRef<str>
 
 *Listing 3-1: Similar function signatures with different contracts*
 
-These three function signatures all take a string and return a string, but they do so under very different contracts. 
+这三个函数签名都接受一个字符串并返回一个字符串，但它们是在非常不同的合同下这样做的。
 
-The first function requires the caller to own the string in the form of the String type, and it promises that it will return an owned String. Since the contract requires the caller to allocate and requires us to return an owned String, we cannot later make this function allocation-free in a back- ward compatible way. 
+第一个函数要求调用者拥有 String 类型形式的字符串，并且它承诺它将返回一个拥有的 String。由于合约要求调用者进行分配并要求我们返回一个拥有的字符串，因此我们以后无法以向后兼容的方式使该函数免分配。
 
-The second function relaxes the contract: the caller can provide any reference to a string, so the user no longer needs to allocate or give up own- ership of a String. It also promises to give back a std::borrow::Cow, meaning it can return either a string reference or an owned String, depending on whether it needs to own the string. The promise here is that the function will always return a Cow, which means that we cannot, say, change it to use some other optimized string representation later. The caller must also spe- cifically provide a &str, so if they have, say, a pre-existing String of their own, they must dereference it to a &str to call our function. 
+第二个函数放宽了契约：调用者可以提供对字符串的任何引用，因此用户不再需要分配或放弃字符串的所有权。它还承诺返回一个 std::borrow::Cow，这意味着它可以返回一个字符串引用或一个拥有的字符串，具体取决于它是否需要拥有该字符串。这里的承诺是该函数将始终返回一个 Cow，这意味着我们不能稍后将其更改为使用其他优化的字符串表示形式。调用者还必须专门提供一个 &str，因此，如果他们有一个自己预先存在的 String，他们必须将其取消引用到 &str 来调用我们的函数。
 
-The third function lifts these restrictions. It requires only that the user pass in a type that can produce a reference to a string, and it promises only that the return value can produce a reference to a string. 
+第三个函数解除了这些限制。它只要求用户传入一个可以产生对字符串的引用的类型，并且它只承诺返回值可以产生对字符串的引用。
 
-None of these function signatures is *better* than the others. If you need ownership of a string in the function, you can use the first argument type to avoid an extra string copy. If you want to allow the caller to take advan- tage of the case where an owned string was allocated and returned, the sec- ond function with a return type of Cow may be a good choice. Instead, what I want you to take away from this is that you should think carefully about what contract your interface binds you to, because changing it after the fact can be disruptive. 
+这些函数签名都不比其他函数签名“更好”。如果您需要函数中字符串的所有权，则可以使用第一个参数类型来避免额外的字符串复制。如果您希望允许调用者利用分配并返回自有字符串的情况，那么返回类型为 Cow 的第二个函数可能是一个不错的选择。相反，我希望您从中学到的是，您应该仔细考虑您的界面将您绑定到什么合同，因为事后更改它可能会造成破坏。
 
-In the remainder of this section I give examples of interface design decisions that often come up, and their implications for your interface contract. 
+在本节的其余部分中，我将给出经常出现的接口设计决策的示例，以及它们对接口契约的影响。
 
 ***Generic Arguments***
 
-One obvious requirement your interface must place on users is what types they must provide to your code. If your function explicitly takes a Foo, the user must own and give you a Foo. There is no way around it. In most cases it pays off to use generics rather than concrete types, to allow the caller to pass any type that conforms to what your function actually needs, rather than only a particular type. Changing &str in Listing 3-1 to impl AsRef<str> is an example of this kind of relaxing. One way to go about relaxing requirements this way is to start with the argument fully generic with no bounds, and then just follow the compiler errors to discover what bounds you need to add. 
+您的界面必须对用户提出的一项明显要求是他们必须向您的代码提供什么类型。如果您的函数显式接受 Foo，则用户必须拥有并给您一个 Foo。没有其他办法了。在大多数情况下，使用泛型而不是具体类型是值得的，以允许调用者传递符合函数实际需要的任何类型，而不仅仅是特定类型。将清单 3-1 中的 &str 更改为 impl AsRef<str> 就是这种放松的一个示例。以这种方式放宽要求的一种方法是从完全通用的参数开始，没有界限，然后按照编译器错误来发现需要添加的界限。
 
-However, if taken to the extreme, this approach would make every argu- ment to every function its own generic type, which would be both hard to read and hard to understand. There are no hard-and-fast rules for exactly when you should or should not make a given parameter generic, so use your best judgment. A good rule of thumb is to make an argument generic if you can think of other types a user might reasonably and frequently want to use instead of the concrete type you started with. 
+然而，如果走向极端，这种方法将使每个函数的每个参数都有自己的泛型类型，这既难以阅读又难以理解。对于何时应该或不应该使给定参数通用，没有硬性规则，因此请使用您的最佳判断。一个好的经验法则是，如果您可以想到用户可能合理且频繁地想要使用的其他类型，而不是您开始使用的具体类型，则使参数通用。
 
-You may remember from Chapter 2 that generic code is duplicated for every combination of types ever used with the generic code through mono- morphization. With that in mind, the idea of making lots of arguments generic might make you worried about overly enlarging your binaries. In Chapter 2 we also discussed how you can use dynamic dispatch to mitigate this at a (usually) negligible performance cost, and that applies here too. For arguments that you take by reference anyway (recall that dyn Trait is not Sized, and that you need a wide pointer to use them), you can easily replace your generic argument with one that uses dynamic dispatch. For instance, instead of impl AsRef<str>, you could take &dyn AsRef<str>. 
+您可能还记得第 2 章中的内容，通过单态化，对于曾经与泛型代码一起使用的每种类型组合，泛型代码都会重复。考虑到这一点，使大量参数通用的想法可能会让您担心过度扩大二进制文件。在第 2 章中，我们还讨论了如何使用动态调度以（通常）可以忽略不计的性能成本来缓解这种情况，这也适用于这里。对于无论如何都通过引用获取的参数（回想一下 dyn Trait 没有调整大小，并且您需要一个宽指针才能使用它们），您可以轻松地将通用参数替换为使用动态分派的参数。例如，您可以采用 &dyn AsRef<str>，而不是 impl AsRef<str>。
 
-Before you go running to do that, though, there are a few things you should consider. First, you are making this choice on behalf of your users, who cannot opt out of dynamic dispatch. If you know that the code you’re applying dynamic dispatch to will never be performance-sensitive, that may be fine. But if a user comes along who wants to use your library in their high-performance application, dynamic dispatch in a function that is called in a hot loop may be a deal breaker. Second, at the time of writing, using dynamic dispatch will work only when you have a simple trait bound like T: AsRef<str> or impl AsRef<str>. For more complex bounds, Rust does not know how to construct a dynamic dispatch vtable, so you cannot take, say, &dyn Hash + Eq. And finally, remember that with generics, the caller can always choose dynamic dispatch themselves by passing in a trait object. The reverse is not true: if you take a trait object, that is what the caller must provide. 
+不过，在你开始跑步之前，你应该考虑一些事情。首先，您是代表用户做出此选择，用户无法选择退出动态调度。如果您知道应用动态分派的代码永远不会对性能敏感，那可能没问题。但是，如果用户想要在其高性能应用程序中使用您的库，那么在热循环中调用的函数中进行动态分派可能会破坏交易。其次，在撰写本文时，仅当您有一个简单的特征绑定（如 T: AsRef<str> 或 impl AsRef<str>）时，使用动态分派才有效。对于更复杂的边界，Rust 不知道如何构造动态调度 vtable，因此您不能采用 &dyn Hash + Eq。最后，请记住，使用泛型时，调用者始终可以通过传入特征对象来选择动态分派。反之则不然：如果您采用特征对象，则调用者必须提供该特征对象。
 
-It may be tempting to start your interfaces off with concrete types and then turn them generic over time. This can work, but keep in mind that such changes are not necessarily backward compatible. To see why, imagine that you change a function from fn foo(v: &Vec<usize>) to fn foo(v: impl AsRef<[usize]>). While every &Vec<usize> implements AsRef<[usize]>, type inference can still cause issues for users. Consider what happens if the caller invokes foo with foo(&iter.collect()). In the original version, the com- piler could determine that it should collect into a Vec, but now it just knows that it needs to collect into some type that implements AsRef<[usize]>. And there could be multiple such types, so with this change, the caller’s code will no longer compile! 
+从具体类型开始你的界面，然后随着时间的推移将它们变成通用的，这可能很诱人。这可行，但请记住，此类更改不一定向后兼容。要了解原因，假设您将函数从 fn foo(v: &Vec<usize>) 更改为 fn foo(v: impl AsRef<[usize]>)。虽然每个 &Vec<usize> 都实现了 AsRef<[usize]>，但类型推断仍然会给用户带来问题。考虑一下如果调用者使用 foo(&iter.collect()) 调用 foo 会发生什么。在原始版本中，编译器可以确定它应该收集到 Vec 中，但现在它只知道它需要收集到实现 AsRef<[usize]> 的某种类型中。并且可能有多个这样的类型，因此通过此更改，调用者的代码将不再编译！
 
 ***Object Safety*** 
 
-When you define a new trait, whether or not that trait is object-safe (see the end of “Compilation and Dispatch” in Chapter 2) is an unwritten part of the trait’s contract. If the trait is object-safe, users can treat different types that implement your trait as a single common type using dyn Trait. If it isn’t, the compiler will disallow dyn Trait for that trait. You should prefer your traits to be object-safe even if that comes at a slight cost to the ergonomics of using them (such as taking impl AsRef<str> over &str), since object safety enables new ways to use your traits. If your trait must have a generic method, consider whether its generic parameters can be on the trait itself or if its generic arguments can also use dynamic dispatch to preserve the object safety of the trait. Alternatively, you can add a where Self: Sized trait bound to that method, which makes it possible to call the method only with a concrete instance of the trait (and not through dyn Trait). You can see examples of this pattern in the Iterator and Read traits, which are object-safe but provide some additional convenience methods on concrete instances. 
+当你定义一个新的特征时，该特征是否是对象安全的（参见第 2 章“编译和调度”的结尾）是该特征契约中不成文的一部分。如果特征是对象安全的，则用户可以使用 dyn Trait 将实现特征的不同类型视为单个常见类型。如果不是，编译器将不允许该特征使用 dyn Trait。您应该更喜欢您的特征是对象安全的，即使这会对使用它们的人体工程学造成轻微的损失（例如采用 impl AsRef<str> 而不是 &str），因为对象安全提供了使用您的特征的新方法。如果您的特征必须具有泛型方法，请考虑其泛型参数是否可以在特征本身上，或者其泛型参数是否也可以使用动态分派来保护特征的对象安全。或者，您可以添加一个绑定到该方法的 where Self: Sized 特征，这样就可以仅使用该特征的具体实例（而不是通过 dyn Trait）调用该方法。您可以在 Iterator 和 Read 特征中看到此模式的示例，它们是对象安全的，但在具体实例上提供了一些额外的便利方法。
 
-There is no single answer to the question of how many sacrifices you should be willing to make to preserve object safety. My recommendation is that you consider how your trait will be used, and whether it makes sense for users to want to use it as a trait object. If you think it’s likely that users will want to use many different instances of your trait together, you should work harder to provide object safety than if you don’t think that use case makes much sense. For example, dynamic dispatch would not be useful for the FromIterator trait because its one method does not take self, so you wouldn’t be able to construct a trait object in the first place. Similarly, std::io::Seek is fairly useless as a trait object on its own, because the only thing you would be able to do with such a trait object is seek, without being able to read or write. 
+对于您应该愿意做出多少牺牲来保护对象安全的问题，没有唯一的答案。我的建议是，您考虑如何使用您的特征，以及用户想要将其用作特征对象是否有意义。如果您认为用户可能想要一起使用您特征的许多不同实例，那么您应该比您认为该用例没有多大意义时更加努力地提供对象安全性。例如，动态分派对于 FromIterator 特征没有用，因为它的一个方法不接受 self，因此您无法首先构造特征对象。类似地， std::io::Seek 本身作为一个特征对象是相当无用的，因为你对这样的特征对象唯一能做的就是查找，而无法读取或写入。
 
 > **DROP TRAIT OBJECTS** 
 
->  You might think that the Drop trait is also useless as a trait object, since all
->  you can do with Drop as a trait object is to drop it . But it turns out there are some libraries that specifically just want to be able to drop arbitrary types . For example, a library that offers deferred dropping of values, such as for concur- rent garbage collection or just deferred cleanup, cares only that the values can be dropped, and nothing else . Interestingly enough, the story of Drop doesn’t end there; since Rust needs to be able to drop trait objects too, every vtable contains the drop method . Effectively, every dyn Trait is also a dyn Drop . 
+>  您可能认为 Drop 特征作为特征对象也是无用的，因为将 Drop 作为特征对象所能做的就是删除它。但事实证明，有一些库专门希望能够删除任意类型。例如，提供延迟删除值的库（例如并发垃圾收集或只是延迟清理）只关心可以删除值，而不关心其他任何事情。有趣的是，Drop 的故事并没有就此结束。由于 Rust 也需要能够删除特征对象，因此每个 vtable 都包含 drop 方法。实际上，每个 dyn Trait 也是一个 dyn Drop 。
 
-Remember that object safety is a part of your public interface! If you modify a trait in an otherwise backward compatible way, such as by adding a method with a default implementation, but it makes the trait not object-safe, you need to bump your major semantic version number. 
+请记住，对象安全是公共接口的一部分！如果您以向后兼容的方式修改特征，例如通过添加具有默认实现的方法，但它使特征不对象安全，则需要更改主要语义版本号。
 
 ***Borrowed vs. Owned***
 
-For nearly every function, trait, and type you define in Rust, you must decide whether it should own, or just hold a reference to, its data. Whatever decision you make will have far-reaching implications for the ergonomics and performance of your interface. Luckily, these decisions very often make themselves. 
+对于您在 Rust 中定义的几乎每个函数、特征和类型，您必须决定它是否应该拥有其数据，或者仅保留对其数据的引用。无论您做出什么决定，都会对界面的人体工程学和性能产生深远的影响。幸运的是，这些决定通常是自己做出的。
 
-If the code you write needs ownership of the data, such as to call methods that take self or to move the data to another thread, it must store the owned data. When your code must own data, it should generally also make the caller provide owned data, rather than taking values by reference and cloning them. This leaves the caller in control of allocation, and it is upfront about the cost of using the interface in question. 
+如果您编写的代码需要数据的所有权，例如调用采用 self 的方法或将数据移动到另一个线程，则它必须存储拥有的数据。当您的代码必须拥有数据时，它通常还应该让调用者提供拥有的数据，而不是通过引用获取值并克隆它们。这使得调用者可以控制分配，并且预先了解使用相关接口的成本。
 
-On the other hand, if your code doesn’t need to own the data, it should operate on references instead. One common exception to this rule is with small types like i32, bool, or f64, which are just as cheap to store and copy directly as to store through references. Be wary of assuming this holds true for all Copy types, though; [u8; 8192] is Copy, but it would be expensive to store and copy it all over the place. 
+另一方面，如果您的代码不需要拥有数据，则应该对引用进行操作。此规则的一个常见例外是 i32、bool 或 f64 等小型类型，直接存储和复制它们与通过引用存储一样便宜。不过，请谨慎假设这适用于所有 Copy 类型； [u8； 8192]是复制，但到处存储和复制它会很昂贵。
 
-Of course, in the real world, things are often less clear-cut. Sometimes, you don’t know in advance whether your code will need to own the data or not. For example, String::from_utf8_lossy needs to take ownership of the byte sequence that is passed to it only if it contains invalid UTF-8 sequences. In this case, the Cow type is your friend: it lets you operate on references if the data allows, and it lets you produce an owned value if necessary. 
+当然，在现实世界中，事情往往不太明确。有时，您事先并不知道您的代码是否需要拥有这些数据。例如，仅当 String::from_utf8_lossy 包含无效的 UTF-8 序列时，才需要获取传递给它的字节序列的所有权。在这种情况下，Cow 类型是您的朋友：如果数据允许，它允许您对引用进行操作，并且如果需要，它可以让您生成自有值。
 
-Other times, reference lifetimes complicate the interface so much that it becomes a pain to use. If your users are struggling to get code to compile on top of your interface, that’s a sign that you may want to (even unnecessarily) take ownership of certain pieces of data. If you do this, start with data that is cheap to clone or is not part of anything performance-sensitive before you decide to heap-allocate what might be a huge chunk of bytes. 
+其他时候，引用生命周期使界面变得非常复杂，以至于使用起来很痛苦。如果您的用户很难在您的界面上编译代码，则表明您可能想要（甚至不必要）拥有某些数据的所有权。如果您这样做，请从克隆成本低廉或不属于任何性能敏感内容的数据开始，然后再决定堆分配可能很大的字节块。
 
 ***Fallible and Blocking Destructors***
 
-Types centered on I/O often need to perform cleanup when they’re dropped. This may include flushing writes to disk, closing files, or gracefully terminat- ing connections to remote hosts. The natural place to perform this cleanup is in the type’s Drop implementation. Unfortunately, once a value is dropped, we no longer have a way to communicate errors to the user except by panick- ing. A similar problem arises in asynchronous code, where we wish to finish up when there is work pending. By the time drop is called, the executor may be shutting down, and we have no way to do more work. We could try to start another executor, but that comes with its own host of problems, such as blocking in asynchronous code, as we will see in Chapter 8. 
+以 I/O 为中心的类型在被删除时通常需要执行清理。这可能包括刷新磁盘写入、关闭文件或正常终止与远程主机的连接。执行此清理的自然位置是在类型的 Drop 实现中。不幸的是，一旦一个值被删除，我们就不再有办法向用户传达错误，除非恐慌。异步代码中也会出现类似的问题，我们希望在有待处理的工作时完成。当 drop 被调用时，执行器可能已经关闭，我们没有办法做更多的工作。我们可以尝试启动另一个执行器，但这会带来很多问题，例如异步代码中的阻塞，我们将在第 8 章中看到。
 
-There is no perfect solution to these problems, and no matter what we do, some applications will inevitably fall back to our Drop implementation. For that reason, we need to provide best-effort cleanup through Drop. If cleanup errors, at least we tried—we swallow the error and move on. If an executor is still available, we might spawn a future to do cleanup, but if it never gets to run, we did what we could. 
+这些问题没有完美的解决方案，无论我们做什么，一些应用程序都不可避免地会回退到我们的 Drop 实现。因此，我们需要通过 Drop 提供尽力清理。如果清理错误，至少我们尝试过——我们吞下错误并继续前进。如果执行器仍然可用，我们可能会生成一个 future 来进行清理，但如果它永远无法运行，我们就会尽力而为。
 
-However, we ought to provide a better alternative for users who wish to leave no loose threads. We can do this by providing an explicit destruc- tor. This usually takes the form of a method that takes ownership of self and exposes any errors (using -> Result<_, _>) or asynchrony (using async fn) that are inherent to the destruction. A careful user can then use that method to gracefully tear down any associated resources. 
+然而，我们应该为那些希望不留下松散线索的用户提供更好的选择。我们可以通过提供显式析构函数来做到这一点。这通常采用一种方法的形式，该方法获取 self 的所有权并公开破坏所固有的任何错误（使用 -> Result<_, _>）或异步（使用 async fn）。然后，细心的用户可以使用该方法来优雅地拆除任何关联的资源。
 
 *Make sure you highlight the explicit destructor in your documentation!* 
 
 As always, there’s a trade-off. The moment you add an explicit destruc- tor, you will run into two issues. First, since your type implements Drop, you can no longer move out of any of that type’s fields in the destructor. This is because Drop::drop will still be called after your explicit destructor runs, and it takes &mut self, which requires that no part of self has been moved. Second, drop takes &mut self, not self, so your Drop implementation cannot simply call your explicit destructor and ignore its result (because it doesn’t own self). There are a couple of ways around these problems, none of which are perfect. 
 
-The first is to make your top-level type a newtype wrapper around an Option, which in turn holds some inner type that holds all of the type’s fields. You can then use Option::take in both destructors, and call the inner type’s explicit destructor only if the inner type has not already been taken. Since the inner type does not implement Drop, you can take ownership of all the fields there. The downside of this approach is that all the methods you wish to provide on the top-level type must now include code to get through the Option (which you know is always Some since drop has not yet been called) to the fields on the inner type. 
+第一个是使您的顶级类型成为围绕 Option 的新类型包装器，该包装器又包含一些包含所有类型字段的内部类型。然后，您可以在两个析构函数中使用 Option::take，并且仅当尚未采用内部类型时才调用内部类型的显式析构函数。由于内部类型没有实现 Drop，因此您可以获得那里所有字段的所有权。这种方法的缺点是，您希望在顶级类型上提供的所有方法现在都必须包含通过 Option（您知道它始终是 Some，因为尚未调用 drop）到内部字段的代码。类型。
 
-The second workaround is to make each of your fields *takeable*. You can “take” an Option by replacing it with None (which is what Option::take does), but you can do this with many other types as well. For example, you can take a Vec or HashMap by simply replacing them with their cheap-to-construct default values—std::mem::take is your friend here. This approach works great if your types have sane “empty” values but gets tedious if you must wrap nearly every field in an Option and then modify every access of those fields with a matching unwrap. 
+第二种解决方法是使每个字段都“可使用”。您可以通过将 Option 替换为 None 来“采用”它（这就是 Option::take 的作用），但您也可以对许多其他类型执行此操作。例如，您可以通过简单地将 Vec 或 HashMap 替换为构造成本低的默认值来获取它们 - std::mem::take 是您的朋友。如果您的类型具有正常的“空”值，则此方法非常有效，但如果您必须将几乎每个字段包装在选项中，然后使用匹配的展开修改这些字段的每个访问，则该方法会变得乏味。
 
-The third option is to hold the data inside the ManuallyDrop type, which dereferences to the inner type, so there’s no need for unwraps. You can also use ManuallyDrop::take in drop to take ownership at destruction time. The pri- mary downside of this approach is that ManuallyDrop::take is unsafe. There are no safety mechanisms in place to ensure that you don’t try to use the value inside the ManuallyDrop after you’ve called take or that you don’t call take multiple times. If you do, your program will silently exhibit undefined behavior, and bad things will happen. 
+第三个选项是将数据保存在 ManuallyDrop 类型中，这会取消对内部类型的引用，因此不需要解包。您还可以使用 ManuallyDrop::take in drop 在销毁时获取所有权。这种方法的主要缺点是 ManuallyDrop::take 不安全。没有适当的安全机制来确保您在调用 take 后不会尝试使用 ManuallyDrop 中的值，或者不会多次调用 take 。如果你这样做，你的程序将默默地表现出未定义的行为，并且会发生不好的事情。
 
-Ultimately, you should choose whichever of these approaches fits your application best. I would err on the side of going with the second option, and switching to the others only if you find yourself in a sea of Options. The ManuallyDrop solution is excellent if the code is simple enough that you can eas- ily check the safety of your code, and you are confident in your ability to do so. 
+最终，您应该选择最适合您的应用程序的方法。我宁愿选择第二个选项，只有当你发现自己陷入了无数的选项时才切换到其他选项。如果代码足够简单，您可以轻松检查代码的安全性，并且您对自己执行此操作的能力充满信心，则 ManuallyDrop 解决方案非常出色。
 
 ### Obvious
 
-While some users may be familiar with aspects of the implementation that underpins your interface, they are unlikely to understand all of its rules and limitations. They won’t know that it’s never okay to call foo after calling bar, or that it’s only safe to call the unsafe method baz when the moon is at a 47-degree angle and no one has sneezed in the past 18 seconds. Only if the interface makes it clear that something strange is going on will they reach for the documentation or carefully read type signatures. It’s therefore criti- cal for you to make it as easy as possible for users to understand your inter- face and as hard as possible for them to use it incorrectly. The two primary techniques at your disposal for this are your documentation and the type system, so let’s look at each of those in turn. 
+虽然某些用户可能熟悉支撑界面的实现的各个方面，但他们不太可能理解其所有规则和限制。他们不会知道在调用 bar 之后再调用 foo 永远都不可以，或者只有当月亮处于 47 度角且过去 18 秒内没有人打喷嚏时调用不安全方法 baz 才是安全的。只有当界面清楚地表明发生了奇怪的事情时，他们才会查阅文档或仔细阅读类型签名。因此，让用户尽可能容易地理解你的界面，并尽可能防止他们错误地使用它，这一点至关重要。为此，您可以使用的两种主要技术是文档和类型系统，所以让我们依次看看这两种技术。
 
 **N O T E** *You can also take advantage of naming to suggest to the user when there’s more to an interface than meets the eye. If a user sees a method named* *dangerous**, chances are they will read its documentation.*
 
 ***Documentation***
 
-The first step to making your interfaces transparent is to write good docu- mentation. I could write an entire book dedicated to how to write documen- tation, but let’s focus on Rust-specific advice here. 
+使界面透明的第一步是编写良好的文档。我可以写一整本书专门讨论如何编写文档，但这里让我们重点关注 Rust 特定的建议。
 
-First, clearly document any cases where your code may do something unexpected, or where it relies on the user doing something beyond what’s dictated by the type signature. Panics are a good example of both of these circumstances: if your code can panic, document that fact, along with the circumstances it might panic under. Similarly, if your code might return an error, document the cases in which it does. For unsafe functions, document what the caller must guarantee in order for the call to be safe. 
+首先，清楚地记录代码可能执行意外操作或依赖用户执行超出类型签名规定的操作的任何情况。恐慌是这两种情况的一个很好的例子：如果您的代码可能发生恐慌，请记录该事实以及可能发生恐慌的情况。同样，如果您的代码可能返回错误，请记录错误的情况。对于不安全的函数，记录调用者必须保证什么才能保证调用安全。
 
-Second, include end-to-end usage examples for your code on a crate and module level. These are more important than examples for specific types or methods, since they give the user a feel for how everything fits together. With a decent high-level understanding of the interface’s struc- ture, the developer may soon realize what particular methods and types do and where they should be used. End-to-end examples also give the user a starting point for customizing their usage, and they can, and often will, copy-paste the example and then modify it to suit their needs. This kind of “learning by doing” tends to work better than having them try to piece something together from the components. 
+其次，在包和模块级别包含代码的端到端使用示例。这些比特定类型或方法的示例更重要，因为它们让用户了解所有内容如何组合在一起。通过对接口结构的深入了解，开发人员可能很快就会意识到特定方法和类型的作用以及它们应该在哪里使用。端到端示例还为用户提供了自定义其用法的起点，他们可以而且通常会复制粘贴示例，然后对其进行修改以满足自己的需求。这种“边做边学”往往比让他们尝试将各个组件拼凑在一起效果更好。
 
-**N O T E** *Very method-specific examples that show that, yes, the* *len* *method indeed returns the length are unlikely to tell the user anything new about your code.*
+**N O T E** *非常特定于方法的示例表明，是的，* *len* *方法确实返回长度，但不太可能告诉用户有关代码的任何新信息。*
 
-Third, organize your documentation. Having all your types, traits, and functions in a single top-level module makes it difficult for the user to get a sense of where to start. Take advantage of modules to group together semantically related items. Then, use intra-documentation links to interlink items. If the documentation on type A talks about trait B, then it should link to that trait right there. If you make it easy for the user to explore your interface, they are less likely to miss important connections or dependen- cies. Also consider marking parts of your interface that are not intended to be public but are needed for legacy reasons with #[doc(hidden)], so that they do not clutter up your documentation. 
+第三，整理你的文档。将所有类型、特征和函数放在一个顶级模块中会使用户很难了解从哪里开始。利用模块将语义相关的项目组合在一起。然后，使用文档内链接来互连项目。如果类型 A 的文档讨论了特征 B，那么它应该链接到该特征。如果您让用户能够轻松地探索您的界面，他们就不太可能错过重要的连接或依赖关系。还可以考虑使用 #[doc(hidden)] 标记界面中不打算公开但出于遗留原因需要的部分，这样它们就不会弄乱您的文档。
 
-And finally, enrich your documentation wherever possible. Link to external resources that explain concepts, data structures, algorithms, or other aspects of your interface that may have good explanations elsewhere. RFCs, blog posts, and whitepapers are great for this, if any are relevant. Use #[doc(cfg(..))] to highlight items that are available only under certain con- figurations so the user quickly realizes why some method that’s listed in the documentation isn’t available. Use #[doc(alias = "...")] to make types and methods discoverable under other names that users may search for them by. In the top-level documentation, point the user to commonly used modules, features, types, traits, and methods. 
+最后，尽可能丰富您的文档。链接到解释概念、数据结构、算法或界面其他方面的外部资源，这些资源在其他地方可能有很好的解释。 RFC、博客文章和白皮书（如果有的话）对此非常有用。使用 #[doc(cfg(..))] 突出显示仅在某些配置下可用的项目，以便用户快速意识到为什么文档中列出的某些方法不可用。使用 #[doc(alias = "...")] 使类型和方法可以在用户可以搜索的其他名称下发现。在顶级文档中，向用户指出常用的模块、功能、类型、特征和方法。
 
 ***Type System Guidance***
 
-The type system is an excellent tool to ensure that your interfaces are obvi- ous, self-documenting, and misuse-resistant. You have several techniques at your disposal that can make your interfaces very hard to misuse, and thus, make it more likely that they will be used correctly. 
+类型系统是一个出色的工具，可以确保您的界面明显、自记录且防误用。您可以使用多种技术来使您的界面很难被误用，从而使它们更有可能被正确使用。
 
-The first of these is *semantic typing*, in which you add types to repre- sent the *meaning* of a value, not just its primitive type. The classic example here is for Booleans: if your function takes three bool arguments, chances are some user will mess up the order of the values and realize it only after something has gone terribly wrong. If, on the other hand, it takes three arguments of distinct two-variant enum types, the user cannot get the order wrong without the compiler yelling at them: if they attempt to pass DryRun::Yes to the overwrite argument, that will simply not work, nor will passing Overwrite::No as the dry_run argument. You can apply semantic typ- ing beyond Booleans as well. For example, a newtype around a numeric type may provide a unit for the contained value, or it could constrain raw pointer arguments to only those that have been returned by another method. 
+第一个是“语义类型”，您可以在其中添加类型来表示值的“含义”，而不仅仅是其原始类型。这里的经典示例是布尔值：如果您的函数采用三个布尔参数，则某些用户很可能会弄乱值的顺序，并且只有在出现严重错误后才意识到这一点。另一方面，如果它采用不同的二变体枚举类型的三个参数，则用户不会在编译器不向他们大喊大叫的情况下弄错顺序：如果他们尝试将 DryRun::Yes 传递给覆盖参数，那只会简单地不起作用，也不会传递 Overwrite::No 作为 dry_run 参数。您还可以应用布尔值之外的语义类型。例如，数字类型周围的新类型可以为所包含的值提供单位，或者可以将原始指针参数限制为仅由其他方法返回的参数。
 
-A closely related technique is to use zero-sized types to indicate that a particular fact is true about an instance of a type. Consider, for instance, a type called Rocket that represents the state of a real rocket. Some operations (methods) on Rocket should be available no matter what state the rocket is in, but some make sense only in particular situations. It is, for example, impossible to launch a rocket if it has already been launched. Similarly, it should probably not be possible to separate the fuel tank if the rocket has not yet launched. We could model these as enum variants, but then all the methods would be available at every stage, and we’d need to introduce pos- sible panics. 
+一种密切相关的技术是使用零大小类型来指示关于类型实例的特定事实是正确的。例如，考虑一个名为 Rocket 的类型，它代表真实火箭的状态。无论火箭处于什么状态，Rocket 上的某些操作（方法）都应该可用，但有些操作仅在特定情况下才有意义。例如，如果火箭已经发射，就不可能再发射。同样，如果火箭尚未发射，则可能无法分离燃料箱。我们可以将它们建模为枚举变体，但是所有方法在每个阶段都可用，并且我们需要引入可能的恐慌。
 
-Instead, as shown in Listing 3-2, we can introduce a generic parameter on Rocket, Stage, and use it to restrict what methods are available when. 
+相反，如清单 3-2 所示，我们可以在 Rocket、Stage 上引入一个通用参数，并用它来限制哪些方法在何时可用。
 
 ```  rust
 1 struct Grounded;
@@ -193,25 +192,25 @@ Instead, as shown in Listing 3-2, we can introduce a generic parameter on Rocket
 } 
 ```
 
-*Listing 3-2: Using marker types to restrict implementations*
+*Listing 3-2: 使用标记类型来限制实现*
 
-We introduce unit types to represent each stage of the rocket 1. We don’t actually need to store the stage—only the meta-information it provides— so we store it behind a PhantomData 2 to guarantee that it is eliminated at compile time. Then, we write implementation blocks for Rocket only when it holds a particular type parameter. You can construct a rocket only on the ground (for now), and you can launch it only from the ground 3. Only when the rocket has been launched can you control its velocity 4. There are some things you can always do with the rocket, no matter what state it is in, and those we place in a generic implementation block 5. You’ll notice that with the interface designed this way, it’s simply not possible for the user to call a method at the wrong time—we have encoded the usage rules in the types themselves, and made illegal states *unrepresentable*. 
+我们引入单元类型来表示火箭 1 的每个阶段。我们实际上不需要存储该阶段，只需存储它提供的元信息，因此我们将其存储在 PhantomData 2 后面，以保证它在编译时被消除。然后，仅当 Rocket 包含特定类型参数时，我们才为 Rocket 编写实现块。你只能在地面上建造火箭（目前），并且你只能从地面发射它 3. 只有当火箭发射后你才能控制它的速度 4. 你总是可以用火箭做一些事情，无论它处于什么状态，以及我们将其放置在通用实现块中 5。您会注意到，通过以这种方式设计的接口，用户根本不可能在错误的时间调用方法 - 我们有将使用规则编码在类型本身中，并使非法状态“无法表示”。
 
-This notion extends to many other domains as well; if your function ignores a pointer argument unless a given Boolean argument is true, it’s better to combine the two arguments instead. With an enum type with one variant for false (and no pointer) and one variant for true that holds a pointer, neither the caller nor the implementer can misunderstand the rela- tionship between the two. This is a powerful idea that I highly encourage you to make use of. 
+这个概念也延伸到许多其他领域。如果你的函数忽略指针参数，除非给定的布尔参数为 true，那么最好将两个参数组合起来。对于具有一种 false 变体（并且没有指针）和一种保存指针的 true 变体的枚举类型，调用者和实现者都不会误解两者之间的关系。这是一个强大的想法，我强烈鼓励您使用。
 
-Another small but useful tool in making interfaces obvious is the #[must _use] annotation. Add it to any type, trait, or function, and the compiler will issue a warning if the user’s code receives an element of that type or trait, or calls that function, and does not explicitly handle it. You may already have seen this in the context of Result: if a function returns a Result and you do not assign its return value somewhere, you get a compiler warning. Be care- ful not to overuse this annotation, though—add it only if the user is very likely to make a mistake if they are not using the return value. 
+另一个使界面变得明显的小但有用的工具是 #[must _use] 注释。将其添加到任何类型、特征或函数，如果用户的代码接收到该类型或特征的元素，或者调用该函数，并且没有显式处理它，编译器将发出警告。您可能已经在 Result 的上下文中看到了这一点：如果函数返回 Result 并且您没有在某处分配其返回值，则会收到编译器警告。不过，请注意不要过度使用此注释，只有当用户不使用返回值很可能会犯错误时才添加它。
 
 ### Constrained
 
-Over time, some user will depend on every property of your interface, whether bug or feature. This is especially true for publicly available librar- ies where you have no control over your users. As a result, you should think carefully before you make user-visible changes. Whether you’re adding a new type, field, method, or trait implementation or changing an existing one, you want to make sure that the change will not break existing users’ code, and that you are planning to keep that change around for a while. Frequent backward incompatible changes (major version increases in semantic versioning) are sure to draw the ire of your users. 
+随着时间的推移，一些用户将依赖于界面的每个属性，无论是错误还是功能。对于您无法控制用户的公开库尤其如此。因此，在进行用户可见的更改之前，您应该仔细考虑。无论您是添加新的类型、字段、方法或特征实现还是更改现有的实现，您都希望确保更改不会破坏现有用户的代码，并且您计划在一段时间内保留该更改尽管。频繁的向后不兼容更改（语义版本控制中的主要版本增加）肯定会引起用户的愤怒。
 
-Many backward incompatible changes are obvious, like renaming a public type or removing a public method, but some are subtler and tie in deeply with the way Rust works. Here, we’ll cover some of the thornier subtle changes and how to plan for them. You’ll see that you need to bal- ance some of these against how flexible you want your interface to be— sometimes, something’s got to give. 
+许多向后不兼容的更改是显而易见的，例如重命名公共类型或删除公共方法，但有些更微妙，并且与 Rust 的工作方式密切相关。在这里，我们将介绍一些棘手的微妙变化以及如何规划它们。您会发现，您需要平衡其中一些因素与您希望界面的灵活性之间的关系——有时，必须做出一些让步。
 
 ***Type Modifications*** 
 
-Removing or renaming a public type will almost certainly break some user’s code. To counter this, you’ll want to take advantage of Rust’s visibility modi- fiers, like pub(crate) and pub(in path), whenever possible. The fewer public types you have, the more freedom you have to change things later without breaking existing code. 
+删除或重命名公共类型几乎肯定会破坏某些用户的代码。为了解决这个问题，您需要尽可能利用 Rust 的可见性修饰符，例如 pub(crate) 和 pub(in path)。公共类型越少，以后在不破坏现有代码的情况下进行更改的自由度就越大。
 
-User code can depend on your types in more ways than just by name, though. Consider the public type in Listing 3-3 and the given use of that code. 
+不过，用户代码可以通过更多方式依赖于您的类型，而不仅仅是名称。考虑清单 3-3 中的公共类型以及该代码的给定用法。
 
 ```
 // in your interface
@@ -236,17 +235,17 @@ fn is_true(u: lib::Unit) -> bool {
 
 *Listing 3-4: User code accessing a single public field*
 
-Here, too, adding a private field to Unit will break user code, this time because Rust’s exhaustive pattern match checking logic is able to see parts of the interface that the user cannot see. It recognizes that there are more fields, even though the user code cannot access them, and rejects the user’s pattern as incomplete. A similar issue arises if we turn a tuple struct into a regular struct with named fields: even if the fields themselves are exactly the same, any old patterns will no longer be valid for the new type definition. 
+在这里，向 Unit 添加私有字段也会破坏用户代码，这次是因为 Rust 详尽的模式匹配检查逻辑能够看到用户看不到的界面部分。它认识到存在更多字段，即使用户代码无法访问它们，并拒绝用户的模式不完整。如果我们将元组结构转换为具有命名字段的常规结构，就会出现类似的问题：即使字段本身完全相同，任何旧模式将不再对新类型定义有效。
 
-Rust provides the #[non_exhaustive] attribute to help mitigate these issues. You can add it to any type definition, and the compiler will disallow the use of implicit constructors (like lib::Unit { field1: true }) and non- exhaustive pattern matches (that is, patterns without a trailing , ..) on that type. This is a great attribute to add if you suspect that you’re likely to modify a particular type in the future. It does constrain user code though, such as by taking away users’ ability to rely on exhaustive pattern matches, so avoid adding it if you think a given type is likely to remain stable. 
+Rust 提供了 #[non_exhaustive] 属性来帮助缓解这些问题。您可以将其添加到任何类型定义中，编译器将不允许使用隐式构造函数（例如 lib::Unit { field1: true }）和非详尽模式匹配（即，没有尾随 , .. 的模式）那种类型。如果您怀疑将来可能会修改特定类型，那么这是一个很好的添加属性。不过，它确实限制了用户代码，例如剥夺了用户依赖详尽模式匹配的能力，因此如果您认为给定类型可能保持稳定，请避免添加它。
 
 ***Trait Implementations*** 
 
-As you’ll recall from Chapter 2, Rust’s coherence rules disallow multiple implementations of a given trait for a given type. Since we do not know what implementations downstream code may have added, adding a blanket implementation of an existing trait is generally a breaking change. The same holds true for implementing a foreign trait for an existing type, or an existing trait for a foreign type—in both cases, the owner of the foreign trait or type may simultaneously add a conflicting implementation, so this must be a breaking change. 
+正如您在第 2 章中所记得的那样，Rust 的一致性规则不允许给定类型的给定特征的多个实现。由于我们不知道下游代码可能添加了哪些实现，因此添加现有特征的全面实现通常是一个重大更改。对于现有类型的外部特征或外部类型的现有特征的实现也是如此 - 在这两种情况下，外部特征或类型的所有者可能会同时添加冲突的实现，因此这一定是一个重大更改。
 
-Removing a trait implementation is a breaking change, but implement- ing traits for a *new* type is never a problem, since no crate can have imple- mentations that conflict with that type. 
+删除特征实现是一个重大更改，但实现*新*类型的特征从来都不是问题，因为任何板条箱都不能具有与该类型冲突的实现。
 
-Perhaps counterintuitively, you also want to be careful about imple- menting *any* trait for an existing type. To see why, consider the code in Listing 3-5. 
+也许与直觉相反，您还需要小心地为现有类型实现 *any* 特征。要了解原因，请考虑清单 3-5 中的代码。
 
 ```rust
 // crate1 1.0 
@@ -264,15 +263,15 @@ fn main() {
 
 *Listing 3-5: Implementing a trait for an existing type may cause problems.*
 
-If you add impl Foo1 for Unit to crate1 without marking it a breaking change, the downstream code will suddenly stop compiling since the call to foo is now ambiguous. This can even apply to implementations of *new* public traits, if the downstream crate uses wildcard imports (use crate1::*). You will particularly want to keep this in mind if you provide a prelude module that you instruct users to use wildcard imports for. 
+如果将 Unit 的 impl Foo1 添加到 crate1 而不将其标记为重大更改，则下游代码将突然停止编译，因为对 foo 的调用现在不明确。如果下游 crate 使用通配符导入（使用 crate1::*），这甚至可以应用于 *new* 公共特征的实现。如果您提供一个指示用户使用通配符导入的前奏模块，您将特别要记住这一点。
 
-Most changes to existing traits are also breaking changes, such as changing a method signature or adding a new method. Changing a method signature breaks all implementations, and probably many uses, of the trait, whereas adding a new method “just” breaks all implementations. Adding a new method with a default implementation is fine though, since existing implementations will continue to apply. 
+对现有特征的大多数更改也是破坏性更改，例如更改方法签名或添加新方法。更改方法签名会破坏该特征的所有实现，甚至可能破坏该特征的许多使用，而添加新方法“只是”破坏所有实现。不过，添加具有默认实现的新方法是可以的，因为现有的实现将继续适用。
 
-I say “generally” and “most” here, because as interface authors, we have a tool available to us that lets us skirt some of these rules: *sealed traits*. A sealed trait is one that can be used only, and not implemented, by other crates. This immediately makes a number of breaking changes non-breaking. For example, you can add a new method to a sealed trait, since you know there are no implementations outside of the current crate to consider. Similarly, you can implement a sealed trait for new foreign types, since you know the foreign crate that defined that type cannot have added a conflicting implementation. 
+我在这里说“一般”和“大多数”，因为作为界面作者，我们有一个可用的工具可以让我们绕过其中一些规则：*密封特征*。密封特征是只能由其他板条箱使用而不能实现的特征。这立即使许多重大变更成为非重大变更。例如，您可以向密封特征添加新方法，因为您知道当前包之外没有实现需要考虑。类似地，您可以为新的外部类型实现密封特征，因为您知道定义该类型的外部包不能添加冲突的实现。
 
-Sealed traits are most commonly used for *derived* traits—traits that provide blanket implementations for types that implement particular other traits. You should seal a trait only if it does not make sense for a foreign crate to implement your trait; it severely restricts the usefulness of the trait, since downstream crates will no longer be able to implement it for their own types. You can also use sealed traits to restrict which types can be used as type arguments, such as restricting the Stage type in the Rocket example from Listing 3-2 to only the Grounded and Launched types. 
+密封特征最常用于“派生”特征，即为实现特定其他特征的类型提供全面实现的特征。仅当外国板条箱实现您的特征没有意义时，您才应该密封该特征；它严重限制了该特征的有用性，因为下游板条箱将不再能够为自己的类型实现它。您还可以使用密封特征来限制哪些类型可以用作类型参数，例如将清单 3-2 中的 Rocket 示例中的 Stage 类型限制为仅 Grounded 和 Launched 类型。
 
-Listing 3-6 shows how to seal a trait and how to then still add implemen- tations for it in the defining crate. 
+Listing 3-6 展示了如何密封一个特征以及如何在定义包中添加它的实现。
 
 ``` rust
 pub trait CanUseCannotImplement: sealed::Sealed 1 { .. } mod sealed { 
@@ -285,17 +284,17 @@ pub trait Sealed {}
 
 *Listing 3-6: How to seal a trait and add implementations for it*
 
-The trick is to add a private, empty trait as a supertrait of the trait you wish to seal 1. Since the supertrait is in a private module, other crates can- not reach it and thus cannot implement it. The sealed trait requires the underlying type to implement Sealed, so only the types that we explicitly allow 2 are able to ultimately implement the trait. 
+诀窍是添加一个私有的空特征作为您想要密封的特征的超级特征 1。由于超级特征位于私有模块中，其他 crate 无法访问它，因此无法实现它。 Sealed 特征需要底层类型来实现 Sealed，因此只有我们明确允许的类型 2 才能最终实现该特征。
 
-*If you do seal a trait this way, make sure you document that fact so that users do not get frustrated trying to implement the trait themselves!* 
+*如果您确实以这种方式密封了一个特征，请确保您记录了该事实，以便用户在尝试自己实现该特征时不会感到沮丧！*
 
 ***Hidden Contracts*** 
 
-Sometimes, changes you make to one part of your code affect the contract elsewhere in your interface in subtle ways. The two primary ways this hap- pens are through re-exports and auto-traits. 
+有时，您对代码的一部分所做的更改会以微妙的方式影响界面中其他地方的契约。发生这种情况的两种主要方式是通过再导出和自动特征。
 
 **Re-Exports** 
 
-If any part of your interface exposes foreign types, then any change to one of those foreign types is *also* a change to your interface. For example, consider what happens if you move to a new major version of a dependency and expose a type from that dependency as, say, an iterator type in your interface. A user that depends on your interface may also depend directly on that dependency and expect that the type your interface provides is the same as the one by the same name in that dependency. But if you change the major version of your dependency, that is no longer true even though the *name* of the type is the same. Listing 3-7 shows an example of this. 
+如果接口的任何部分公开了外部类型，那么对这些外部类型之一的任何更改也*也是对您的接口的更改。例如，考虑一下如果您迁移到依赖项的新主要版本并公开该依赖项中的类型（例如接口中的迭代器类型），会发生什么情况。依赖于您的接口的用户也可能直接依赖于该依赖项，并期望您的接口提供的类型与该依赖项中同名的类型相同。但是，如果您更改依赖项的主要版本，即使类型的*名称*相同，情况也不再如此。清单 3-7 显示了一个示例。
 
 ```
 // your crate: bestiter
@@ -305,31 +304,29 @@ struct EmptyIterator { it: itercrate::Empty<()> }
 EmptyIterator { it: bestiter::iter() }
 ```
 
-*Listing 3-7: Re-exports make foreign crates part of your interface contract.*
+*Listing 3-7: 再出口使外国板条箱成为您的接口合同的一部分。*
 
-Designing Interfaces **53** 
+如果您的板条箱从 itercrate 1.0 移至 itercrate 2.0 但其他方面没有更改，则此清单中的代码将不再编译。即使类型没有改变，编译器（正确地）认为 itercrate1.0::Empty 和 itercrate2.0::Empty 是*不同的*类型。因此，您不能将后者分配给前者，这使得这是界面中的重大更改。
 
-If your crate moves from itercrate 1.0 to itercrate 2.0 but otherwise does not change, the code in this listing will no longer compile. Even though no types have changed, the compiler believes (correctly) that itercrate1.0::Empty and itercrate2.0::Empty are *different* types. Therefore, you cannot assign the latter to the former, making this a breaking change in your interface. 
+为了缓解此类问题，通常最好使用 newtype 模式包装外部类型，然后仅公开您认为有用的外部类型部分。在许多情况下，您可以通过使用 impl Trait 只向调用者提供非常小的契约来完全避免 newtype 包装器。通过减少承诺，你可以减少破坏性的改变。
 
-To mitigate issues like this, it’s often best to wrap foreign types using the newtype pattern, and then expose only the parts of the foreign type that you think are useful. In many cases, you can avoid the newtype wrap- per altogether by using impl Trait to provide only the very minimal contract to the caller. By promising less, you make fewer changes breaking. 
-
-> **THE SEMVER TRICK** 
-
-> The itercrate example may have rubbed you the wrong way . If the Empty type did not change, then why does the compiler not allow anything that uses it to keep working, regardless of whether the code is using version 1 .0 or 2 .0 of it? The answer is  .  .  . complicated . It boils down to the fact that the Rust compiler does not assume that just because two types have the same fields, they are the same . To take a simple example of this, imagine that itercrate 2 .0 added a #[derive(Copy)] for Empty . Now, the type suddenly has different move seman- tics depending on whether you are using 1 .0 or 2 .0! And code written with one in mind won’t work with the other . 
-
-> This problem tends to crop up in large, widely used libraries, where over time, breaking changes are likely to have to happen somewhere in the crate . Unfortunately, semantic versioning happens at the crate level, not the type level, so a breaking change anywhere is a breaking change everywhere . 
-
-> But all is not lost . A few years ago, David Tolnay (the author of serde, among a vast number of other Rust contributions) came up with a neat trick to handle exactly this kind of situation . He called it “the semver trick .” The idea is simple: if some type T stays the same across a breaking change (from 1 .0 to 2 .0, say), then after releasing 2 .0, you can release a new 1 .0 minor version that depends on 2 .0 and replaces T with a re-export of T from 2 .0 . 
-
-> By doing this, you’re ensuring that there is in fact only a single type T across both major versions . This, in turn, means that any crate that depends on 1 .0 will be able to use a T from 2 .0, and vice versa . And because this happens only for types you explicitly opt into with this trick, changes that were in fact breaking will continue to be . 
+> **SEMVER 技巧**
+>
+> itercrate 示例可能让您感到不舒服。如果 Empty 类型没有改变，那么为什么编译器不允许任何使用它的东西继续工作，无论代码使用的是它的版本 1 .0 还是 2 .0 ？答案是  。 。 。复杂的 。归根结底，Rust 编译器不会仅仅因为两种类型具有相同的字段就认为它们是相同的。举一个简单的例子，假设 itercrate 2 .0 为 Empty 添加了 #[derive(Copy)] 。现在，该类型突然具有不同的移动语义，具体取决于您使用的是 1 .0 还是 2 .0！只考虑其中一个而编写的代码将无法与另一个一起使用。
+>
+> 这个问题往往会出现在大型、广泛使用的库中，随着时间的推移，可能会在板条箱中的某个地方发生重大更改。不幸的是，语义版本控制发生在包级别，而不是类型级别，因此任何地方的重大更改都是到处的重大更改。
+>
+> 但一切并没有失去。几年前，David Tolnay（serde 的作者，以及众多其他 Rust 贡献者）想出了一个巧妙的技巧来处理这种情况。他称之为“semver 技巧”。这个想法很简单：如果某些类型 T 在重大更改（例如从 1 .0 到 2 .0）中保持不变，那么在发布 2 .0 后，您可以发布一个依赖于 2 的新 1 .0 小版本.0 并用从 2 .0 重新导出的 T 替换 T。
+>
+> 通过这样做，您可以确保两个主要版本中实际上只有一个类型 T 。反过来，这意味着任何依赖于 1 .0 的 crate 都能够使用 2 .0 中的 T，反之亦然。而且由于这种情况仅发生在您使用此技巧明确选择的类型上，因此实际上破坏的更改将继续存在。
 
 **Auto-Traits** 
 
-Rust has a handful of traits that are automatically implemented for every type depending on what that type contains. The most relevant of these for this discussion are Send and Sync, though the Unpin, Sized, and UnwindSafe traits have similar issues. By their very nature, these add a hidden promise made by nearly every type in your interface. These traits even propagate through otherwise type-erased types like impl Trait. 
+Rust 有一些特征，根据类型包含的内容，自动为每种类型实现。其中与本次讨论最相关的是发送和同步，尽管 Unpin、Sized 和 UnwindSafe 特征也有类似的问题。就其本质而言，它们添加了界面中几乎每种类型所做出的隐藏承诺。这些特征甚至通过其他类型擦除的类型（如 impl Trait）传播。
 
-Implementations for these traits are (generally) automatically added by the compiler, but that also means that they are *not* automatically added if they no longer apply. So, if you have a public type A that contains a private type B, and you change B so that it is no longer Send, then A is now *also* not Send. That is a breaking change! 
+这些特征的实现（通常）由编译器自动添加，但这也意味着如果它们不再适用，它们*不会*自动添加。因此，如果您有一个包含私有类型 B 的公共类型 A，并且您更改了 B，使其不再是 Send，那么 A 现在 *也* 不是 Send。这是一个突破性的改变！
 
-These changes can be hard to keep track of and are often not discov- ered until a user of your interface complains that their code no longer works. To catch these cases before they happen, it’s good practice to include some simple tests in your test suite that check that all your types implement these traits the way you expect. Listing 3-8 gives an example of what such a test might look like. 
+这些更改可能很难跟踪，并且通常不会被发现，直到您的界面的用户抱怨他们的代码不再工作。为了在这些情况发生之前捕获它们，最好在测试套件中包含一些简单的测试，以检查所有类型是否按照您期望的方式实现这些特征。清单 3-8 给出了此类测试的示例。
 
 ```
 fn is_normal<T: Sized + Send + Sync + Unpin>() {}
@@ -339,14 +336,14 @@ fn normal_types() {
 }
 ```
 
-*Listing 3-8: Testing that a type implements a set of traits*
+*Listing 3-8: 测试类型是否实现一组特征*
 
-Notice that this test does not run any code, but simply tests that the code compiles. If MyType no longer implements Sync, the test code will not compile, and you will know that the change you just made broke the auto- trait implementation. 
+请注意，此测试不运行任何代码，而只是测试代码是否可以编译。如果 MyType 不再实现 Sync，则测试代码将无法编译，并且您将知道刚刚所做的更改破坏了 autotrait 实现。
 
-> **HIDING ITEMS FROM DOCUMENTATION** 
+> **隐藏文档中的项目**
 
-> The #[doc(hidden)] attribute lets you hide a public item from your documentation without making it inaccessible to code that happens to know it is there . This is often used to expose methods and types that are needed by macros, but not by user code . How such hidden items interact with your interface contract is a matter of some debate . In general, items marked as #[doc(hidden)] are only considered part of your contract insofar as their public effects; for example, if user code may end up containing a hidden type, then whether that type is Send or not is part of the contract, whereas its name is not . Hidden inherent methods and hidden trait methods on sealed traits are not generally part of your interface contract, though you should make sure to state this clearly in the documentation for those methods . And yes, hidden items should still be documented! 
+> #[doc(hidden)] 属性允许您从文档中隐藏公共项目，而不会使碰巧知道它存在的代码无法访问它。这通常用于公开宏所需的方法和类型，但用户代码不需要。这些隐藏项目如何与您的界面合约交互是一个有争议的问题。一般来说，标记为 #[doc(hidden)] 的项目仅在其公共效果方面被视为合同的一部分；例如，如果用户代码最终可能包含隐藏类型，则该类型是否为 Send 是契约的一部分，而其名称则不是。隐藏的固有方法和密封特征上的隐藏特征方法通常不是接口契约的一部分，尽管您应该确保在这些方法的文档中清楚地说明这一点。是的，隐藏的项目仍然应该记录下来！
 
 ## Summary
 
-In this chapter we’ve explored the many facets of designing a Rust inter- face, whether it’s intended for external use or just as an abstraction boundary between the different modules within your crate. We covered a lot of specific pitfalls and tricks, but ultimately, the high-level principles are what should guide your thinking: your interfaces should be unsurprising, flexible, obvious, and constrained. In the next chapter, we will dig into how to represent and handle errors in Rust code. 
+在本章中，我们探讨了设计 Rust 接口的许多方面，无论它是供外部使用还是只是作为板条箱内不同模块之间的抽象边界。我们讨论了许多具体的陷阱和技巧，但最终，高级原则应该指导您的思考：您的界面应该是毫不奇怪的、灵活的、明显的和受约束的。在下一章中，我们将深入研究如何表示和处理 Rust 代码中的错误。
