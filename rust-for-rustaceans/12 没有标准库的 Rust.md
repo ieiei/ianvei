@@ -4,7 +4,7 @@ In this chapter, we’ll take a look at how you can use Rust in unorthodox envir
 
 Rust’s alloc module, the Rust runtime (yes, Rust does technically have a runtime), and some of the tricks you have to play to write up a Rust binary for use in such an environment. 
 
-### Opting Out of the Standard Library
+## Opting Out of the Standard Library
 
 As a language, Rust consists of multiple independent pieces. First there’s the compiler, which dictates the grammar of the Rust language and imple- ments type checking, borrow checking, and the final conversion into machine-runnable code. Then there’s the standard library, std, which implements all the useful common functionality that most programs need—things like file and network access, a notion of time, facilities for printing and reading user input, and so on. But std itself is also a compos- ite, building on top of two other, more fundamental libraries called core and alloc. In fact, many of the types and functions in std are just re-exports from those two libraries. 
 
@@ -23,7 +23,7 @@ However, that is *all* the #![no_std] attribute does—it does not prevent you f
 **N O T E** *Since features should be additive, prefer an* *std**-enabling feature to an* *std**-disabling one. Otherwise, if* any *crate in a consumer’s dependency graph enables the no-**std* *feature,* all *consumers will be given access only to the bare-bones API without* *std* *sup- port, which may then mean that APIs they depend on aren’t available, causing them to no longer compile.* 
 
 > **THE PRELUDE** 
-
+>
 > Have you ever wondered why there are some types and traits—like Box, Iterator, Option, and Clone—that are available in every Rust file without you needing to use them? Or why you don’t need to use any of the macros in the standard library (like vec![])? The reason is that every Rust module automatically imports the Rust standard prelude with an implicit use std::prelude::rust_2021::* (or similar for other editions), which brings all the exports from the crate’s chosen edition’s prelude into scope . The prelude modules themselves aren’t special beyond this auto-inclusion—they are merely collections of pub use statements for key types, traits, and macros that the Rust developers expect to be commonly used . 
 
 ### Dynamic Memory Allocation
@@ -38,7 +38,7 @@ In environments without an operating system, the standard C library is also gene
 
 It might strike you as odd that it’s possible to write nontrivial crates that use *only* core. After all, they can’t use collections, the String type, the net- work, or the filesystem, and they don’t even have a notion of time! The trick to core-only crates is to utilize the stack and static allocations. For example, for a heapless vector, you allocate enough memory up front—either in static memory or in a function’s stack frame—for the largest number of elements you expect the vector to be able to hold, and then augment it with a usize that tracks how many elements it currently holds. To push to the vector, you write to the next element in the (statically sized) array and increment a variable that tracks the number of elements. If the vector’s length ever reaches the static size, the next push fails. Listing 12-1 gives an example of such a heapless vector type implemented using const generics. 
 
-```
+``` rust
  struct ArrayVec<T, const N: usize> {
 	 values: [Option<T>; N],
 	 len: usize,
@@ -51,7 +51,8 @@ It might strike you as odd that it’s possible to write nontrivial crates that 
 		 self.values[self.len] = Some(t);
 		 self.len += 1;
 		 return Ok(());
- }} 
+	 }
+ } 
 ```
 
 
@@ -126,27 +127,29 @@ pub struct On;
 pub struct Off;
 pub struct Pair<R1, R2>(PhantomData<(R1, R2)>);
 impl Pair<Off, Off> {
-pub fn get() -> Option<Self> {
-                    static mut PAIR_TAKEN: bool = false;
-                     if unsafe { PAIR_TAKEN } {
-                     None } else { 
-					  // Ensure initial state is correct.
-                         registers::off("r1");
-                         registers::off("r2");
-                         unsafe { PAIR_TAKEN = true };
-                         Some(Pair(PhantomData))
-                    }}
-                     pub fn first_on(self) -> Pair<On, Off> {
-	                     registers::set_on("r1");
-	                     Pair(PhantomData)
-	                    // .. and inverse for -> Pair<Off, On>
-             }
-             impl Pair<On, Off> {
-                 pub fn off(self) -> Pair<Off, Off> {
-                     registers::set_off("r1");
-                     Pair(PhantomData)
-                }} 
-                // .. and inverse for Pair<Off, On>
+	pub fn get() -> Option<Self> {
+		static mut PAIR_TAKEN: bool = false;
+		 if unsafe { PAIR_TAKEN } {
+		 None 
+	 } else { 
+		  // Ensure initial state is correct.
+			 registers::off("r1");
+			 registers::off("r2");
+			 unsafe { PAIR_TAKEN = true };
+			 Some(Pair(PhantomData))
+		}}
+		 pub fn first_on(self) -> Pair<On, Off> {
+			 registers::set_on("r1");
+			 Pair(PhantomData)
+			// .. and inverse for -> Pair<Off, On>
+ }
+ impl Pair<On, Off> {
+	 pub fn off(self) -> Pair<Off, Off> {
+		 registers::set_off("r1");
+		 Pair(PhantomData)
+	}
+} 
+// .. and inverse for Pair<Off, On>
 ```
 
 *Listing 12-2: Statically ensuring correct operation*
@@ -175,7 +178,7 @@ The target platform also dictates what components of the standard library are av
 
 > If your target is not supported by the Rust compiler—that is, if rustc doesn’t even know about your target triple—you’ll have to go one step further and teach rustc about the properties of the triple using a custom target specification . How you do that is both currently unstable and beyond the scope of this book, but a search for “custom target specification json” is a good place to start . 
 
-## Summary
+## 总结
 
 In this chapter, we’ve covered what lies beneath the standard library—or, more precisely, beneath std. We’ve gone over what you get with core, how you can extend your non-std reach with alloc, and what the (tiny) Rust runtime adds to your programs to make fn main work. We’ve also taken a look at how you can interact with device-mapped memory and otherwise handle the unorthodox execution patterns that can happen at the very lowest level of hardware programming, and how to safely encapsulate at least some of the oddities of hardware in the Rust type system. Next, we’ll move from the very small to the very large by discussing how to navigate, understand, and maybe even contribute to the larger Rust ecosystem. 
 

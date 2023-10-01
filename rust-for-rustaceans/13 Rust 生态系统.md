@@ -3,7 +3,7 @@ Programming rarely happens in a vacuum these days—nearly every Rust crate you 
 
 In this brave new interdependent world, it’s more important than ever to have a solid grasp of what libraries and tools are available and to stay up to date on the latest and greatest of what the Rust community has to offer. This chapter is dedicated to how you can leverage, track, understand, and contribute back to the Rust ecosystem. Since this is the final chapter, in the closing section I’ll also provide some suggestions of additional resources you can explore to continue developing your Rust skills. 
 
-### What’s Out There?
+## What’s Out There?
 
 Despite its relative youth, Rust already has an ecosystem large enough that it’s hard to keep track of everything that’s available. If you know what you want, you may be able to search your way to a set of appropriate crates and then use download statistics and superficial vibe-checks on each crate’s repository to determine which may make for reasonable dependencies. However, there’s also a plethora of tools, crates, and general language features that you might not necessarily know to look for that could potentially save you countless hours and difficult design decisions. 
 
@@ -397,7 +397,7 @@ My experience has been that the best way to learn something well and thoroughly,
 
 *Whether you’re looking to teach or be taught, make sure to visit Awesome Rust Mentors (*https://rustbeginners.github.io/awesome-rust-mentors/*).* 
 
-## Summary
+## 总结
 
 In this chapter, we’ve covered Rust beyond what exists in your local work- space. We surveyed useful tools, libraries, and Rust features; looked at how to stay up to date as the ecosystem continues to evolve; and then discussed how you can get your hands dirty and contribute back to the ecosystem yourself. Finally, we discussed where you can go next to continue your Rust journey now that this book has reached its end. And with that, there’s little more to do than to declare: 
 ``` rust
