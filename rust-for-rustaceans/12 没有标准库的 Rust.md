@@ -26,7 +26,7 @@ However, that is *all* the #![no_std] attribute does—it does not prevent you f
 >
 > Have you ever wondered why there are some types and traits—like Box, Iterator, Option, and Clone—that are available in every Rust file without you needing to use them? Or why you don’t need to use any of the macros in the standard library (like vec![])? The reason is that every Rust module automatically imports the Rust standard prelude with an implicit use std::prelude::rust_2021::* (or similar for other editions), which brings all the exports from the crate’s chosen edition’s prelude into scope . The prelude modules themselves aren’t special beyond this auto-inclusion—they are merely collections of pub use statements for key types, traits, and macros that the Rust developers expect to be commonly used . 
 
-### Dynamic Memory Allocation
+## Dynamic Memory Allocation
 
 As we discussed in Chapter 1, a machine has many different regions of memory, and each one serves a distinct purpose. There’s static memory for your program code and static variables, there’s the stack for function-local variables and function arguments, and there’s the heap for, well, every- thing else. The heap supports allocating variably sized regions of memory at runtime, and those allocations stick around for however long you want them to. This makes heap memory extremely versatile, and as a result, you find it used everywhere. Vec, String, Arc and Rc, and the collection types are all implemented in heap memory, which allows them to grow and shrink over time and to be returned from functions without the borrow checker complaining. 
 
@@ -62,11 +62,11 @@ We make ArrayVec generic over both the type of its elements, T, and the maximum 
 
 **NOTE** *We could have implemented* *ArrayVec* *using* *[MaybeUninit; N]* *to avoid the over- head of the* *Option**, but that would require using unsafe code, which isn’t warranted for this example.* 
 
-### The Rust Runtime
+## The Rust Runtime
 
 You may have heard the claim that Rust doesn’t have a runtime. While that’s true at a high level—it doesn’t have a garbage collector, an inter- preter, or a built-in user-level scheduler—it’s not really true in the strictest sense. Specifically, Rust does have some special code that runs before your main function and in response to certain special conditions in your code, which really is a form of bare-bones runtime. 
 
-**The Panic Handler** 
+### *The Panic Handler*
 
 The first bit of such special code is Rust’s *panic handler*. When Rust code panics by invoking panic! or panic_any, the panic handler dictates what happens next. When the Rust runtime is available—as is the case on most targets that supply std—the panic handler first invokes the *panic hook* set via std::panic::set_hook, which prints a message and optionally a backtrace to standard error by default. It then either unwinds the current thread’s stack or aborts the process, depending on the panic setting chosen for cur- rent compilation (either through Cargo configuration or arguments passed directly to rustc). 
 
@@ -74,7 +74,7 @@ However, not all targets provide a panic handler. For example, most embedded tar
 
 There are many valid ways for a panic handler to avoid returning. The standard panic handler unwinds the thread’s stack and then terminates the thread, but a panic handler can also halt the thread using loop {}, abort the program, or do anything else that makes sense for the target platform, even as far as resetting the device. 
 
-***Program Initialization***
+### *Program Initialization*
 
 Contrary to popular belief, the main function is not the first thing that runs in a Rust program. Instead, the main symbol in a Rust binary actually points to a function in the standard library called lang_start. That function per- forms the (fairly minimal) setup for the Rust runtime, including stashing the program’s command-line arguments in a place where std::env::args can get to them, setting the name of the main thread, handling panics in the main function, flushing standard output on program exit, and setting up signal handlers. The lang_start function in turn calls the main function defined in your crate, which then doesn’t need to think about how, for example, Windows and Linux differ in how command-line arguments are passed in. 
 
@@ -82,7 +82,7 @@ This arrangement works well on platforms where all of that setup is sensible and
 
 **NOTE** *On platforms that truly run no code before they jump to the defined start symbol, like most embedded devices, the initial values of static variables may not even match what’s specified in the source code. In such cases, your initialization function will need to explicitly initialize the various static memory segments with the initial data values specified in your program binary.* 
 
-**The Out-of-Memory Handler** 
+### *The Out-of-Memory Handler*
 
 If you write a program that wishes to use alloc but is built for a platform that does not supply an allocator, you must dictate which allocator to use using the #[global_allocator] attribute mentioned earlier in the chapter. But you also have to specify what happens if that global allocator fails to allocate memory. Specifically, you need to define an *out-of-memory handler* to say what should happen if an infallible operation like Vec::push needs to allocate more memory, but the allocator cannot supply it. 
 
@@ -90,7 +90,7 @@ The default behavior of the out-of-memory handler on std-enabled platforms is to
 
 **N O T E** *By the time you read this, the out-of-memory handler may already have been stabilized under a permanent name (**#[alloc_error_handler]**, most likely). Work is also under- way to give the default* *std* *out-of-memory handler the same kind of “hook” function- ality as Rust’s panic handler, so that code can change the out-of-memory behavior on the fly through a method like* *set_alloc_error_hook**.* 
 
-### Low-Level Memory Accesses
+## Low-Level Memory Accesses
 
 In Chapter 10, we discussed the fact that the compiler is given a fair amount of leeway in how it turns your program statements into machine instructions, and that the CPU is allowed some wiggle room to execute instructions out of order. Normally, the shortcuts and optimizations that the compiler and CPU can take advantage of are invisible to the semantics of the program—you can’t generally tell whether, say, two reads have been reordered relative to each other or whether two reads from the same memory location actually result in two CPU load instructions. This is by design. The language and hardware designers carefully specified what semantics programmers commonly expect from their code when it runs so that your code generally does what you expect it to. 
 
@@ -105,12 +105,12 @@ To deal with these exceptional situations, Rust provides *volatile* memory opera
 **N O T E** *There is also a* *std::sync::atomic::compiler_fence* *function that prevents the compiler from reordering non-volatile memory accesses. You’ll very rarely need a compiler fence, but its documentation is an interesting read.* 
 
 > **INCLUDING ASSEMBLY CODE** 
-
+> 
 > These days, you rarely need to drop down to writing assembly code to accomplish any given task . But for low-level hardware programming where you need to initialize CPUs at boot or issue strange instructions to manipulate memory mappings, assembly code is still sometimes required . At the time of writing, there is an RFC and a mostly complete implementation of inline assembly syntax on nightly Rust, but nothing has been stabilized yet, so I won’t discuss the syntax in this book . 
-
+> 
 > It’s still possible to write assembly on stable Rust—you just need to get a lit- tle creative . Specifically, remember build scripts from Chapter 11? Well, Cargo build scripts can emit certain special directives to standard output to augment Cargo’s standard build process, including cargo:rustc-link-lib=static=*xyz\* to link the static library file libxyz.a into the final binary, and cargo:rustc-link- search:*/some/path* to add /some/path to the search path for link objects . Using those, we can add a build.rs to the project that compiles a standalone assembly file (.s) to an object file (.o) using the target platform’s compiler and then repackages it into a static archive (.a) using the appropriate archiving tool (usually ar) . The project then emits those two Cargo directives, pointing at where it placed the static archive—probably in OUT_DIR—and we’re off to the races! If the target platform doesn’t change, you can even include the precompiled .a when publishing your crate so that consumers don’t need to rebuild it . 
 
-### Misuse-Resistant Hardware Abstraction
+## Misuse-Resistant Hardware Abstraction
 
 Rust’s type system excels at encapsulating unsafe, hairy, and otherwise unpleasant code behind safe, ergonomic interfaces. Nowhere is that more important than in the infamously complex world of low-level systems programming, littered with magic hardware-defined values pulled from obscure manuals and mysterious undocumented assembly instruction incantations to get devices into just the right state. And all that in a space where a runtime error might crash more than just a user program! 
 
@@ -133,15 +133,16 @@ impl Pair<Off, Off> {
 		 None 
 	 } else { 
 		  // Ensure initial state is correct.
-			 registers::off("r1");
-			 registers::off("r2");
-			 unsafe { PAIR_TAKEN = true };
-			 Some(Pair(PhantomData))
-		}}
-		 pub fn first_on(self) -> Pair<On, Off> {
-			 registers::set_on("r1");
-			 Pair(PhantomData)
-			// .. and inverse for -> Pair<Off, On>
+		 registers::off("r1");
+		 registers::off("r2");
+		 unsafe { PAIR_TAKEN = true };
+		 Some(Pair(PhantomData))
+	}
+}
+ pub fn first_on(self) -> Pair<On, Off> {
+	 registers::set_on("r1");
+	 Pair(PhantomData)
+	// .. and inverse for -> Pair<Off, On>
  }
  impl Pair<On, Off> {
 	 pub fn off(self) -> Pair<Off, Off> {
@@ -158,7 +159,7 @@ There are a few noteworthy patterns in this code. The first is that we ensure on
 
 The second noteworthy pattern in Listing 12-2 is that we use PhantomData to take advantage of zero-sized types and represent runtime information statically. That is, at any given point in the code the types tell us what the runtime state *must* be, and therefore we don’t need to track or check any state related to the registers at runtime. There’s no need to check that r2 isn’t already on when we’re asked to enable r1, since the types prevent writ- ing a program in which that is the case. 
 
-### Cross-Compilation
+## Cross-Compilation
 
 Usually, you’ll write no_std programs on a computer with a full-fledged operating system running and all the niceties of modern hardware, but ultimately run it on a dinky hardware device with 93/4 bits of RAM and a sock for a CPU. That calls for *cross-compilation*—you need to compile the code in your development environment, but compile it *for* the sock. That’s not the only context in which cross-compilation is important, though. For example, it’s increasingly common to have one build pipeline produce binary artifacts for all consumer platforms rather than trying to have a build pipe- line for every platform your consumers may be using, and that means using cross-compilation. 
 
@@ -173,9 +174,9 @@ To tell Cargo to cross-compile, you simply pass it the --target <*target triple*
 The target platform also dictates what components of the standard library are available. For example, while x86_64-unknown-linux-gnu includes the full std library, something like thumbv7m-none-eabi does no, and doesn’t even define an allocator, so if you use alloc without defining one explicitly, you’ll get a build error. This comes in handy for testing that code you write *actually* doesn’t require std (recall that even with #![no_std] you can still have use std::, since no_std opts out of only the std prelude). If you have your continuous integration pipeline build your crate with --target thumbv7m-none-eabi, any attempt to access components from anything but core will trigger a build failure. Crucially, this will also check that your crate doesn’t accidentally bring in dependencies that themselves use items from std (or alloc). 
 
 > **PLATFORM SUPPORT** 
-
+> 
 > The standard Rust installer, Rustup, doesn’t install the standard library for all the target triples that Rust supports by default . That would be a waste of space and bandwidth . Instead, you have to use the command rustup target add to install the appropriate standard library versions for additional targets . If no version of the standard library exists for your target platform, you’ll have to compile it from source yourself by adding the rust-src Rustup component and using Cargo’s (currently unstable) build-std feature to also build std (and/or core and alloc) when building any crate . 
-
+> 
 > If your target is not supported by the Rust compiler—that is, if rustc doesn’t even know about your target triple—you’ll have to go one step further and teach rustc about the properties of the triple using a custom target specification . How you do that is both currently unstable and beyond the scope of this book, but a search for “custom target specification json” is a good place to start . 
 
 ## 总结

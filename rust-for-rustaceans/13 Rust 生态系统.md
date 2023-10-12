@@ -9,149 +9,115 @@ Despite its relative youth, Rust already has an ecosystem large enough that it�
 
 In this section, I’ll go through some of the tools, libraries, and Rust features I have found helpful over the years in the hopes that they may come in useful for you at some point too! 
 
-***Tools***
+### *Tools*
 
 First off, here are some Rust tools I find myself using regularly that you should add to your toolbelt: 
 
-```rust
-cargo-deny
-```
+**cargo-deny**
+
 
 Provides a way to lint your dependency graph. At the time of writing, you can use cargo-deny to allow only certain licenses, deny-list crates or specific crate versions, detect dependencies with known vulnerabilities or that use Git sources, and detect crates that appear multiple times with different versions in the dependency graph. By the time you’re reading this, there may be even more handy lints in place. 
 
-```
-cargo-expand
-```
+**cargo-expand**
+
 
 Expands macros in a given crate and lets you inspect the output, which makes it much easier to spot mistakes deep down in macro transcribers or procedural macros. cargo-expand is an invaluable tool when you’re writing your own macros. 
 
-```rust
-cargo-hack
-```
+**cargo-hack**
 
 Helps you check that your crate works with any combination of features enabled. The tool presents an interface similar to that of Cargo itself (like cargo check, build, and test) but gives you the ability to run a given command with all possible combinations (the *powerset*) of the crate’s features. 
 
-```
-cargo-llvm-lines
-```
+**cargo-llvm-lines**
 
 Analyzes the mapping from Rust code to the intermediate representation (IR) that’s passed to the part of the Rust compiler that actually generates machine code (LLVM), and tells you which bits of Rust code produce the largest IR. This is useful because a larger IR means longer compile times, so identifying what Rust code generates a bigger IR (due to, for example, monomorphization) can highlight opportunities for reducing compile times. 
 
-```
-cargo-outdated
-```
+**cargo-outdated**
 
 Checks whether any of your dependencies, either direct or transitive, have newer versions available. Crucially, unlike cargo update, it even tells you about new major versions, so it’s an essential tool for check- ing if you’re missing out on newer versions due to an outdated major version specifier. Just keep in mind that bumping the major version of a dependency may be a breaking change for your crate if you expose that dependency’s types in your interface! 
 
-```rust
-cargo-udeps
-```
+**cargo-udeps**
 
 Identifies any dependencies listed in your *Cargo.toml* that are never actually used. Maybe you used them in the past but they’ve since become redundant, or maybe they should be moved to dev-dependencies; what- ever the case, this tool helps you trim down bloat in your dependency closure. 
 
 While they’re not specifically tools for developing Rust, I highly recommend fd and ripgrep too—they’re excellent improvements over their predecessors find and grep and also happen to be written in Rust themselves. I use both every day. 
 
-**Libraries** 
+### *Libraries*
 
 Next up are some useful but lesser-known crates that I reach for regularly, and that I suspect I will continue to depend on for a long time: 
 
-```rust
-bytes
-```
+**bytes**
 
 Provides an efficient mechanism for passing around subslices of a single piece of contiguous memory without having to copy or deal with lifetimes. This is great in low-level networking code where you may need multiple views into a single chunk of bytes, and copying is a no-no. 
 
-```rust
-criterion
-```
+**criterion**
 
 A statistics-driven benchmarking library that uses math to eliminate noise from benchmark measurements and reliably detect changes in performance over time. You should almost certainly be using it if you’re including micro-benchmarks in your crate. 
 
-```
-cxx
-```
+**cxx**
 
 Provides a safe and ergonomic mechanism for calling C++ code from Rust and Rust code from C++. If you’re willing to invest some time into declaring your interfaces more thoroughly in advance in exchange for much nicer cross-language compatibility, this library is well worth your attention. 
 
-```
-flume
-```
+**flume**
 
-Implements a multi-producer, multi-consumer channel that is faster, more flexible, and simpler than the one included with the Rust stan- dard library. It also supports both asynchronous and synchronous oper- ation and so is a great bridge between those two worlds. 
+Implements a multi-producer, multi-consumer channel that is faster, more flexible, and simpler than the one included with the Rust stan- dard library. It also supports both asynchronous and synchronous operation and so is a great bridge between those two worlds. 
 
-```
-hdrhistogram
-```
+**hdrhistogram**
 
 A Rust port of the High Dynamic Range (HDR) histogram data structure, which provides a compact representation of histograms across a wide range of values. Anywhere you currently track averages or min/ max values, you should most likely be using an HDR histogram instead; it can give you much better insight into the distribution of your metrics. 
 
-```
-heapless
-```
+**heapless**
 
 Supplies data structures that do not use the heap. Instead, heapless’s data structures are all backed by static memory, which makes them perfect for embedded contexts or other situations in which allocation is undesirable. 
 
-```rust
-itertools
-```
+**itertools**
 
 Extends the Iterator trait from the standard library with lots of new convenient methods for deduplication, grouping, and computing pow- ersets. These extension methods can significantly reduce boilerplate in code, such as where you manually implement some common algorithm over a sequence of values, like finding the min and max at the same time (Itertools::minmax), or where you use a common pattern like check- ing that an iterator has exactly one item (Itertools::exactly_one). 
 
-```
-nix
-```
+**nix**
 
 Provides idiomatic bindings to system calls on Unix-like systems, which allows for a much better experience than trying to cobble together the C-compatible FFI types yourself when working with something like libc directly. 
 
-```
-pin-project
-```
+**pin-project**
+
 
 Provides macros that enforce the pinning safety invariants for anno- tated types, which in turn provide a safe pinning interface to those types. This allows you to avoid most of the hassle of getting Pin and Unpin right for your own types. There’s also pin-project-lite, which avoids the (currently) somewhat heavy dependency on the procedural macro machinery at the cost of slightly worse ergonomics. 
 
-```
-ring
-```
+**ring**
 
 Takes the good parts from the cryptography library BoringSSL, written in C, and brings them to Rust through a fast, simple, and hard-to-misuse interface. It’s a great starting point if you need to use cryptography in your crate. You’ve already most likely come across this in the rustls library, which uses ring to provide a modern, secure-by-default TLS stack. 
 
-```
-slab
-```
+**slab**
 
 Implements an efficient data structure to use in place of HashMap<Token, T>, where Token is an opaque type used only to differentiate between entries in the map. This kind of pattern comes up a lot when managing resources, where the set of current resources must be managed centrally but indi- vidual resources must also be accessible somehow. 
 
-```
-static_assertions
-```
+
+**static_assertions**
 
 Provides static assertions—that is, assertions that are evaluated at, and thus may fail at, compile time. You can use it to assert things like that a type implements a given trait (like Send) or is of a given size. I highly recommend adding these kinds of assertions for code where those guarantees are likely to be important. 
 
-```
-structopt
-```
+
+**structopt**
+
 
 Wraps the well-known argument parsing library clap and provides a way to describe your application’s command line interface entirely using the Rust type system (plus macro annotations). When you parse your appli- cation’s arguments, you get a value of the type you defined, and you thus get all the type checking benefits, like exhaustive matching and IDE auto-complete. 
 
-```
-thiserror
-```
+**thiserror**
+
 
 Makes writing custom enumerated error types, like the ones we discussed in Chapter 4, a joy. It takes care of implementing the recommended traits and following the established conventions and leaves you to define just the critical bits that are unique to your application. 
 
-```
-tower
-```
+**tower**
+
 
 Effectively takes the function signature async fn(Request) -> Response and implements an entire ecosystem on top of it. At its core is the Service trait, which represents a type that can turn a request into a response (something I suspect may make its way into the standard library one day). This is a great abstraction to build anything that looks like a ser- vice on top of. 
 
-```
-tracing
-```
+
+**tracing**
+
 
 Provides all the plumbing needed to efficiently trace the execution of your applications. Crucially, it is agnostic to the types of events you’re tracing and what you want to do with those events. This library can be used for logging, metrics collection, debugging, profiling, and obviously tracing, all with the same machinery and interfaces. 
 
-***Rust Tooling***
+### *Rust Tooling*
 
 The Rust toolchain has a few features up its sleeve that you may not know to look for. These are usually for very specific use cases, but if they match yours, they can be lifesavers! 
 
@@ -183,7 +149,7 @@ is immensely valuable when trying to determine the source of unexpected time spe
 
 If your profiling samples look weird, with stack frames reordered or entirely missing, you could also try -Cforce-frame-pointers = yes. Frame point- ers provide a more reliable way to unwind the stack—which is done a lot during profiling—at the cost of an extra register being used for function calls. Even though stack unwinding *should* work fine with just regular debug symbols enabled (remember to set debug = true when using the release pro- file), that’s not always the case, and frame pointers may take care of any issues you do encounter. 
 
-***The Standard Library***
+### *The Standard Library*
 
 The Rust standard library is generally considered to be small compared to those of other programming languages, but what it lacks in breadth, it makes up for in depth; you won’t find a web server implementation or an X.509 certificate parser in Rust’s standard library, but you will find more than 40 different methods on the Option type alongside over 20 trait implementations. For the types it does include, Rust does its best to make avail- able any relevant functionality that meaningfully improves ergonomics, so you avoid all that verbose boilerplate that can so easily arise otherwise. In this section, I’ll present some types, macros, functions, and methods from the standard library that you may not have come across before, but that can often simplify or improve (or both) your code. 
 
@@ -212,7 +178,7 @@ Listing 13-1: A representation of a combined input/output type that requires all
 
 Now imagine two methods: get_entity takes an EntityIdentifier as an argument, and find_by returns an EntityIdentifier based on some search parameters. The get_entity method requires only a reference since the identifier will (presumably) be serialized before being sent to the server. But for find_by, the entity will be deserialized from the server response and must therefore be represented as an owned value. If we make get_entity take &EntityIdentifier, it will mean callers must still allocate owned Strings to call get_entity even though that’s not required by the interface, since it’s required to construct an EntityIdentifier in the first place! We could instead introduce a separate type for get_entity, EntityIdenifierRef, that holds only &str types, but then we’d have two types to represent one thing. Cow to the rescue! Listing 13-2 shows an EntityIdentifier that instead holds Cows internally. 
 
-```
+``` rust
 struct EntityIdentifier<'a> {
     namespace: Cow<'a, str>,
     name: Cow<'a str>,
@@ -247,11 +213,11 @@ The **Clone::clone_from** method is an alternative form of .clone() that lets yo
 
 **Vec::swap_remove** is Vec::remove’s faster twin. Vec::remove preserves the order of the vector, which means that to remove an element in the middle, it must shift all the later elements in the vector down by one. This can be very slow for large vectors. Vec::swap_remove, on the other hand, swaps the to-be-removed element with the last element and then truncates the vector’s length by one, which is a constant-time operation. Be aware, though, that it will shuffle your vector around and thus invalidate old indexes! 
 
-### Patterns in the Wild
+## Patterns in the Wild
 
 As you start exploring codebases that aren’t your own, you’ll likely come across a couple of common Rust patterns that we haven’t discussed in the book so far. Knowing about them will make it easier to recognize them, and thus understand their purpose, when you do encounter them. You may even find use for them in your own codebase one day! 
 
-**Index Pointers** 
+### *Index Pointers*
 
 Index pointers allow you to store multiple references to data within a data structure without running afoul of the borrow checker. For example, if you want to store a collection of data so that it can be efficiently accessed in more than one way, such as by keeping one HashMap keyed by one field and one keyed by a different field, you don’t want to store the underlying data multiple times too. You could use Arc or Rc, but they use dynamic reference counting that introduces unnecessary overhead, and the extra bookkeeping requires you to store additional bytes per entry. You could use references, but the lifetimes become difficult if not impossible to manage because the data and the references live in the same data structure (it’s a self-referential data structure, as we discussed in Chapter 8). You could use raw pointers combined with Pin to ensure the pointers remain valid, but that introduces a lot of complexity as well as unsafety you then need to carefully consider. 
 
@@ -263,13 +229,13 @@ The petgraph crate, which implements graph data structures and algo- rithms, als
 
 The trick lies in how you support deletions. To delete a data entry, you first need to search for its index in all of the derived data structures and remove the corresponding entries, and then you need to remove the data from the root data store. If the root data store is a Vec, removing the entry will also change the index of one other data entry (when using swap_remove), so you then need to go update all the derived data structures to reflect the new index for the entry that moved. 
 
-**Drop Guards** 
+### *Drop Guards*
 
 Drop guards provide a simple but reliable way to ensure that a bit of code runs even in the presence of panics, which is often essential in unsafe code. An example is a function that takes a closure f: FnOnce and executes it under mutual exclusion using atomics. Say the function uses compare_exchange (dis- cussed in Chapter 10) to set a Boolean from false to true, calls f, and then sets the Boolean back to false to end the mutual exclusion. But consider what happens if f panics—the function will never get to run its cleanup, and no other call will be able to enter the mutual exclusion section ever again. 
 
 It’s possible to work around this using catch_unwind, but drop guards provide an alternative that is often more ergonomic. Listing 13-3 shows how, in our current example, we can use a drop guard to ensure the Boolean always gets reset. 
 
-```
+``` rust
 fn mutex(lock: &AtomicBool, f: impl FnOnce()) {
     // .. while lock.compare_exchange(false, true).is_err() ..
     struct DropGuard<'a>(&'a AtomicBool);
@@ -293,7 +259,7 @@ This pattern is frequently used in conjunction with thread locals, when library 
 
 **N O T E**  *You’ll often see* *Cell* *or* *Rc* *used in thread locals. This is because thread locals are accessible only through shared references, since a thread might access a thread local again that it is already referencing somewhere higher up in the call stack. Both types provide interior mutability without incurring much overhead because they’re intended only for single-threaded use, and so are ideal for this use case.* 
 
-**Extension Traits** 
+### *Extension Traits*
 
 Extension traits allow crates to provide additional functionality to types that implement a trait from a different crate. For example, the itertools crate provides an extension trait for Iterator, which adds a number of con- venient shortcuts for common (and not so common) iterator operations. As another example, tower provides ServiceExt, which adds several more ergo- nomic operations to wrap the low-level interface in the Service trait from tower-service. 
 
@@ -301,7 +267,7 @@ Extension traits tend to be useful either when you do not control the base trait
 
 An extension trait extends the base trait it is an extension of (trait ServiceExt: Service) and consists solely of provided methods. It also comes with a blanket implementation for any T that implements the base trait (impl<T> ServiceExt for T where T: Service {}). Together, these conditions ensure that the extension trait’s methods are available on anything that implements the base trait. 
 
-***Crate Predules***
+### *Crate Predules*
 
 In Chapter 12, we talked about the standard library prelude that makes a number of types and traits automatically available without you having to write any use statements. Along similar lines, crates that export multiple types, traits, or functions that you’ll often use together sometimes define their own prelude in the form of a module called prelude, which re-exports some particularly common subset of those types, traits, and functions. There’s nothing magical about that module name, and it doesn’t get used automatically, but it serves as a signal to users that they likely want to add use *somecrate*::prelude::* to files that want to use the crate in question. The * is a *glob import* and tells Rust to use all publicly available items from the indicated module. This can save quite a bit of typing when the crate has a lot of items you’ll usually need to name. 
 
@@ -309,7 +275,7 @@ In Chapter 12, we talked about the standard library prelude that makes a number 
 
 Preludes are also great for crates that expose a lot of extension traits, since trait methods can be called only if the trait that defines them is in scope. For example, the diesel crate, which provides ergonomic access to relational databases, makes extensive use of extension traits so you can write code like: 
 
-```
+``` rust
 posts.filter(published.eq(true)).limit(5).load::<Post>(&connection)
 ```
 
@@ -319,7 +285,7 @@ In general, you should be careful when adding glob imports to your code, as they
 
 Specifically in the case of preludes, using glob imports is usually fine when recommended by the vending crate, since its maintainers know that their users will use glob imports for the prelude module and thus will take that into account when deciding whether a change requires a major version bump. 
 
-### Staying Up to Date
+## Staying Up to Date
 
 Rust, being such a young language, is evolving rapidly. The language itself, the standard library, the tooling, and the broader ecosystem are all still in their infancy, and new developments happen every day. While staying on top of all the changes would be infeasible, it’s worth your time to keep up with significant developments so that you can take advantage of the latest and greatest features in your projects. 
 
@@ -337,13 +303,13 @@ A great single location for staying up to date with ongoing developments is the 
 
 **N O T E** *Want to look up when a particular feature landed on stable? Can I Use... (*https://caniuse.rs/*) has you covered.* 
 
-### What Next?
+## What Next?
 
 So, you’ve read this book front to back, absorbed all the knowledge it imparts, and are still hungry for more? Great! There are a number of other excellent resources out there for broadening and deepening your knowledge and understanding of Rust, and in this very final section I’ll give you a survey of some of my favorites so that you can keep learning. I’ve divided them into subsections based on how different people prefer to learn so that you can find resources that’ll work for you. 
 
 **N O T E** *A challenge with learning on your own, especially in the beginning, is that progress is hard to perceive. Implementing even the simplest of things can take an outsized amount of time when you have to constantly refer to documentation and other resources, ask for help, or debug to learn how some aspect of Rust works. All of that non-coding work can make it seem like you’re treading water and not really improv- ing. But you’re* learning*, which is progress in and of itself—it’s just harder to notice and appreciate.* 
 
-**Learn by Watching** 
+### *Learn by Watching*
 
 Watching experienced developers code is essentially a life hack to remedy the slow starting phase of solo learning. It allows you to observe the pro- cess of designing and building while utilizing someone else’s experience. Listening to experienced developers articulate their thinking and explain tricky concepts or techniques as they come up can be an excellent alter- native to struggling through problems on your own. You’ll also pick up a variety of auxiliary knowledge like debugging techniques, design patterns, and best practices. Eventually you will have to sit down and do things your- self—it’s the only way to check that you actually understand what you’ve observed—but piggybacking on the experience of others will almost certainly make the early stages more pleasant. And if the experience is interactive, that’s even better! 
 
@@ -361,7 +327,7 @@ Ryan Levick’s channel: *https://www.youtube.com/c/RyanLevicksVideos/*. Ryan ma
 
 Given that I make Rust videos, it should come as no surprise that I am a fan of this approach to teaching. But this kind of receptive or interactive learning doesn’t have to come in the form of videos. Another great avenue for learning from experienced developers is pair programming. If you have a colleague or friend with expertise in a particular aspect of Rust you’d like to learn, ask if you can do a pair-programming session with them to solve a problem together! 
 
-***Learn by Doing***
+### *Learn by Doing*
 
 Since your ultimate goal is to get better at writing Rust, there’s no substitute for programming experience. No matter what or how many resources you learn from, you need to put that learning into practice. However, finding a good place to start can be tricky, so here I’ll give some suggestions. 
 
@@ -373,7 +339,7 @@ If that’s not your cup of tea, I recommend finding something you use frequentl
 
 Should you be more of a “build it from scratch” kind of person, I recommend looking back at your own development experience so far and thinking about similar code you’ve ended up writing in multiple projects (whether in Rust or in other languages). Such repetition tends to be a good signal that something is reusable and could be turned into a library. If nothing comes to mind, David Tolnay maintains a list of smaller utility crates that other Rust developers have requested at *https://github.com/dtolnay/request-for- implementation/* that may provide a source of inspiration. If you’re looking for something more substantial and ambitious, there’s also the Not Yet Awesome list at *https://github.com/not-yet-awesome-rust/not-yet-awesome-rust/* that lists things that should exist in Rust but don’t (yet). 
 
-***Learn by Reading***
+### *Learn by Reading*
 
 Although the state of affairs is constantly improving, finding good Rust reading material beyond the beginner level can still be tricky. Here’s a collection of pointers to some of my favorite resources that continue to teach me new things or serve as good references when I have particularly niche or nuanced questions. 
 
@@ -391,7 +357,7 @@ When you feel more confident in your Rust abilities and need more of a quick ref
 
 And finally, if you want to put all of your Rust understanding to the test, go give David Tolnay’s *Rust Quiz* (*https://dtolnay.github.io/rust-quiz/*) a try. There are some real mind-benders in there, but each question comes with a thorough explanation of what’s going on, so even if you get one wrong, you’ll have learned from the experience! 
 
-***Learn by Teaching***
+### *Learn by Teaching*
 
 My experience has been that the best way to learn something well and thoroughly, by far, is to try to teach it to others. I have learned an enormous amount from writing this book, and I learn new things every time I make a new Rust video or podcast episode. So, I wholeheartedly recommend that you try your hand at teaching others about some of the things you’ve learned from reading this book or that you learn from here on out. It can take whatever form you prefer: in person, writing a blog post, tweet- ing, making a video or podcast, or giving a talk. The important thing is that you try to convey your newfound knowledge in your own words to someone who doesn’t already understand the topic—in doing so, you also give back to the community so that the next you that comes along has a slightly easier time getting up to speed. Teaching is a humbling and deeply educational experience, and I cannot recommend it highly enough. 
 
