@@ -1,0 +1,1 @@
+spark 除了通过spark-submit原生提交，还可以通过 **[spark-on-k8s-operator](https://github.com/GoogleCloudPlatform/spark-on-k8s-operator)** 管理，该解决方案是谷歌云提供

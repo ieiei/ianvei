@@ -234,19 +234,19 @@ PCollection<KV<Team, Integer>> totals = input
 
 - 处理乱序数据
 
-  由于网站流量和广告印象数据来自不同的系统，这两个系统本身都是作为分布式收集服务实现的，因此数据可能会出现乱序。因此，我们的管道必须能够抵御这种混乱。
+    由于网站流量和广告印象数据来自不同的系统，这两个系统本身都是作为分布式收集服务实现的，因此数据可能会出现乱序。因此，我们的管道必须能够抵御这种混乱。
 
 - 处理大量数据
 
-  我们不仅必须假设此管道将为大量独立用户处理数据，而且根据给定广告活动的数量和给定网站的受欢迎程度，我们可能需要存储大量印象和/或流量数据，因为我们试图建立归因证据。例如，存储每个用户 90 天的访问、印象和目标树[^5] 数据，以便我们建立跨越多个月活动价值的归因，这并非闻所未闻.
+    我们不仅必须假设此管道将为大量独立用户处理数据，而且根据给定广告活动的数量和给定网站的受欢迎程度，我们可能需要存储大量印象和/或流量数据，因为我们试图建立归因证据。例如，存储每个用户 90 天的访问、印象和目标树[^5] 数据，以便我们建立跨越多个月活动价值的归因，这并非闻所未闻.
 
 - 防止垃圾邮件
 
-  鉴于涉及金钱，正确性至关重要。我们不仅必须确保访问次数和展示次数只计算一次（通过简单地使用支持一次有效处理的执行引擎，我们或多或少地免费获得一些东西），而且我们还必须保护我们的广告商免受垃圾邮件攻击试图不公平地向广告商收费。例如，同一用户连续多次点击的单个广告将作为多次展示到达，但只要这些点击发生在彼此的一定时间内（例如，在同一天），它们只能归因一次。换句话说，即使系统保证我们会看到每个单独的*印象*一次，我们也必须对技术上不同的事件但我们的业务逻辑要求我们将其解释为重复的印象执行一些手动重复数据删除。
+    鉴于涉及金钱，正确性至关重要。我们不仅必须确保访问次数和展示次数只计算一次（通过简单地使用支持一次有效处理的执行引擎，我们或多或少地免费获得一些东西），而且我们还必须保护我们的广告商免受垃圾邮件攻击试图不公平地向广告商收费。例如，同一用户连续多次点击的单个广告将作为多次展示到达，但只要这些点击发生在彼此的一定时间内（例如，在同一天），它们只能归因一次。换句话说，即使系统保证我们会看到每个单独的*印象*一次，我们也必须对技术上不同的事件但我们的业务逻辑要求我们将其解释为重复的印象执行一些手动重复数据删除。
 
 - 优化性能
 
-  最重要的是，由于这条管道的潜在规模，我们必须始终关注优化管道的性能。由于写入持久存储的固有成本，持久状态通常可能成为此类管道中的性能瓶颈。因此，我们之前讨论的灵活性特征对于确保我们的设计尽可能高性能至关重要。
+    最重要的是，由于这条管道的潜在规模，我们必须始终关注优化管道的性能。由于写入持久存储的固有成本，持久状态通常可能成为此类管道中的性能瓶颈。因此，我们之前讨论的灵活性特征对于确保我们的设计尽可能高性能至关重要。
 
 ### 使用 Apache Beam 进行转换归因
 
@@ -491,15 +491,15 @@ public void processElement(
 
 - 数据结构的灵活性
 
-  我们有地图、集合、值和计时器。它们使我们能够以对我们的算法有效的方式有效地操纵我们的状态。
+    我们有地图、集合、值和计时器。它们使我们能够以对我们的算法有效的方式有效地操纵我们的状态。
 
 - 写入和读取粒度的灵活性
 
-  我们处理的每一次访问和印象都会调用我们的`@ProcessElement` 方法。因此，我们需要它尽可能高效。我们利用了对我们需要的特定字段进行细粒度、盲写的能力。我们也只在遇到新目标的罕见情况下从我们的 `@ProcessElement` 方法中读取状态。当我们这样做时，我们只读取一个整数值，而不涉及（可能更大的）映射和列表。
+    我们处理的每一次访问和印象都会调用我们的`@ProcessElement` 方法。因此，我们需要它尽可能高效。我们利用了对我们需要的特定字段进行细粒度、盲写的能力。我们也只在遇到新目标的罕见情况下从我们的 `@ProcessElement` 方法中读取状态。当我们这样做时，我们只读取一个整数值，而不涉及（可能更大的）映射和列表。
 
 - 处理调度的灵活性
 
-  多亏了计时器，我们能够延迟我们复杂的目标归因逻辑（接下来定义），直到我们确信我们已经收到了所有必要的输入数据，从而最大限度地减少重复工作并最大限度地提高效率。
+    多亏了计时器，我们能够延迟我们复杂的目标归因逻辑（接下来定义），直到我们确信我们已经收到了所有必要的输入数据，从而最大限度地减少重复工作并最大限度地提高效率。
 
 定义了核心处理逻辑之后，现在让我们看看我们的最后一段代码，即目标归因方法。此方法使用 `@TimerId` 注释进行注释，以将其标识为在相应的归因计时器触发时要执行的代码。这里的逻辑比 `@ProcessElement` 方法要复杂得多：
 
@@ -529,19 +529,19 @@ private Impression attributeGoal(Visit goal,
             visit.referer(), visit.url());
         LOG.info("attributeGoal: visit={} sourceAndTarget={}",
                  visit, sourceAndTarget);
-	if (impressions.containsKey(sourceAndTarget)) {
-	    LOG.info("attributeGoal: impression={}", impression);
-	    // Walked entire path back to impression. Return success.
-	    return impressions.get(sourceAndTarget);
-	} else if (visits.containsKey(visit.referer())) {
-	    // Found another visit in the path, continue searching.
-	    visit = visits.get(visit.referer());
-	    trail.add(0, visit);
-	} else {
-	    LOG.info("attributeGoal: not found");
-	    // Referer not found, trail has gone cold. Return failure.
-	    return null;
-	}
+		if (impressions.containsKey(sourceAndTarget)) {
+		    LOG.info("attributeGoal: impression={}", impression);
+		    // Walked entire path back to impression. Return success.
+		    return impressions.get(sourceAndTarget);
+		} else if (visits.containsKey(visit.referer())) {
+		    // Found another visit in the path, continue searching.
+		    visit = visits.get(visit.referer());
+		    trail.add(0, visit);
+		} else {
+		    LOG.info("attributeGoal: not found");
+		    // Referer not found, trail has gone cold. Return failure.
+		    return null;
+		}
     }
 }
 
@@ -585,19 +585,19 @@ public void attributeGoal(
     List<Visit> trail = new ArrayList<>();
     Impression impression = attributeGoal(goal, visits, impressions, trail);
     if (impression != null) {
-	output.output(new Attribution(impression, trail, goal));
-	impressions.remove(impression.sourceAndTarget());
+		output.output(new Attribution(impression, trail, goal));
+		impressions.remove(impression.sourceAndTarget());
     }
     goalsState.remove(goal);
 
     // Set the next timer, if any.
     Instant minGoal = minTimestamp(goals, goal);
     if (minGoal != null) {
-	LOG.info("Setting new timer at {}", Utils.formatTime(minGoal));
-	minGoalState.write(minGoal);
-	attributionTimer.set(minGoal);
+		LOG.info("Setting new timer at {}", Utils.formatTime(minGoal));
+		minGoalState.write(minGoal);
+		attributionTimer.set(minGoal);
     } else {
-	minGoalState.clear();
+		minGoalState.clear();
     }
 }
 ```
@@ -617,67 +617,67 @@ public void attributeGoal(
 
 *示例 7-10。用于验证转化归因逻辑的示例数据集*
 
-```
+``` java
 private static TestStream<KV<String, VisitOrImpression>> createStream() {
     // Impressions and visits, in event-time order, for two (logical) attributable
     // impressions and one unattributable impression.
     Impression signupImpression = new Impression(
-	123L, "http://search.com?q=xyz",
-	"http://xyz.com/", Utils.parseTime("12:01:00"));
+		123L, "http://search.com?q=xyz",
+		"http://xyz.com/", Utils.parseTime("12:01:00"));
     Visit signupVisit = new Visit(
-	"http://xyz.com/", Utils.parseTime("12:01:10"),
-	"http://search.com?q=xyz", false/*isGoal*/);
+		"http://xyz.com/", Utils.parseTime("12:01:10"),
+		"http://search.com?q=xyz", false/*isGoal*/);
     Visit signupGoal = new Visit(
-	"http://xyz.com/join-mailing-list", Utils.parseTime("12:01:30"),
-	"http://xyz.com/", true/*isGoal*/);
+		"http://xyz.com/join-mailing-list", Utils.parseTime("12:01:30"),
+		"http://xyz.com/", true/*isGoal*/);
 
     Impression shoppingImpression = new Impression(
-	456L, "http://search.com?q=thing",
-	"http://xyz.com/thing", Utils.parseTime("12:02:00"));
+		456L, "http://search.com?q=thing",
+		"http://xyz.com/thing", Utils.parseTime("12:02:00"));
     Impression shoppingImpressionDup = new Impression(
-	789L, "http://search.com?q=thing",
-	"http://xyz.com/thing", Utils.parseTime("12:02:10"));
+		789L, "http://search.com?q=thing",
+		"http://xyz.com/thing", Utils.parseTime("12:02:10"));
     Visit shoppingVisit1 = new Visit(
-	"http://xyz.com/thing", Utils.parseTime("12:02:30"),
-	"http://search.com?q=thing", false/*isGoal*/);
+		"http://xyz.com/thing", Utils.parseTime("12:02:30"),
+		"http://search.com?q=thing", false/*isGoal*/);
     Visit shoppingVisit2 = new Visit(
-	"http://xyz.com/thing/add-to-cart", Utils.parseTime("12:03:00"),
-	"http://xyz.com/thing", false/*isGoal*/);
+		"http://xyz.com/thing/add-to-cart", Utils.parseTime("12:03:00"),
+		"http://xyz.com/thing", false/*isGoal*/);
     Visit shoppingVisit3 = new Visit(
-	"http://xyz.com/thing/purchase", Utils.parseTime("12:03:20"),
-	"http://xyz.com/thing/add-to-cart", false/*isGoal*/);
+		"http://xyz.com/thing/purchase", Utils.parseTime("12:03:20"),
+		"http://xyz.com/thing/add-to-cart", false/*isGoal*/);
     Visit shoppingGoal = new Visit(
-	"http://xyz.com/thing/receipt", Utils.parseTime("12:03:45"),
-	"http://xyz.com/thing/purchase", true/*isGoal*/);
+		"http://xyz.com/thing/receipt", Utils.parseTime("12:03:45"),
+		"http://xyz.com/thing/purchase", true/*isGoal*/);
 
     Impression unattributedImpression = new Impression(
-	000L, "http://search.com?q=thing",
-	"http://xyz.com/other-thing", Utils.parseTime("12:04:00"));
+		000L, "http://search.com?q=thing",
+		"http://xyz.com/other-thing", Utils.parseTime("12:04:00"));
     Visit unattributedVisit = new Visit(
-	"http://xyz.com/other-thing", Utils.parseTime("12:04:20"),
-	"http://search.com?q=other thing", false/*isGoal*/);
+		"http://xyz.com/other-thing", Utils.parseTime("12:04:20"),
+		"http://search.com?q=other thing", false/*isGoal*/);
 
     // Create a stream of visits and impressions, with data arriving out of order.
     return TestStream.create(
-	KvCoder.of(StringUtf8Coder.of(), AvroCoder.of(VisitOrImpression.class)))
-	.advanceWatermarkTo(Utils.parseTime("12:00:00"))
-	.addElements(visitOrImpression(shoppingVisit2, null))
-	.addElements(visitOrImpression(shoppingGoal, null))
-	.addElements(visitOrImpression(shoppingVisit3, null))
-	.addElements(visitOrImpression(signupGoal, null))
-	.advanceWatermarkTo(Utils.parseTime("12:00:30"))
-	.addElements(visitOrImpression(null, signupImpression))
-	.advanceWatermarkTo(Utils.parseTime("12:01:00"))
-	.addElements(visitOrImpression(null, shoppingImpression))
-	.addElements(visitOrImpression(signupVisit, null))
-	.advanceWatermarkTo(Utils.parseTime("12:01:30"))
-	.addElements(visitOrImpression(null, shoppingImpressionDup))
-	.addElements(visitOrImpression(shoppingVisit1, null))
-	.advanceWatermarkTo(Utils.parseTime("12:03:45"))
-	.addElements(visitOrImpression(null, unattributedImpression))
-	.advanceWatermarkTo(Utils.parseTime("12:04:00"))
-	.addElements(visitOrImpression(unattributedVisit, null))
-	.advanceWatermarkToInfinity();
+		KvCoder.of(StringUtf8Coder.of(), AvroCoder.of(VisitOrImpression.class)))
+			.advanceWatermarkTo(Utils.parseTime("12:00:00"))
+			.addElements(visitOrImpression(shoppingVisit2, null))
+			.addElements(visitOrImpression(shoppingGoal, null))
+			.addElements(visitOrImpression(shoppingVisit3, null))
+			.addElements(visitOrImpression(signupGoal, null))
+			.advanceWatermarkTo(Utils.parseTime("12:00:30"))
+			.addElements(visitOrImpression(null, signupImpression))
+			.advanceWatermarkTo(Utils.parseTime("12:01:00"))
+			.addElements(visitOrImpression(null, shoppingImpression))
+			.addElements(visitOrImpression(signupVisit, null))
+			.advanceWatermarkTo(Utils.parseTime("12:01:30"))
+			.addElements(visitOrImpression(null, shoppingImpressionDup))
+			.addElements(visitOrImpression(shoppingVisit1, null))
+			.advanceWatermarkTo(Utils.parseTime("12:03:45"))
+			.addElements(visitOrImpression(null, unattributedImpression))
+			.advanceWatermarkTo(Utils.parseTime("12:04:00"))
+			.addElements(visitOrImpression(unattributedVisit, null))
+			.advanceWatermarkToInfinity();
 }
 ```
 
